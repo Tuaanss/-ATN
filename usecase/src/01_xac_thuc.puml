@@ -1,0 +1,45 @@
+@startuml 01_xac_thuc
+!include style.iuml
+title UC01 – Xác thực & quản lý tài khoản
+left to right direction
+
+actor "Khách\n(chưa đăng nhập)" as Khach
+actor "Người dùng" as ND
+actor "Phụ huynh" as PH
+PH -up-|> ND
+
+rectangle "Hệ thống EduPortfolio" {
+  usecase "Đăng ký tài khoản\ndoanh nghiệp" as DK
+  usecase "Đăng nhập" as DN
+  usecase "Đăng nhập bằng SĐT" as DNSDT
+  usecase "Đổi mật khẩu lần đầu" as DMKLD
+  usecase "Chọn con cần xem" as CHON
+  usecase "Quên mật khẩu" as QMK
+  usecase "Đổi mật khẩu" as DMK
+  usecase "Đăng xuất" as DX
+}
+actor "Dịch vụ\nEmail/SMS" as MAIL
+
+Khach -- DK
+ND -- DN
+ND -- QMK
+ND -- DMK
+ND -- DX
+PH -- DNSDT
+
+DNSDT -up-|> DN
+DN <.. DMKLD : <<extend>>
+DNSDT <.. CHON : <<extend>>
+DK -- MAIL
+QMK -- MAIL
+
+legend bottom left
+  <b>Ghi chú</b>
+  <b>(1) Đổi mật khẩu lần đầu:</b> Điều kiện: tài khoản do hệ thống sinh (SV, PH, GV) và chưa đổi
+      mật khẩu.
+  <b>(2) Chọn con cần xem:</b> Điều kiện: SĐT liên kết với từ 2 sinh viên. Sau đăng nhập vẫn đổi
+      được con ở UC09.
+  <b>(3) Đăng nhập:</b> Sai mật khẩu 5 lần liên tiếp → tạm khóa 15 phút. Doanh nghiệp chỉ đăng
+      nhập được sau khi Admin duyệt.
+endlegend
+@enduml

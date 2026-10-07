@@ -1,0 +1,45 @@
+@startuml 11_thong_ke
+!include style.iuml
+title UC11 – Thống kê – báo cáo
+left to right direction
+
+actor "Admin" as AD
+actor "Giảng viên" as GV
+
+actor "Sinh viên" as SV
+
+actor "Doanh nghiệp" as DN
+
+rectangle "Hệ thống EduPortfolio" {
+  usecase "Xem dashboard tổng quan" as DASH
+  usecase "Xem thống kê doanh nghiệp\n(toàn hệ thống)" as TKDN
+  usecase "Xem thống kê\nchủ đề đề tài" as CHUDE
+  usecase "Xem thống kê\nlớp học phần" as LHP
+  usecase "Xuất báo cáo\n(Excel / PDF)" as XUAT
+  usecase "Xem thống kê cá nhân" as CANHAN
+  usecase "Xem thống kê của\ndoanh nghiệp mình" as DNMINH
+}
+
+AD -- DASH
+AD -- TKDN
+AD -- CHUDE
+AD -- LHP
+GV -- LHP
+SV -- CANHAN
+DN -- DNMINH
+
+DASH <.. XUAT : <<extend>>
+TKDN <.. XUAT : <<extend>>
+CHUDE <.. XUAT : <<extend>>
+LHP <.. XUAT : <<extend>>
+
+legend bottom left
+  <b>Ghi chú</b>
+  <b>(1) Xem thống kê lớp học phần:</b> GV: chỉ lớp mình dạy. Tỉ lệ nộp đúng hạn, phổ điểm, danh
+      sách SV chưa nộp.
+  <b>(2) Xem thống kê cá nhân:</b> GPA theo học kỳ, tiến độ nộp bài, DN đã xem hồ sơ / bài của
+      mình.
+  <b>(3) Xem thống kê của doanh nghiệp mình:</b> Số yêu cầu theo trạng thái, quyền xem còn hạn,
+      số SV đã xem, lịch sử tìm kiếm.
+endlegend
+@enduml

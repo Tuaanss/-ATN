@@ -1,0 +1,47 @@
+@startuml 08_diem
+!include style.iuml
+title UC08 – Quản lý & xem điểm
+left to right direction
+
+actor "Giảng viên" as GV
+actor "Sinh viên" as SV
+
+actor "Admin" as AD
+
+rectangle "Hệ thống EduPortfolio" {
+  usecase "Chấm điểm bài tập" as CHAM
+  usecase "Điều chỉnh điểm riêng\ntừng thành viên nhóm" as DCHINH #F7F7F7;line.dashed
+  usecase "Trả bài yêu cầu làm lại" as TRA #F7F7F7;line.dashed
+  usecase "Nhập điểm học phần" as NHAP
+  usecase "Nhập điểm bằng Excel" as EXCEL #F7F7F7;line.dashed
+  usecase "Tính điểm tổng kết,\nGPA, CPA" as TINH
+  usecase "Xem bảng điểm\nlớp học phần" as BANG
+  usecase "Công bố điểm\n(khóa bảng điểm)" as CB
+  usecase "Gửi yêu cầu mở khóa\nbảng điểm đã công bố" as YCSUA
+  usecase "Xử lý yêu cầu mở khóa\nbảng điểm" as MOKHOA
+  usecase "Xem điểm, GPA, CPA\ncủa mình" as SVXEM
+}
+
+GV -- CHAM
+GV -- NHAP
+GV -- BANG
+GV -- CB
+GV -- YCSUA
+SV -- SVXEM
+AD -- MOKHOA
+
+CHAM <.. DCHINH : <<extend>>
+CHAM <.. TRA : <<extend>>
+NHAP <.. EXCEL : <<extend>>
+NHAP ..> TINH : <<include>>
+
+legend bottom left
+  <b>Ghi chú</b>
+  <b>(1) Tính điểm tổng kết, GPA, CPA:</b> Quy đổi A..F, hệ 4; GPA/CPA = Σ(hệ4 × TC) / Σ TC. Môn
+      học lại lấy điểm cao nhất.
+  <b>(2) Xử lý yêu cầu mở khóa bảng điểm:</b> Admin duyệt (mở khóa để GV sửa) hoặc từ chối; mọi thay đổi được ghi nhật ký.
+  ----
+  Viền nét đứt: chức năng mức P2 (nên có)
+  Phụ huynh xem điểm của con ở UC09.
+endlegend
+@enduml

@@ -1,0 +1,28 @@
+@startuml 09_phu_huynh
+!include style.iuml
+title UC09 – Xem kết quả học tập của con
+left to right direction
+
+actor "Phụ huynh" as PH
+
+rectangle "Hệ thống EduPortfolio" {
+  usecase "Chọn / đổi con cần xem" as CHON
+  usecase "Xem điểm, GPA, CPA\ncủa con" as DIEM
+  usecase "Xem bài nộp của con" as BAI
+  usecase "Xem cảnh báo học tập\ncủa con" as CB
+}
+
+PH -- CHON
+PH -- DIEM
+PH -- BAI
+PH -- CB
+
+legend bottom left
+  <b>Ghi chú</b>
+  <b>(1) Xem bài nộp của con:</b> Chỉ xem (read-only): không tải xuống, không sửa, không bình
+      luận (BR-PH-04).
+  <b>(2) Xem cảnh báo học tập của con:</b> Cảnh báo do hệ thống sinh: quá hạn nộp, điểm dưới
+      ngưỡng, GPA giảm (UC12).
+  <b>(3) Chọn / đổi con cần xem:</b> Đăng nhập bằng SĐT, đổi mật khẩu lần đầu: UC01.
+endlegend
+@enduml

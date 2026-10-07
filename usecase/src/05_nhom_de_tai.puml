@@ -1,0 +1,66 @@
+@startuml 05_nhom_de_tai
+!include style.iuml
+title UC05 – Quản lý nhóm & đề tài
+left to right direction
+
+actor "Sinh viên" as SV
+actor "Trưởng nhóm" as TN
+TN -up-|> SV
+actor "Giảng viên" as GV
+
+rectangle "Hệ thống EduPortfolio" {
+  usecase "Chọn hình thức làm bài\n(cá nhân / nhóm)" as HT
+  usecase "Tạo nhóm" as TAO
+  usecase "Tham gia nhóm\nbằng mã mời" as MAMOI
+  usecase "Phản hồi lời mời\n(chấp nhận / từ chối)" as PHMOI
+  usecase "Rời nhóm" as ROI
+  usecase "Đăng ký đề tài" as DKDT
+  usecase "Sửa đề tài" as SUADT
+  usecase "Gắn từ khóa đề tài\n(1–5 từ khóa)" as TK
+  usecase "Mời thành viên\nqua MSSV" as MOI
+  usecase "Tạo / làm mới mã mời" as LAMMOI
+  usecase "Xóa thành viên" as XOATV
+  usecase "Chuyển quyền\ntrưởng nhóm" as CHUYEN
+  usecase "Xem danh sách nhóm\n& đề tài của lớp" as DSNHOM
+  usecase "Duyệt đề tài" as DUYET #F7F7F7;line.dashed
+  usecase "Xếp sinh viên vào nhóm" as XEP #F7F7F7;line.dashed
+  usecase "Khóa nhóm" as KHOA
+  usecase "Hủy lời mời quá hạn" as HUY #F7F7F7;line.dashed
+}
+
+actor "Bộ hẹn giờ\n(tác vụ nền)" as TIMER
+
+SV -- HT
+SV -- TAO
+SV -- MAMOI
+SV -- PHMOI
+SV -- ROI
+SV -- DKDT
+SV -- SUADT
+TN -- MOI
+TN -- LAMMOI
+TN -- XOATV
+TN -- CHUYEN
+
+HT <. TAO : <<extend>>
+DKDT ..> TK : <<include>>
+SUADT ..> TK : <<include>>
+
+GV -- DSNHOM
+GV -- DUYET
+GV -- XEP
+GV -- KHOA
+KHOA -- TIMER
+HUY -- TIMER
+
+legend bottom left
+  <b>Ghi chú</b>
+  <b>(1) Rời nhóm:</b> Nhóm đã nộp bài → rời nhóm / xóa thành viên cần GV chấp thuận. Trưởng nhóm
+      phải chuyển quyền trước khi rời.
+  <b>(2) Khóa nhóm:</b> Bộ hẹn giờ tự khóa khi hết hạn nộp; GV có thể khóa thủ công.
+  <b>(3) Đăng ký đề tài:</b> Mỗi nhóm / SV cá nhân đúng 1 đề tài. Phải có đề tài (và được duyệt
+      nếu GV bật chế độ duyệt) trước khi nộp bài.
+  ----
+  Viền nét đứt: chức năng mức P2 (nên có)
+endlegend
+@enduml

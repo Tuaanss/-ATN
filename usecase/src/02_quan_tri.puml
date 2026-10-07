@@ -1,0 +1,49 @@
+@startuml 02_quan_tri
+!include style.iuml
+title UC02 – Quản trị hệ thống
+left to right direction
+
+actor "Admin" as AD
+
+rectangle "Hệ thống EduPortfolio" {
+  usecase "Quản lý tài khoản\ngiảng viên" as QLGV
+  usecase "Quản lý tài khoản\nsinh viên" as QLSV
+  usecase "Import sinh viên\ntừ Excel" as IMP
+  usecase "Quản lý tài khoản\nphụ huynh" as QLPH
+  usecase "Xử lý đổi SĐT\nphụ huynh" as DOISDT
+  usecase "Duyệt & quản lý tài khoản\ndoanh nghiệp" as QLDN
+  usecase "Quản lý danh mục" as DM
+  usecase "Gộp / chuẩn hóa\ntừ khóa đề tài" as GOP #F7F7F7;line.dashed
+  usecase "Quản lý học kỳ,\nmôn học" as HKMH
+  usecase "Quản lý lớp học phần" as LHP
+  usecase "Kiểm tra trùng lịch\n(GV, phòng học)" as TRUNG
+  usecase "Xếp sinh viên vào\nlớp học phần" as XEPSV
+  usecase "Xem nhật ký hệ thống" as LOG
+  usecase "Cấu hình hệ thống" as CFG
+}
+
+AD -- QLGV
+AD -- QLSV
+AD -- QLPH
+AD -- QLDN
+AD -- DM
+AD -- HKMH
+AD -- LHP
+AD -- LOG
+AD -- CFG
+
+QLSV <.. IMP : <<extend>>
+QLPH <.. DOISDT : <<extend>>
+DM <.. GOP : <<extend>>
+LHP ..> TRUNG : <<include>>
+LHP <.. XEPSV : <<extend>>
+
+legend bottom left
+  <b>Ghi chú</b>
+  <b>(1) Duyệt & quản lý tài khoản doanh nghiệp:</b> Duyệt / từ chối (bắt buộc lý do) / khóa DN
+      vi phạm. Khóa DN → thu hồi mọi quyền xem bài còn hạn.
+  <b>(2) Xem nhật ký hệ thống:</b> Xử lý yêu cầu mở khóa bảng điểm: xem UC08. Xử lý yêu cầu xem bài: xem UC10.
+  ----
+  Viền nét đứt: chức năng mức P2 (nên có)
+endlegend
+@enduml

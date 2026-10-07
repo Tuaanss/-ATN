@@ -1,0 +1,74 @@
+@startuml 00_tong_quat
+!include style.iuml
+title Use case tổng quát – Hệ thống EduPortfolio
+left to right direction
+
+actor "Khách" as Khach
+actor "Người dùng" as ND
+actor "Admin" as AD
+actor "Giảng viên" as GV
+actor "Sinh viên" as SV
+actor "Phụ huynh" as PH
+actor "Doanh nghiệp" as DN
+
+AD -up-|> ND
+GV -up-|> ND
+SV -up-|> ND
+PH -up-|> ND
+DN -up-|> ND
+
+rectangle "Hệ thống EduPortfolio" {
+  usecase "UC01. Xác thực &\nquản lý tài khoản" as UC01
+  usecase "UC02. Quản trị hệ thống" as UC02
+  usecase "UC03. Quản lý hồ sơ\nsinh viên" as UC03
+  usecase "UC04. Quản lý bài tập" as UC04
+  usecase "UC05. Quản lý nhóm\n& đề tài" as UC05
+  usecase "UC06. Nộp & xem\nbài nộp" as UC06
+  usecase "UC07. Tìm kiếm bài nộp" as UC07
+  usecase "UC08. Quản lý & xem điểm" as UC08
+  usecase "UC09. Xem kết quả học tập\ncủa con" as UC09
+  usecase "UC10. Tìm kiếm sinh viên &\nquản lý quyền xem bài" as UC10
+  usecase "UC11. Thống kê – báo cáo" as UC11
+  usecase "UC12. Thông báo" as UC12
+}
+
+actor "Google Drive" as GD
+actor "Bộ hẹn giờ\n(tác vụ nền)" as TIMER
+actor "Dịch vụ\nEmail/SMS" as MAIL
+
+Khach -- UC01
+ND -- UC01
+ND -- UC12
+AD -- UC02
+AD -- UC06
+AD -- UC07
+AD -- UC08
+AD -- UC10
+AD -- UC11
+GV -- UC04
+GV -- UC05
+GV -- UC06
+GV -- UC07
+GV -- UC08
+GV -- UC11
+SV -- UC03
+SV -- UC04
+SV -- UC05
+SV -- UC06
+SV -- UC08
+SV -- UC10
+SV -- UC11
+PH -- UC09
+DN -- UC10
+DN -- UC11
+
+UC04 -- GD
+UC06 -- GD
+UC05 -- TIMER
+UC06 -- TIMER
+UC10 -- TIMER
+UC12 -- TIMER
+UC12 -- MAIL
+UC01 -- MAIL
+
+@enduml

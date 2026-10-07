@@ -1,0 +1,33 @@
+@startuml 03_ho_so
+!include style.iuml
+title UC03 – Quản lý hồ sơ sinh viên
+left to right direction
+
+actor "Sinh viên" as SV
+
+rectangle "Hệ thống EduPortfolio" {
+  usecase "Khai báo hồ sơ\n(lần đầu)" as KB
+  usecase "Cập nhật hồ sơ" as CN
+  usecase "Đồng bộ tài khoản\nphụ huynh theo SĐT" as DBPH
+  usecase "Cập nhật hồ sơ năng lực\n(ảnh, kỹ năng, GitHub/Behance)" as NL #F7F7F7;line.dashed
+  usecase "Bật/tắt cho doanh nghiệp\ntìm thấy hồ sơ" as RIENGTU
+}
+
+SV -- KB
+SV -- CN
+SV -- NL
+SV -- RIENGTU
+KB ..> DBPH : <<include>>
+CN ..> DBPH : <<include>>
+
+legend bottom left
+  <b>Ghi chú</b>
+  <b>(1) Khai báo hồ sơ (lần đầu):</b> Bắt buộc: SĐT bản thân, email nhận thông báo, ít nhất 1
+      SĐT phụ huynh (bố / mẹ / giám hộ). Chưa hoàn thành → không dùng được chức năng khác.
+  <b>(2) Đồng bộ tài khoản phụ huynh theo SĐT:</b> Mỗi SĐT: đã có tài khoản PH → thêm liên kết;
+      chưa có → tạo tài khoản (mật khẩu tạm = SĐT). Đổi SĐT → gỡ liên kết cũ, vô hiệu tài khoản không
+      còn con nào. Ghi nhật ký.
+  ----
+  Viền nét đứt: chức năng mức P2 (nên có)
+endlegend
+@enduml

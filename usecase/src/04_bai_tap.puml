@@ -1,0 +1,50 @@
+@startuml 04_bai_tap
+!include style.iuml
+title UC04 – Quản lý bài tập
+left to right direction
+
+actor "Giảng viên" as GV
+
+rectangle "Hệ thống EduPortfolio" {
+  usecase "Xem danh sách lớp\nphụ trách" as DSLOP
+  usecase "Tạo bài tập" as TAO
+  usecase "Sửa / đóng bài tập" as SUA
+  usecase "Điều chỉnh số\nthành viên nhóm" as SOTV
+  usecase "Đổi thư mục Drive\nnhận bài" as DOIDR
+  usecase "Xóa bài tập" as XOA
+  usecase "Kiểm tra quyền ghi\nthư mục Drive" as KTQ
+  usecase "Tạo thư mục bài tập\ntrên Drive" as TAOTM
+  usecase "Mở thư mục trên\nGoogle Drive" as MODR
+  usecase "Liên kết tài khoản\nGoogle (OAuth)" as OAUTH #F7F7F7;line.dashed
+  usecase "Xem lớp học phần &\nbài tập được giao" as SVXEM
+}
+actor "Google Drive" as GD
+actor "Sinh viên" as SV
+
+GV -- DSLOP
+GV -- TAO
+GV -- SUA
+GV -- XOA
+GV -- MODR
+GV -- OAUTH
+SV -- SVXEM
+
+TAO ..> KTQ : <<include>>
+TAO ..> TAOTM : <<include>>
+SUA <.. SOTV : <<extend>>
+SUA <.. DOIDR : <<extend>>
+DOIDR ..> KTQ : <<include>>
+KTQ -- GD
+TAOTM -- GD
+MODR -- GD
+OAUTH -- GD
+
+legend bottom left
+  <b>Ghi chú</b>
+  <b>(1) Xóa bài tập:</b> Chỉ xóa khi chưa có bài nộp; đã có bài nộp → chỉ đóng / ẩn.
+  <b>(2) Điều chỉnh số thành viên nhóm:</b> 1 ≤ min ≤ max. Giảm max khi nhóm đã vượt: cảnh báo,
+      nhóm giữ thành viên nhưng không được thêm người.
+  ----
+  Viền nét đứt: chức năng mức P2 (nên có)
+endlegend
+@enduml

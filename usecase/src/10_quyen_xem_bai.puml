@@ -1,0 +1,54 @@
+@startuml 10_quyen_xem_bai
+!include style.iuml
+title UC10 – Tìm kiếm sinh viên & quản lý quyền xem bài của doanh nghiệp
+left to right direction
+
+actor "Doanh nghiệp" as DN
+actor "Sinh viên" as SV
+
+actor "Admin" as AD
+
+actor "Bộ hẹn giờ\n(tác vụ nền)" as TIMER
+
+rectangle "Hệ thống EduPortfolio" {
+  usecase "Tìm kiếm sinh viên\n(MSSV, khóa, ngành, lớp,\nchủ đề đề tài, khoảng GPA)" as TIM
+  usecase "Xem hồ sơ tóm tắt\nsinh viên" as HOSO
+  usecase "Gửi yêu cầu xem bài" as GUI
+  usecase "Xem yêu cầu &\nquyền xem của tôi" as CUATOI
+  usecase "Xem bài nộp của\nsinh viên được cấp quyền" as XEM
+  usecase "Ghi nhật ký truy cập" as NK
+  usecase "Đồng ý / từ chối\ncho DN xem bài" as DONGY #F7F7F7;line.dashed
+  usecase "Xem DN đã xem\nbài của mình" as AIXEM #F7F7F7;line.dashed
+  usecase "Xử lý yêu cầu xem bài\n(duyệt 14–28 ngày / từ chối)" as XULY
+  usecase "Thu hồi quyền xem bài" as THUHOI
+  usecase "Thu hồi quyền\nkhi hết hạn" as TUDONG
+}
+
+DN -- TIM
+DN -- CUATOI
+DN -- XEM
+SV -- DONGY
+SV -- AIXEM
+AD -- XULY
+AD -- THUHOI
+TIMER -- TUDONG
+
+TIM <.. HOSO : <<extend>>
+HOSO <.. GUI : <<extend>>
+XEM ..> NK : <<include>>
+
+legend bottom left
+  <b>Ghi chú</b>
+  <b>(1) Tìm kiếm sinh viên (MSSV, khóa, ngành, lớp, chủ đề đề tài, khoảng GPA):</b> Kết quả sắp
+      GPA giảm dần, 20 SV/trang. Ẩn SV đã tắt "cho DN tìm thấy" (UC03). Tìm theo MSSV: chỉ khớp chính
+      xác.
+  <b>(2) Xem hồ sơ tóm tắt sinh viên:</b> Họ tên, khóa, ngành, GPA, danh sách đề tài. Không có
+      SĐT, email, thông tin PH, điểm chi tiết.
+  <b>(3) Xem bài nộp của sinh viên được cấp quyền:</b> Tiền điều kiện: yêu cầu đã duyệt (và SV
+      đồng ý nếu bật) và còn hạn.
+  <b>(4) Gửi yêu cầu xem bài:</b> Không gửi trùng khi yêu cầu cũ còn chờ duyệt hoặc còn hiệu lực.
+  ----
+  Viền nét đứt: chức năng mức P2 (nên có)
+  Duyệt tài khoản doanh nghiệp: UC02.
+endlegend
+@enduml

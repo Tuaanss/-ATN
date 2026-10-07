@@ -1,0 +1,39 @@
+@startuml 12_thong_bao
+!include style.iuml
+title UC12 – Thông báo
+left to right direction
+
+actor "Người dùng" as ND
+
+actor "Bộ hẹn giờ\n(tác vụ nền)" as TIMER
+
+rectangle "Hệ thống EduPortfolio" {
+  usecase "Xem thông báo" as XEM
+  usecase "Đánh dấu đã đọc" as DOC
+  usecase "Tùy chỉnh loại thông báo\nmuốn nhận" as TUYCHINH #F7F7F7;line.dashed
+  usecase "Gửi nhắc hạn nộp bài\n(trước 24 giờ)" as NHAC
+  usecase "Gửi cảnh báo học tập\ncho phụ huynh" as CANHBAO
+  usecase "Gửi thông báo\nqua email / SMS" as GUI
+}
+actor "Dịch vụ\nEmail/SMS" as MAIL
+
+ND -- XEM
+ND -- TUYCHINH
+XEM <.. DOC : <<extend>>
+TIMER -- NHAC
+TIMER -- CANHBAO
+NHAC ..> GUI : <<include>>
+CANHBAO ..> GUI : <<include>>
+GUI -- MAIL
+
+legend bottom left
+  <b>Ghi chú</b>
+  <b>(1) Gửi cảnh báo học tập cho phụ huynh:</b> Khi con quá hạn nộp, điểm dưới ngưỡng, GPA giảm
+      (ngưỡng do Admin cấu hình).
+  <b>(2) Xem thông báo:</b> Thông báo theo sự kiện, sinh ra từ các use case khác: bài tập mới
+      (UC04), lời mời vào nhóm (UC05), thành viên nộp bài (UC06), điểm mới (UC08), yêu cầu xem bài
+      được duyệt / từ chối (UC10).
+  ----
+  Viền nét đứt: chức năng mức P2/P3
+endlegend
+@enduml

@@ -1,0 +1,63 @@
+@startuml 06_07_nop_xem_tim_bai
+!include style.iuml
+title UC06, UC07 – Nộp bài, xem & tìm kiếm bài nộp
+left to right direction
+
+actor "Sinh viên" as SV
+actor "Giảng viên" as GV
+actor "Admin" as AD
+actor "Doanh nghiệp" as DN
+
+actor "Bộ hẹn giờ\n(tác vụ nền)" as TIMER
+
+rectangle "Hệ thống EduPortfolio" {
+  usecase "Nộp bài nhóm" as NOPN
+  usecase "Nộp bài cá nhân" as NOPC
+  usecase "Nộp lại bài" as NOPLAI
+  usecase "Tải tệp lên hệ thống\n(kiểm tra định dạng, dung lượng)" as TAI
+  usecase "Xóa ảnh / tệp đã nộp" as XOA
+  usecase "Xem lịch sử nộp bài" as LS #F7F7F7;line.dashed
+  usecase "Xem bài nộp" as XEM
+  usecase "Tải xuống bài nộp" as TAIX
+  usecase "Tìm kiếm bài nộp\n(chủ đề, từ khóa, thông tin SV)" as TIM
+  usecase "Đồng bộ tệp lên Drive" as DB
+  usecase "Đồng bộ lại tệp lỗi" as DBL
+}
+actor "Google Drive" as GD
+
+SV -- NOPN
+SV -- NOPC
+SV -- XOA
+SV -- LS
+SV -- XEM
+GV -- XEM
+GV -- TIM
+AD -- XEM
+AD -- TIM
+DN -- XEM
+
+NOPN ..> TAI : <<include>>
+NOPC ..> TAI : <<include>>
+NOPN <.. NOPLAI : <<extend>>
+NOPC <.. NOPLAI : <<extend>>
+XEM <.. TAIX : <<extend>>
+
+
+TIMER -- DB
+TIMER -- DBL
+DB -- GD
+DBL -- GD
+
+legend bottom left
+  <b>Ghi chú</b>
+  <b>(1) Tải tệp lên hệ thống (kiểm tra định dạng, dung lượng):</b> Bài nộp thành công khi hệ
+      thống đã nhận đủ tệp; thời gian nộp tính tại lúc nhận. Ghi lên Drive chạy nền qua hàng đợi (BR-
+      DR-05).
+  <b>(2) Xem bài nộp:</b> SV: bài chung của nhóm + bài cá nhân của mình. GV: lớp mình dạy. DN:
+      chỉ khi có quyền còn hạn (UC10). Phụ huynh xem bài của con ở UC09.
+  <b>(3) Nộp lại bài:</b> Chỉ trước hạn và khi chưa chấm. Bản cũ bị xóa (cả tệp trên Drive).
+  <b>(4) Tải xuống bài nộp:</b> Chỉ GV, Admin và SV (bài của mình). DN, PH không được tải xuống.
+  ----
+  Viền nét đứt: chức năng mức P2 (nên có)
+endlegend
+@enduml
