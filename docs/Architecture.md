@@ -186,7 +186,7 @@ Thumbnail: GET /files/:id/thumbnail?w=400 ──► cache đĩa /data/thumbs/<id
 
 ## 9. Triển khai
 
-### 9.1. Docker Compose (production)
+### 9.1. Docker Compose trên server (VPS)
 
 | Service | Image | Cổng | Ghi chú |
 |---|---|---|---|
@@ -206,7 +206,7 @@ Volume `/data` gắn vào `api` và `worker` (chung): `uploads/tus`, `pending`, 
 |---|---|---|
 | `local` | Phát triển | `docker compose -f compose.dev.yml up` (postgres, redis, mailpit); chạy `pnpm dev` |
 | `test` | CI | Testcontainers; Google Drive dùng **mock adapter** |
-| `staging/demo` | Demo cho GVHD và hội đồng | VPS thật, Shared Drive thật, dữ liệu seed |
+| `server` | Demo 31/10, chạy thử tháng 11, bảo vệ | Một VPS duy nhất, Shared Drive thật, dữ liệu seed (không có production riêng) |
 
 ### 9.3. Quy trình CI/CD
 
