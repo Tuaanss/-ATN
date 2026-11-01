@@ -1,0 +1,50 @@
+{
+  "name": "@eduportfolio/backend",
+  "version": "0.1.0",
+  "private": true,
+  "description": "EduPortfolio API – NestJS 11 trên Node.js 22",
+  "scripts": {
+    "dev": "nest start --watch",
+    "build": "nest build",
+    "start": "node dist/main.js",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "db:migrate": "prisma migrate dev",
+    "db:deploy": "prisma migrate deploy",
+    "db:seed": "tsx prisma/seed.ts",
+    "db:setup": "prisma migrate deploy && tsx prisma/seed.ts",
+    "db:reset": "prisma migrate reset --force",
+    "prisma:generate": "prisma generate"
+  },
+  "prisma": {
+    "seed": "tsx prisma/seed.ts"
+  },
+  "dependencies": {
+    "@nestjs/common": "^11.2.7",
+    "@nestjs/core": "^11.2.7",
+    "@nestjs/jwt": "^11.0.2",
+    "@nestjs/platform-express": "^11.2.7",
+    "@nestjs/serve-static": "^5.0.5",
+    "@prisma/client": "^6.19.3",
+    "@types/nodemailer": "^6.4.24",
+    "argon2": "^0.45.1",
+    "cookie-parser": "^1.4.7",
+    "exceljs": "^4.4.0",
+    "googleapis": "^185.0.0",
+    "multer": "^2.4.0",
+    "nodemailer": "^6.10.1",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.2",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@nestjs/cli": "^11.0.24",
+    "@nestjs/schematics": "^11.1.0",
+    "@types/cookie-parser": "^1.4.10",
+    "@types/express": "^5.0.6",
+    "@types/multer": "^2.3.0",
+    "@types/node": "^22.20.5",
+    "prisma": "^6.19.3",
+    "tsx": "^4.23.15",
+    "typescript": "~5.7"
+  }
+}

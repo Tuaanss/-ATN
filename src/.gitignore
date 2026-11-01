@@ -1,0 +1,48 @@
+# ---------- Phụ thuộc ----------
+node_modules/
+.pnpm-store/
+
+# ---------- Build ----------
+dist/
+build/
+*.tsbuildinfo
+frontend/.vite/
+
+# ---------- Biến môi trường & bí mật ----------
+.env
+.env.*
+!.env.example
+# Khóa Service Account Google, chứng chỉ
+*.pem
+*.key
+**/secrets/
+**/service-account*.json
+**/*-sa-key*.json
+
+# ---------- Dữ liệu chạy cục bộ ----------
+# Tệp upload tạm, bản mô phỏng Drive, CSDL nhúng
+backend/data/
+backend/.pgdata/
+*.sqlite
+*.db
+
+# ---------- Log ----------
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+
+# ---------- Kiểm thử ----------
+coverage/
+playwright-report/
+test-results/
+
+# ---------- IDE & hệ điều hành ----------
+.vscode/*
+!.vscode/extensions.json
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+desktop.ini

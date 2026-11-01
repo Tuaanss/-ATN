@@ -1,6 +1,7 @@
 # EduPortfolio – Kiến trúc hệ thống (Architecture)
 
-> Phiên bản 2.0 · 07/10/2026
+> Phiên bản 3.0 · 11/10/2026 · **Nền tảng chính: Node.js 22 LTS** (TypeScript, NestJS 11)
+> **v3.0:** Drive dùng OAuth của từng GV làm mặc định; giao diện dựng theo bộ mẫu `project/`; thêm thành phần đọc/sinh Excel cho danh sách nhóm và điểm; bỏ phần chấm bài trên web.
 > Tài liệu liên quan: [Requirement](Requirement.md) · [ModulesStructure](ModulesStructure.md) · [DatabaseDesign](DatabaseDesign.md)
 
 ---
@@ -9,18 +10,34 @@
 
 Đây là đồ án tốt nghiệp: 1 người phát triển, khoảng 14 tuần, cần demo ổn định và dễ bảo vệ trước hội đồng. Thứ tự ưu tiên:
 
-1. **Làm nhanh, ít lỗi**: một ngôn ngữ cho cả frontend và backend, thư viện UI có sẵn bảng/form/upload.
+1. **Làm nhanh, ít lỗi**: một ngôn ngữ (TypeScript) và **một runtime (Node.js)** cho backend, worker và công cụ build frontend; thư viện UI có sẵn bảng/form/upload.
 2. **Đáp ứng đúng nghiệp vụ khó**: ghi tệp lên Google Drive có thử lại, tác vụ định kỳ, real-time, tìm kiếm tiếng Việt không dấu.
 3. **Ít thành phần hạ tầng**: chạy được trên 1 VPS bằng Docker Compose.
 4. **Dễ giải thích**: kiến trúc phân lớp rõ, mỗi module ứng với một nhóm use case.
 
 ## 2. Công nghệ được chọn
 
+### 2.0. Nền tảng Node.js
+
+**Node.js 22 LTS** (hỗ trợ đến 04/2027) là nền tảng chính của toàn hệ thống; tài liệu dự án trước đây để ngỏ "Node.js / Java Spring Boot / ASP.NET Core", nay chốt Node.js (Requirement D14).
+
+| Thành phần | Chạy trên Node.js như thế nào |
+|---|---|
+| `api` | NestJS 11 trên adapter **Express** (mặc định của Nest) — REST `/api/v1`, Socket.IO, tus server; `node dist/main.js` |
+| `worker` | Cùng codebase NestJS, entry `worker.ts`, chỉ chạy BullMQ processors + job lặp; `node dist/worker.js` |
+| Frontend | React SPA build bằng **Vite** (chạy trên Node.js) ra file tĩnh; khi chạy thật không cần Node cho FE (Caddy phục vụ) |
+| Công cụ | pnpm, Prisma CLI (migrate/seed), ESLint, Vitest/Jest, Playwright đều chạy trên Node.js |
+| Thư viện Node chính | `googleapis` (Drive v3 + OAuth2), `bullmq` + `ioredis`, `sharp`, `file-type`, `argon2`, `nodemailer`, `exceljs` (file mẫu + đọc file nhóm/điểm), `pdfmake`, `pino` |
+
+Lý do: một ngôn ngữ cho FE/BE và gói `shared` (Zod); I/O không chặn hợp với stream tệp/video và gọi Drive API; hệ sinh thái có đủ thư viện cho mọi nghiệp vụ khó; dễ tìm tài liệu và dễ dùng trợ lý AI. Việc CPU nặng (sinh thumbnail bằng `sharp`) chạy trong threadpool của libuv nên không chặn event loop.
+
+### 2.1. Bảng công nghệ
+
 | Lớp | Công nghệ | Lý do chọn | Phương án đã cân nhắc |
 |---|---|---|---|
 | Ngôn ngữ | **TypeScript** (cả hai phía) | Dùng chung kiểu và schema kiểm tra dữ liệu giữa FE và BE | Java/C# cho BE: thêm một ngôn ngữ, chậm hơn khi làm một mình |
 | Frontend | **React 19 + Vite 6** (SPA) | Mọi trang đều sau đăng nhập, không cần SEO/SSR; SPA build ra file tĩnh, Nginx phục vụ trực tiếp, không cần server Node cho FE | Next.js: SSR/RSC thêm độ phức tạp (2 lớp server, cookie, cache) mà không có lợi ích ở đây |
-| UI kit | **Ant Design 5** (locale `vi_VN`) | Table lọc/sắp xếp/phân trang, Form, DatePicker, Upload, Tree, Steps có sẵn; hợp hệ thống nhiều màn hình quản trị | MUI, shadcn/ui: phải tự dựng nhiều bảng/form hơn |
+| Giao diện | **CSS của bộ mẫu `project/`** (`kit.css`) + component tự viết | Giao diện phải khớp đúng 74 màn hình mẫu đã chốt; thư viện UI có sẵn khó chỉnh cho giống; màn hình rộng phóng to theo bậc | Ant Design 5 (đã thử, khác mẫu nhiều) |
 | Routing | **React Router 7** (data router) | Route lồng nhau theo vai trò, loader và guard | TanStack Router |
 | Gọi API & cache | **TanStack Query 5** + `ky` | Cache, refetch, optimistic update, xử lý trạng thái tải/lỗi | SWR, Redux Toolkit Query |
 | State cục bộ | **Zustand** | Chỉ cần giữ phiên người dùng và đứa con đang chọn | Redux |
@@ -29,16 +46,17 @@
 | Trình xem ảnh | **yet-another-react-lightbox** (+ plugin Thumbnails, Zoom, Fullscreen, Counter) | Đủ Next/Prev, "3/12", phím, vuốt, zoom | Swiper |
 | Video | `<video>` HTML5 + stream có `Range` từ API | Không cần thư viện; tua được | Video.js |
 | Biểu đồ | **Recharts** | Khai báo bằng JSX, đủ các loại biểu đồ cần dùng | ECharts, Chart.js |
-| Backend | **NestJS 11** (Node.js 22 LTS) | Module + DI tương ứng nhóm use case; Guard/Interceptor cho RBAC; tích hợp sẵn BullMQ, Schedule, WebSocket, Swagger | Express thuần (thiếu cấu trúc), Spring Boot |
+| Runtime | **Node.js 22 LTS** | Nền tảng chính (§2.0) | Java 21, .NET 8 |
+| Backend | **NestJS 11** trên Node.js 22 (adapter Express) | Module + DI tương ứng nhóm use case; Guard/Interceptor cho RBAC; tích hợp sẵn BullMQ, Schedule, WebSocket, Swagger | Express thuần (thiếu cấu trúc), Fastify adapter (không cần), Spring Boot |
 | ORM | **Prisma 6** | Schema khai báo, migration, kiểu an toàn; `$queryRaw` cho truy vấn tìm kiếm/thống kê | TypeORM, Drizzle |
 | CSDL | **PostgreSQL 16** + extension `unaccent`, `pg_trgm` | Dữ liệu quan hệ chặt; tìm gần đúng tiếng Việt không dấu bằng trigram, không cần Elasticsearch; JSONB cho log và cấu hình; partial unique index | MySQL (không có `unaccent`/partial index) |
 | Hàng đợi & lịch | **BullMQ** trên **Redis 7** | Thử lại với backoff mũ, giới hạn tốc độ (quota Drive), job lặp theo cron, tách worker; Redis dùng thêm cho rate limit, cache, Socket.IO adapter | pg-boss (ít tính năng giới hạn tốc độ), `@nestjs/schedule` (không bền khi khởi động lại, không thử lại) |
 | Real-time | **Socket.IO** (`@nestjs/websockets`) + Redis adapter | Đẩy thông báo, cập nhật bài chung nhóm; tự kết nối lại | SSE (một chiều, không có phòng) |
-| Lưu tệp | **Google Drive API v3** (`googleapis`) qua **Service Account** | Theo yêu cầu: bài nộp nằm trong Drive của GV | – |
+| Lưu tệp | **Google Drive API v3** (`googleapis`) qua **OAuth của từng GV** (mặc định, scope `drive.file`) hoặc **Service Account** + Shared Drive | Theo yêu cầu: bài nộp nằm trong Drive của GV; OAuth dùng được với Gmail cá nhân | Chỉ Service Account (cần Google Workspace) |
 | Upload server | **@tus/server** + `@tus/file-store` | Server cho giao thức tus, lưu khối vào đĩa | Multer (không tải tiếp được) |
 | Xử lý ảnh / kiểm tra tệp | **sharp** (thumbnail), **file-type** (magic bytes) | Nhanh, phổ biến | – |
 | Email | **Nodemailer** qua SMTP (Brevo free 300 mail/ngày hoặc Gmail App Password) | Đơn giản | SendGrid |
-| Excel / PDF | **ExcelJS**, **pdfmake** (font Roboto, có tiếng Việt) | Không cần trình duyệt headless | Puppeteer (nặng) |
+| Excel / PDF | **ExcelJS** (sinh file mẫu có sẵn danh sách SV, đọc file nhóm/điểm GV tải lên, xuất báo cáo), **pdfmake** (font Roboto) | Không cần trình duyệt headless; đọc/ghi .xlsx ổn định | SheetJS, Puppeteer |
 | Auth | JWT (`@nestjs/jwt`) trong cookie httpOnly, **argon2** | Không lưu token trong JS; Argon2id là chuẩn hiện hành | Session lưu Redis |
 | Tài liệu API | **@nestjs/swagger** (OpenAPI 3) | Tự sinh từ decorator | – |
 | Log | **pino** (`nestjs-pino`) dạng JSON | Nhanh, có request-id | Winston |
@@ -61,7 +79,7 @@ Hai tiến trình dùng chung module nghiệp vụ, CSDL và Redis. Tách worker
 ```mermaid
 flowchart LR
   subgraph Client["Trình duyệt"]
-    SPA["React SPA<br/>(Ant Design, TanStack Query, Uppy)"]
+    SPA["React SPA<br/>(giao diện theo mẫu, TanStack Query)"]
   end
 
   subgraph VPS["VPS – Docker Compose"]
@@ -73,7 +91,7 @@ flowchart LR
     VOL[["Volume /data<br/>uploads tạm · cache · exports"]]
   end
 
-  GD["Google Drive API v3<br/>(Service Account)"]
+  GD["Google Drive API v3<br/>(OAuth của GV / Service Account)"]
   SMTP["SMTP"]
 
   SPA -- "HTTPS (cùng origin)" --> CADDY
@@ -113,18 +131,32 @@ Integration adapters       – GoogleDriveClient, MailClient, StorageService (đ
 
 ### 5.1. Mô hình quyền
 
-```
-Google Cloud project của hệ thống
-└── Service Account: eduportfolio-drive@<project>.iam.gserviceaccount.com   (khóa JSON để ở secret)
+**Mặc định – OAuth của từng GV:**
 
-Shared Drive của trường / khoa (Google Workspace)
-└── Thư mục gốc của GV  ← GV thêm SA làm "Content manager"
-    └── <MaLHP>_<TenBaiTap>/ ...   ← hệ thống tạo và ghi
+```
+Google Cloud project của hệ thống (Drive API + OAuth client loại Web application)
+└── GV bấm "Liên kết tài khoản Google" → đồng ý scope drive.file (+ email)
+    └── My Drive của GV
+        └── EduPortfolio_<MãGV>/                ← hệ thống tạo khi liên kết
+            └── <MaLHP>_<TenBaiTap>/ ...         ← hệ thống tạo và ghi
 ```
 
-- Service Account không có dung lượng lưu trữ riêng. Tệp do SA tạo trong **Shared Drive** thuộc về Shared Drive, nên không lỗi `storageQuotaExceeded`. Vì vậy bắt buộc dùng Shared Drive (UC04.4 phát hiện bằng cách ghi thử).
-- Mọi lời gọi API đều đặt `supportsAllDrives=true`, `includeItemsFromAllDrives=true`.
-- **Phương án dự phòng** (khi trường không có Workspace, ghi ở [Plan_project](Plan_project.md#7-quản-lý-rủi-ro)): thêm chế độ OAuth của GV (`drive.file` scope, lưu refresh token đã mã hóa). Lớp `DriveClientFactory` trả client theo `lecturer_drive_links.auth_mode`, nên phần còn lại không phải sửa.
+- `drive.file` là scope không nhạy cảm: ứng dụng chỉ thấy tệp/thư mục do chính nó tạo, không đọc được tài liệu khác của GV. Vì vậy ở chế độ này thư mục nhận bài phải do EduPortfolio tạo.
+- Refresh token của GV mã hóa AES-256-GCM (khóa suy ra từ bí mật máy chủ) trong `lecturer_drive_links.refresh_token_enc`. Client OAuth được lưu đệm theo GV và tự làm mới access token.
+- Tệp nằm trong My Drive của GV nên tính vào dung lượng của GV; trang *Kết nối Google Drive* hiển thị dung lượng đã dùng.
+- Ứng dụng ở trạng thái *Testing* trên Google Cloud: chỉ Gmail có trong *Test users* mới liên kết được, refresh token hết hạn sau 7 ngày (GV liên kết lại). Chuyển sang *In production* để bỏ hai giới hạn này.
+- Mỗi GV mới chỉ cần được thêm vào *Test users* (khi còn Testing) rồi tự liên kết; không phải sửa cấu hình máy chủ.
+
+**Tùy chọn – Service Account + Shared Drive** (khi trường có Google Workspace):
+
+```
+Service Account: eduportfolio-drive@<project>.iam.gserviceaccount.com   (khóa JSON để ở secret)
+Shared Drive của trường → thư mục của GV ← GV thêm SA làm "Người chỉnh sửa"
+```
+
+- Service Account không có dung lượng riêng nên phải ghi vào Shared Drive (ghi vào My Drive sẽ lỗi `storageQuotaExceeded`, UC04.4 phát hiện bằng cách ghi thử). Mọi lời gọi đặt `supportsAllDrives=true`.
+
+**Chọn client:** `DriveService` nhận `owner` = GV tạo bài tập (`assignments.created_by`). Có liên kết OAuth → client OAuth của GV; không có → Service Account (nếu cấu hình); không có cả hai → `DRIVE_NOT_LINKED`. Nhờ vậy các processor ghi tệp không phụ thuộc chế độ.
 
 ### 5.2. Luồng dữ liệu tệp
 
@@ -167,12 +199,12 @@ Thumbnail: GET /files/:id/thumbnail?w=400 ──► cache đĩa /data/thumbs/<id
 | Cookie | `HttpOnly; Secure; SameSite=Lax` |
 | CSRF | SameSite=Lax + middleware kiểm tra header `Origin` khớp tên miền với mọi method ghi |
 | Phân quyền | RBAC bằng `@Roles()` + Policy kiểm tra quyền sở hữu trong service; truy vấn danh sách luôn lọc theo phạm vi người dùng ở tầng repository |
-| Rate limit | Đăng nhập 5/phút/IP+username; quên mật khẩu 3/giờ; nhập mã nhóm 10/phút; tìm kiếm DN 30/phút; mặc định 300/phút/người dùng |
-| Upload | Chỉ người đã đăng nhập mới upload qua tus; giới hạn kích thước theo cấu hình; kiểm tra magic bytes; tên tệp được làm sạch; không bao giờ thực thi hay giải nén tệp |
+| Rate limit | Đăng nhập 5/phút/IP+username; quên mật khẩu 3/giờ; tìm kiếm DN 30/phút; tải lên Excel 10/phút; mặc định 300/phút/người dùng |
+| Upload | Chỉ người đã đăng nhập mới upload; giới hạn kích thước theo cấu hình; kiểm tra magic bytes; tên tệp được làm sạch; không bao giờ thực thi hay giải nén tệp. File Excel chỉ đọc giá trị ô (không chạy macro/công thức), giới hạn 2.000 dòng, 5 MB |
 | Header | `helmet`: CSP (`default-src 'self'; frame-src https://www.figma.com; img-src 'self' data: blob:`), HSTS, `X-Content-Type-Options` |
-| Bí mật | `.env` / Docker secrets: `DATABASE_URL`, `JWT_SECRET`, `GOOGLE_SA_KEY_BASE64`, `SMTP_*`; không commit lên git |
+| Bí mật | `.env` / Docker secrets: `DATABASE_URL`, `JWT_SECRET`, `DRIVE_MODE`, `GOOGLE_OAUTH_CLIENT_ID/SECRET`, `GOOGLE_OAUTH_REDIRECT_URI` (mặc định `<WEB_ORIGIN>/api/v1/lecturer/drive/oauth/callback`), `GOOGLE_SA_KEY_BASE64` (tùy chọn), `SMTP_*`; không commit lên git |
 | Dữ liệu cá nhân | DN chỉ nhận DTO `StudentPublicProfile` (không có trường nhạy cảm, kiểm thử bằng snapshot); log không ghi mật khẩu/token |
-| Audit | `audit_logs` ghi đăng nhập, thao tác quản trị, sửa điểm, nộp/xóa bài, duyệt quyền DN |
+| Audit | `audit_logs` ghi đăng nhập, thao tác quản trị, giao/sửa bài tập, áp dụng file nhóm/điểm, công bố và sửa điểm, nộp/xóa bài, liên kết Drive, duyệt quyền DN |
 
 ## 8. Hiệu năng
 
@@ -181,7 +213,7 @@ Thumbnail: GET /files/:id/thumbnail?w=400 ──► cache đĩa /data/thumbs/<id
 - Thống kê: truy vấn tổng hợp + cache Redis 5 phút.
 - Ảnh luôn hiển thị qua thumbnail WebP; ảnh gốc chỉ tải khi mở trình chiếu (prefetch ảnh kế tiếp).
 - Video: stream theo `Range` (chunk 1 MB), không tải trọn tệp.
-- FE: tách bundle theo vai trò (`React.lazy` mỗi khu vực), Ant Design import theo component.
+- FE: tách bundle theo vai trò (`React.lazy` mỗi khu vực); CSS dùng chung một tệp `kit.css` nhỏ.
 - Ước lượng tải: 500 người dùng đồng thời × ~1 request/5 s ≈ 100 rps, đủ cho 1 instance Node (tách worker riêng).
 
 ## 9. Triển khai
@@ -191,7 +223,7 @@ Thumbnail: GET /files/:id/thumbnail?w=400 ──► cache đĩa /data/thumbs/<id
 | Service | Image | Cổng | Ghi chú |
 |---|---|---|---|
 | `caddy` | `caddy:2` | 80, 443 | Phục vụ `/srv/web` (build SPA), proxy `/api`, `/socket.io` |
-| `api` | `ghcr.io/<user>/eduportfolio-api` | 3000 (nội bộ) | `node dist/main.js` |
+| `api` | `ghcr.io/<user>/eduportfolio-api` (base `node:22-alpine`) | 3000 (nội bộ) | `node dist/main.js` |
 | `worker` | cùng image | – | `node dist/worker.js` |
 | `postgres` | `postgres:16-alpine` | nội bộ | Volume `pgdata`; dùng image có `unaccent` và `pg_trgm` (có sẵn trong contrib) |
 | `redis` | `redis:7-alpine` | nội bộ | `appendonly yes` |
@@ -206,7 +238,7 @@ Volume `/data` gắn vào `api` và `worker` (chung): `uploads/tus`, `pending`, 
 |---|---|---|
 | `local` | Phát triển | `docker compose -f compose.dev.yml up` (postgres, redis, mailpit); chạy `pnpm dev` |
 | `test` | CI | Testcontainers; Google Drive dùng **mock adapter** |
-| `server` | Demo 31/10, chạy thử tháng 11, bảo vệ | Một VPS duy nhất, Shared Drive thật, dữ liệu seed (không có production riêng) |
+| `server` | Demo 31/10, chạy thử tháng 11, bảo vệ | Một VPS duy nhất, Google Drive thật (OAuth của GV), dữ liệu seed (không có production riêng) |
 
 ### 9.3. Quy trình CI/CD
 
@@ -222,9 +254,13 @@ deploy (thủ công): ssh VPS ─► docker compose pull && docker compose up -d
 |---|---|---|
 | ADR-01 | Modular monolith, tách tiến trình worker | Đơn giản khi triển khai; tách thành service riêng sau này nếu cần |
 | ADR-02 | SPA thay vì SSR | Không có server Node cho FE; trang đầu tải chậm hơn chút (chấp nhận được vì toàn trang nội bộ) |
-| ADR-03 | Service Account + Shared Drive | GV phải dùng Shared Drive; dự phòng OAuth qua `DriveClientFactory` |
+| ADR-03 | OAuth của từng GV (scope `drive.file`) là mặc định; Service Account + Shared Drive là tùy chọn | Không phụ thuộc Google Workspace; mỗi GV tự liên kết; tệp tính vào dung lượng Drive của GV |
 | ADR-04 | Nộp thành công khi server nhận đủ tệp, ghi Drive bất đồng bộ | Cần ổ đĩa tạm và cơ chế đồng bộ lại; SV không phải chờ Drive |
 | ADR-05 | Tìm kiếm bằng PostgreSQL `pg_trgm` + `unaccent` | Không vận hành Elasticsearch; đủ nhanh với 10⁵ bản ghi |
 | ADR-06 | Mọi truy cập tệp đi qua API proxy | Tốn băng thông VPS; đổi lại phân quyền chặt và ghi log được lượt xem của DN |
 | ADR-07 | JWT trong cookie httpOnly, cùng origin | An toàn trước XSS đánh cắp token; cần phòng CSRF (đã có) |
 | ADR-08 | Zod schema dùng chung FE/BE | Một nguồn quy tắc kiểm tra dữ liệu |
+| ADR-09 | Node.js 22 LTS là runtime duy nhất phía server | Một ngôn ngữ, một bộ công cụ; việc nặng CPU đẩy sang worker/threadpool |
+| ADR-10 | Thống kê đề tài tính sẵn hằng đêm (`topic_trend_snapshots`) | Trang phân tích nhanh; số liệu kỳ hiện tại trễ tối đa 1 ngày (kỳ hiện tại vẫn truy vấn trực tiếp khi cần) |
+| ADR-11 | **[v3.0]** Hệ thống chỉ lưu trữ kết quả; nhóm và điểm nhập bằng Excel qua bước xem trước | Bỏ được phần lập nhóm/chấm phức tạp; mọi file tải lên đi qua `import_jobs` (xem trước → áp dụng) nên kiểm soát được lỗi và có lịch sử |
+| ADR-12 | **[v3.0]** Giao diện dựng từ CSS của bộ mẫu, không dùng thư viện UI | Giống mẫu tuyệt đối; tự viết một bộ component nhỏ (thẻ, bảng, tab, modal, toast) |

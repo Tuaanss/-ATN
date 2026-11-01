@@ -1,0 +1,18 @@
+# Dùng khi máy có Docker mà chưa cài MySQL: docker compose -f docker/compose.dev.yml up -d
+# (Đã cài MySQL 8 trên máy thì không cần file này – xem README.)
+services:
+  mysql:
+    image: mysql:8.4
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: eduportfolio
+      MYSQL_USER: edu
+      MYSQL_PASSWORD: edu
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysqldata:/var/lib/mysql
+
+volumes:
+  mysqldata:

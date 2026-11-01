@@ -1,6 +1,7 @@
 # EduPortfolio – Cấu trúc module & mã nguồn (Modules Structure)
 
-> Phiên bản 2.0 · 07/10/2026
+> Phiên bản 3.0 · 11/10/2026 · Node.js 22 LTS + TypeScript (NestJS 11 / React 19 + Vite 6)
+> **v3.0:** bỏ module `appeals`, phần chấm bài, lời mời/chốt nhóm, duyệt đề tài; thêm `imports` (Excel nhóm/điểm), `group_reports`; Drive OAuth của GV là mặc định.
 > Tài liệu liên quan: [Architecture](Architecture.md) · [ModuleFlows](ModuleFlows.md) · [TechTasks](TechTasks.md)
 
 ---
@@ -21,8 +22,9 @@ eduportfolio/
 │   └── api.Dockerfile
 ├── docs/                         # Tài liệu này
 ├── .github/workflows/ci.yml
+├── .nvmrc                        # 22 (Node.js LTS)
 ├── pnpm-workspace.yaml
-├── package.json                  # scripts gốc: dev, build, lint, test, db:*
+├── package.json                  # scripts gốc: dev, build, lint, test, db:*; "engines": { "node": ">=22" }
 └── tsconfig.base.json
 ```
 
@@ -34,7 +36,7 @@ packages/shared/src/
 ├── errors.ts           # ErrorCode + thông điệp tiếng Việt mặc định
 ├── constants.ts        # GRADE_SCALE (BR-15), PHONE_REGEX, giới hạn mặc định
 ├── grading.ts          # computeTotal(), toLetter(), toGpa4() – hàm thuần, dùng ở cả FE (xem trước) và BE
-├── schemas/            # Zod: auth, profile, assignment, group, topic, submission, grade, enterprise, ...
+├── schemas/            # Zod: auth, profile, assignment, group-import, topic, submission, grade-import, enterprise, ...
 │   └── *.schema.ts
 └── index.ts
 ```
@@ -72,7 +74,8 @@ apps/api/
 │   │   ├── queue/                # đăng ký queue BullMQ, tên queue, Bull Board
 │   │   ├── storage/              # StorageService: đường dẫn /data, move, cleanup, stream Range
 │   │   ├── mail/                 # MailService (nodemailer) + templates/
-│   │   ├── google-drive/         # DriveClientFactory, DriveService, drive-errors.ts
+│   │   ├── google-drive/         # DriveService (client theo GV: OAuth / Service Account), mã hóa token, drive-errors.ts
+│   │   ├── excel/                # ExcelService: sinh file mẫu, đọc & chuẩn hóa ô, xuất Excel
 │   │   └── realtime/             # RealtimeGateway (Socket.IO), RealtimeEmitter (cho worker)
 │   └── modules/                  # mỗi module: *.module.ts, controllers/, services/, dto/, policies/, processors/
 │       ├── auth/
@@ -80,14 +83,15 @@ apps/api/
 │       ├── catalog/              # khoa, ngành, khóa, lớp SH, phòng, lĩnh vực, tags (quản trị)
 │       ├── academic/             # học kỳ, môn học, LHP, lịch học, xếp SV
 │       ├── profile/              # hồ sơ SV, đồng bộ PH
-│       ├── drive-link/           # liên kết Drive của GV
+│       ├── drive-link/           # liên kết Drive của GV (OAuth connect/callback/revoke, kiểm tra lại)
 │       ├── assignments/
-│       ├── groups/
-│       ├── topics/               # đề tài + tags (phía SV)
+│       ├── groups/               # tải danh sách nhóm (Excel), xem nhóm, phản hồi nhóm chưa đúng
+│       ├── topics/               # đề tài (tên + từ khóa), tags, cảnh báo trùng
 │       ├── uploads/              # tus server
 │       ├── submissions/          # nộp, nộp lại, xóa tệp, lịch sử, xem, tìm, đồng bộ
 │       ├── files/                # stream nội dung, thumbnail, download
-│       ├── grading/              # chấm bài, điểm học phần, công bố, yêu cầu sửa điểm, GPA
+│       ├── grades/               # tải điểm bài tập & học phần (Excel), công bố, yêu cầu sửa điểm, GPA
+│       ├── imports/              # import_jobs: xem trước / áp dụng / hết hạn (dùng chung cho SV, nhóm, điểm)
 │       ├── parent-portal/
 │       ├── enterprise/           # tìm SV, hồ sơ, yêu cầu xem bài, nhật ký truy cập
 │       ├── access-control/       # Admin xử lý yêu cầu xem bài, thu hồi, job hết hạn
@@ -106,38 +110,42 @@ apps/api/
 | Module | Use case | Trách nhiệm chính | Phụ thuộc |
 |---|---|---|---|
 | `auth` | UC01 | Đăng nhập (2 kiểu), refresh, đăng xuất, đổi/quên mật khẩu, chọn con, đăng ký DN | users, mail, audit |
-| `users` | UC02.1–2.5, 2.7 | CRUD tài khoản theo vai trò, khóa/mở, đặt lại mật khẩu, import SV, đổi SĐT PH, duyệt DN | profile (sync PH), notifications |
+| `users` | UC02.1–2.5, 2.7 | CRUD tài khoản theo vai trò, khóa/mở, đặt lại mật khẩu, import SV, đổi SĐT PH, duyệt DN | profile (sync PH), imports, notifications |
 | `catalog` | UC02.6 | Danh mục; gộp/ẩn tag | – |
 | `academic` | UC02.8–2.11, UC04.9 | Học kỳ, môn, LHP, lịch, kiểm tra trùng lịch, xếp SV, "LHP của tôi" | – |
 | `profile` | UC03 | Khai báo/cập nhật hồ sơ, `ParentLinkSyncService`, công tắc discoverable, ảnh đại diện | audit |
-| `drive-link` | UC04.1, UC04.4 | Lưu/kiểm tra thư mục gốc của GV | google-drive |
-| `assignments` | UC04.2–4.8 | CRUD bài tập, tạo thư mục, đổi thư mục (migrate), đóng/mở, điều chỉnh min/max | google-drive, groups, notifications |
-| `groups` | UC05.1–5.6, 5.9–5.10, UC04.7 | Nhóm, thành viên, lời mời, mã mời, làm cá nhân, khóa nhóm, GV điều chỉnh | google-drive (job), notifications, realtime |
-| `topics` | UC05.7–5.8 | Đề tài, tags, gợi ý, cảnh báo trùng, lịch sử | – |
-| `uploads` | UC06.1–2 | tus endpoint, bảng `uploads`, dọn tệp hết hạn | storage |
-| `submissions` | UC06 | Nộp/nộp lại/xóa tệp, lịch sử, chi tiết bài, tìm kiếm, đồng bộ Drive (processor), trạng thái đồng bộ | uploads, topics, google-drive, notifications, realtime |
-| `files` | UC06.7, UC09.5 | `/files/:id/content|thumbnail|download`, `SubmissionAccessPolicy` | storage, google-drive, enterprise (log) |
-| `grading` | UC07, UC08.2 | Chấm bài, ghi đè điểm, trả bài, điểm học phần, import Excel, công bố, yêu cầu sửa điểm, `GpaService`, cảnh báo học tập | notifications |
-| `parent-portal` | UC08 | API chỉ đọc cho PH (dùng service của grading/submissions qua policy) | grading, submissions |
+| `drive-link` | UC04.1, UC04.4 | OAuth Google của GV (start/callback/revoke, tạo thư mục gốc), kiểm tra lại, dung lượng, trạng thái thư mục từng bài tập; Service Account | google-drive |
+| `assignments` | UC04.2–4.8 | Giao bài (1 hoặc nhiều LHP, `batch_id`), tệp đề bài, tạo thư mục, sửa/đóng/mở lại/giao ngay/xóa, đổi thư mục, lịch sử thay đổi | google-drive, notifications |
+| `groups` | UC05.1–5.6 | File mẫu nhóm, xem trước + áp dụng danh sách nhóm, bảng nhóm cho GV, nhóm của tôi cho SV, phản hồi nhóm chưa đúng | imports, excel, notifications |
+| `topics` | UC05.7–5.8 | Đề tài (tên + từ khóa), tags, gợi ý, cảnh báo trùng, lịch sử | notifications |
+| `uploads` | UC06.1–2 | Nhận tệp tải lên, bảng `uploads`, dọn tệp hết hạn | storage |
+| `submissions` | UC06 | Nộp/nộp lại (thay theo loại tệp)/xóa tệp, lịch sử, chi tiết bài, danh sách bài đã nộp cho GV, tìm kiếm, đồng bộ Drive (processor), nhắc hạn | uploads, topics, google-drive, notifications |
+| `files` | UC06.7, UC09.5 | `/files/:id/content|thumbnail|download`, tệp đề bài, `SubmissionAccessPolicy` | storage, google-drive, enterprise (log) |
+| `grades` | UC07, UC08.2 | File mẫu điểm, xem trước + áp dụng điểm bài tập / điểm học phần, công bố, bảng điểm, yêu cầu sửa điểm, `GpaService`, cảnh báo học tập | imports, excel, notifications |
+| `imports` | UC02.3, UC05.2, UC07.2–7.4 | `import_jobs`: lưu bản xem trước, áp dụng, hết hạn, lịch sử tải lên | excel |
+| `parent-portal` | UC08 | API chỉ đọc cho PH | grades, submissions |
 | `enterprise` | UC09.1–9.6, 9.11 | Tìm SV, hồ sơ công khai, gửi/hủy yêu cầu, bài của SV được cấp quyền, log truy cập, "DN đã xem tôi" | submissions, notifications |
 | `access-control` | UC09.8–9.10 | Admin duyệt/từ chối/thu hồi; job hết hạn và sắp hết hạn | notifications |
-| `statistics` | UC10 | Truy vấn thống kê, cache, xuất Excel/PDF | – |
-| `notifications` | UC11 | `NotificationService.notify`, API chuông, processor email | mail, realtime |
+| `statistics` | UC10 | Thống kê kết quả (không theo dõi tiến độ), cache, xuất Excel/PDF; phân tích đề tài, bản đồ năng lực | – |
+| `notifications` | UC11 | `NotificationService.notify` (tôn trọng cài đặt), API chuông, email, cài đặt + bản tin | mail |
 | `audit` | UC02.12 | `AuditService.log`, API tra cứu | – |
-| `settings` | UC02.13 | Đọc/ghi `system_settings` + cache | redis |
-| `scheduler` | Bộ hẹn giờ | Đăng ký job lặp BullMQ (xem ModuleFlows §8) | các module trên |
+| `settings` | UC02.13 | Đọc/ghi `system_settings` + cache | – |
+| `scheduler` | Bộ hẹn giờ | Đăng ký job lặp (xem ModuleFlows §8) | các module trên |
 
-### 3.3. Hàng đợi BullMQ
+### 3.3. Hàng đợi
 
 | Queue | Job | Đồng thời | Thử lại |
 |---|---|---|---|
-| `drive` | `ensure-folder`, `upload-file`, `trash-file`, `rename-folder`, `migrate-assignment`, `verify-files` | 4 + limiter 8/s | 8 lần, mũ từ 30 s |
-| `mail` | `send` | 5 | 5 lần, mũ từ 1' |
-| `notify` | `fanout` (gửi thông báo cho nhiều người: mở bài tập, công bố điểm) | 2 | 3 |
-| `grading` | `recompute-gpa`, `academic-warning-check` | 2 | 3 |
+| `drive` | `ensure-folder`, `upload-file`, `trash-file`, `move-folder`, `verify-files` | 4, có giới hạn tốc độ | backoff tăng dần |
+| `mail` | `send`, `digest` | 5 | 5 lần |
+| `notify` | `fanout` (mở bài tập, công bố điểm, áp dụng danh sách nhóm) | 2 | 3 |
+| `grades` | `recompute-gpa`, `academic-warning-check` | 2 | 3 |
+| `stats` | `topic-trends` | 1 | 2 |
 | `reports` | `export` | 1 | 1 |
-| `maintenance` | `cleanup-uploads`, `cleanup-cache`, `purge-logs` | 1 | 1 |
+| `maintenance` | `cleanup-uploads`, `cleanup-cache`, `purge-logs`, `imports-expire` | 1 | 1 |
 | `scheduler` | Job lặp (cron) gọi các service tương ứng | 1 | – |
+
+> Bản cài đặt hiện tại chạy hàng đợi trong tiến trình API (không Redis) với trạng thái lưu trong CSDL; khi cần mở rộng thì chuyển sang BullMQ + Redis theo bảng trên.
 
 ## 4. Danh sách API (REST `/api/v1`)
 
@@ -182,66 +190,57 @@ Ký hiệu vai trò: A = Admin, L = GV, S = SV, P = PH, E = DN, * = mọi ngư�
 | PATCH | `/me/profile/discoverable` `{value}` | S | 03.4 |
 | POST | `/me/avatar` | S | 03.2 |
 
-### 4.4. Đào tạo & bài tập
+### 4.4. Đào tạo, Drive & bài tập
 | Method | Endpoint | Vai trò | UC |
 |---|---|---|---|
-| GET | `/sections/mine?semesterId=` | L, S | 04.9 |
-| GET | `/sections/:id` · `/sections/:id/students` | L (của mình), S (đang học) | 04.9 |
-| GET/PUT | `/lecturer/drive-link` · POST `/lecturer/drive-link/verify` | L | 04.1, 04.4 |
-| GET | `/drive/service-account` | L | 04.1 |
-| POST | `/sections/:id/assignments` | L | 04.2 |
-| GET | `/sections/:id/assignments` | L, S | 04.9 |
-| GET/PATCH/DELETE | `/assignments/:id` | L (sửa/xóa), S (xem) | 04.5, 04.8 |
-| POST | `/assignments/:id/close` · `/reopen` `{dueAt}` | L | 04.5 |
-| POST | `/assignments/:id/change-folder` `{folderUrl}` | L | 04.6 |
-| PATCH | `/assignments/:id/group-settings` `{minMembers, maxMembers}` | L | 04.7 |
-| GET | `/assignments/:id/sync-status` · POST `/assignments/:id/sync/retry` | L | 06.9 |
+| GET | `/lecturer/sections` · `/lecturer/sections/:id/assignments` · `/lecturer/sections/:id/students` · `/lecturer/sections/:id/groups` | L | 04.9, 05.4 |
+| GET | `/student/sections` · `/student/sections/:id` · `/student/assignments` | S | 04.9 |
+| GET | `/lecturer/drive-link` (liên kết, dung lượng, thư mục từng bài tập) | L | 04.1 |
+| GET | `/lecturer/drive/oauth/start` · `/lecturer/drive/oauth/callback?code&state` · DELETE `/lecturer/drive/oauth` | L | 04.1 |
+| POST | `/lecturer/drive/recheck` · `/lecturer/drive/check` `{folderUrl}` | L | 04.1, 04.4 |
+| PUT | `/lecturer/drive-link` `{folderUrl}` (chế độ Service Account) | L | 04.1 |
+| POST | `/lecturer/sections/:id/assignments` `{common, schedule}` (cố định LHP) | L | 04.2 |
+| POST | `/lecturer/assignments/batch` `{common, sections:[{sectionId, openAt, dueAt}]}` | L | 04.8 |
+| GET | `/lecturer/assignments/:id` (thông tin + nhóm + bài đã nộp + điểm) · `/lecturer/assignments/:id/edit` | L | 04.5 |
+| PATCH/DELETE | `/lecturer/assignments/:id` `{common, schedule, folderMode?}` | L | 04.5, 04.6, 04.7 |
+| POST | `/lecturer/assignments/:id/publish` (giao ngay) · `/close` · `/reopen` `{dueAt}` | L | 04.5 |
+| POST | `/lecturer/assignments/:id/brief` (multipart tệp đề bài) | L | 04.2 |
+| GET | `/student/assignments/:id` (đề bài, nhóm của tôi, đề tài, bài nộp, điểm đã công bố) | S | 04.9 |
 
 ### 4.5. Nhóm & đề tài
 | Method | Endpoint | Vai trò | UC |
 |---|---|---|---|
-| GET | `/assignments/:id/my-work` (hình thức, nhóm, đề tài, bài nộp của tôi) | S | 04.9 |
-| POST | `/assignments/:id/individual` · DELETE `/assignments/:id/individual` | S | 05.1 |
-| POST | `/assignments/:id/groups` `{name}` | S | 05.1 |
-| GET | `/assignments/:id/groups` (bảng nhóm, đề tài, trạng thái) · `/assignments/:id/ungrouped` | L | 05.9 |
-| GET/PATCH | `/groups/:id` (`{name}`) | S (thành viên), L | – |
-| POST | `/groups/:id/invitations` `{studentCode}` · DELETE `/invitations/:id` | S (trưởng nhóm) | 05.2 |
-| POST | `/groups/:id/invite-code/regenerate` | S (trưởng nhóm) | 05.2 |
-| GET | `/me/invitations` · POST `/invitations/:id/accept` · `/decline` | S | 05.3 |
-| POST | `/groups/join` `{code}` | S | 05.3 |
-| DELETE | `/groups/:id/members/:studentId` | S (trưởng nhóm), L | 05.4, 04.7 |
-| POST | `/groups/:id/transfer-leader` `{studentId}` | S (trưởng nhóm), L | 05.5 |
-| POST | `/groups/:id/leave` | S | 05.6 |
-| POST | `/groups/:id/members` `{studentId, force?}` · `/groups/:id/move-member` `{studentId, toGroupId}` | L | 04.7 |
-| POST | `/groups/:id/lock` · `/unlock` · `/assignments/:id/groups/lock-all` | L | 05.10 |
-| PUT | `/assignments/:id/topic` `{title, description, technologies, tags[]}` (tự xác định nhóm/cá nhân) | S, L | 05.7–5.8 |
-| GET | `/topics/similar?assignmentId&title` | S | 05.7 |
-| GET | `/topics/:id/history` | S (thành viên), L | 05.7 |
+| GET | `/lecturer/assignments/:id/groups/template` (.xlsx) | L | 05.1 |
+| POST | `/lecturer/assignments/:id/groups/import/preview` (multipart) → `{jobId, groups[], moved[], ungrouped[], errors[]}` | L | 05.2, 05.3 |
+| POST | `/lecturer/assignments/:id/groups/import/:jobId/commit` `{onlyValid?}` · DELETE `.../import/:jobId` | L | 05.2 |
+| GET | `/lecturer/assignments/:id/groups` · `/lecturer/assignments/:id/groups/export` · `/lecturer/assignments/:id/imports?type=ASSIGNMENT_GROUPS` | L | 05.4 |
+| GET | `/lecturer/assignments/:id/group-reports` · POST `/lecturer/group-reports/:id/resolve` `{note?}` | L | 05.6 |
+| POST | `/student/assignments/:id/group-report` `{content}` | S | 05.6 |
+| PUT | `/student/assignments/:id/topic` `{title, keywords[]}` (tự xác định nhóm/cá nhân) | S (L sửa sau hạn) | 05.7–5.8 |
+| GET | `/topics/similar?assignmentId&title` · `/topics/:id/history` | S, L | 05.7 |
 | GET | `/tags?q=` | * | 05.8 |
 
 ### 4.6. Nộp bài, xem, tìm
 | Method | Endpoint | Vai trò | UC |
 |---|---|---|---|
-| POST/PATCH/HEAD/DELETE | `/uploads[/:id]` (giao thức tus) | S | 06.1–2 |
-| POST | `/assignments/:id/submissions` `{kind, uploadIds[], figmaUrl?, gitUrl?, note?, order[]}` | S | 06.1, 06.2, 06.4 |
-| PATCH | `/submissions/:id` `{figmaUrl?, gitUrl?, note?, order[]?}` (không đổi tệp) | S | 06.1–2 |
-| DELETE | `/submissions/:id/files` `{fileIds[]}` | S | 06.5 |
-| GET | `/submissions/:id` | theo policy | 06.7 |
-| GET | `/assignments/:id/submissions` (danh sách cho GV) | L | 06.7 |
-| GET | `/submissions/:id/events` · `/assignments/:id/my-events` | S, L | 06.6 |
-| GET | `/submissions/search?q&...` | A, L, E | 06.8 |
-| GET | `/files/:id/content` (Range) · `/files/:id/thumbnail?w=` · `/files/:id/download` | theo policy | 06.7 |
+| POST | `/student/assignments/:id/submissions` (multipart `files[]` + `kind, figmaUrl?, gitUrl?, note?, contributionPercent?`) | S | 06.1, 06.2, 06.4 |
+| DELETE | `/student/submissions/:id/files` `{fileIds[]}` | S | 06.5 |
+| GET | `/files/submission/:id` (dữ liệu trình xem) | theo policy | 06.7 |
+| GET | `/lecturer/assignments/:id/submissions` (danh sách bài đã nộp) · `.../submissions/export` | L | 06.7 |
+| GET | `/submissions/:id/events` | S, L | 06.6 |
+| GET | `/submissions/search?q&by=topic|name|code|cohort&...` | A, L, E | 06.8 |
+| GET | `/files/:id/content` (Range) · `/files/:id/thumbnail?w=` · `/files/:id/content?download=1` · `/files/brief/:assignmentId` | theo policy | 06.7 |
+| POST | `/lecturer/assignments/:id/sync/retry` | L | 06.9 |
 
 ### 4.7. Điểm
 | Method | Endpoint | Vai trò | UC |
 |---|---|---|---|
-| PUT | `/submissions/:id/grade` `{score, feedback, memberOverrides?[]}` | L | 07.1, 07.3 |
-| POST | `/submissions/:id/return` `{reason, resubmitDueAt}` | L | 07.2 |
-| GET | `/sections/:id/grades` | L, A | 07.4–7.5 |
-| PATCH | `/sections/:id/grades/:studentId` `{attendance?, assignment?, midterm?, final?}` | L | 07.4 |
-| POST | `/sections/:id/grades/fill-assignment` | L | 07.4 |
-| GET | `/sections/:id/grades/export` · POST `/sections/:id/grades/import/preview` · `/import/:jobId/commit` | L | 07.4 |
-| POST | `/sections/:id/grades/publish` `{allowIncomplete?}` | L | 07.6 |
+| GET | `/lecturer/assignments/:id/grades/template` · `/lecturer/sections/:id/grades/template` | L | 07.1 |
+| POST | `/lecturer/assignments/:id/grades/import/preview` · `.../import/:jobId/commit` | L | 07.2, 07.4 |
+| POST | `/lecturer/sections/:id/grades/import/preview` · `.../import/:jobId/commit` | L | 07.3, 07.4 |
+| POST | `/lecturer/assignments/:id/grades/publish` | L | 07.6 |
+| GET | `/lecturer/gradebooks?year=` · `/lecturer/sections/:id/grades` · `.../grades/export` | L, A | 07.5 |
+| POST | `/lecturer/sections/:id/grades/publish` `{allowIncomplete?}` | L | 07.6 |
 | POST | `/grade-change-requests` · GET `/grade-change-requests/mine` · DELETE `/grade-change-requests/:id` | L | 07.7 |
 | GET | `/admin/grade-change-requests` · POST `/admin/grade-change-requests/:id/approve` · `/reject` | A | 07.8 |
 | GET | `/me/grades` · `/me/assignment-grades` | S | 07.9 |
@@ -273,68 +272,55 @@ Ký hiệu vai trò: A = Admin, L = GV, S = SV, P = PH, E = DN, * = mọi ngư�
 | GET | `/stats/sections/:id` | A, L | 10.3 |
 | GET | `/stats/me` | S | 10.4 |
 | GET | `/stats/enterprise/me` | E | 10.5 |
+| GET | `/stats/topics?semesterFrom&semesterTo&majorId&cohortId` (xu hướng, DN quan tâm, cung – cầu) | A, L (LHP của mình) | 10.7 |
+| GET | `/stats/talent-map?dimension=major|cohort|cpa` | E, A | 10.8 |
 | POST | `/reports/export` `{type, format, filters, chartImages?}` · GET `/reports/:id` · `/reports/:id/download` | A (L với LHP của mình) | 10.6 |
 | GET | `/notifications?cursor&unread` · `/notifications/unread-count` | * | 11.1 |
 | POST | `/notifications/:id/read` · `/notifications/read-all` | * | 11.1 |
+| GET/PUT | `/notifications/settings` `{channels: {<loại>: {app, email}}, digest}` | * | 11.4 |
 | GET | `/health` | Pub | – |
 
 ## 5. Frontend `apps/web`
+
+Giao diện dựng theo bộ mẫu HTML `project/` (CSS của mẫu chép thành `styles/kit.css`, component tự viết: thẻ, bảng, badge, tab, thanh bước, modal, toast), **không dùng thư viện UI**. Màn hình rộng tự phóng to theo bậc (`zoom`) để giữ bố cục ~1440 px của mẫu.
 
 ### 5.1. Cây thư mục
 
 ```
 apps/web/src/
-├── main.tsx
-├── app/
-│   ├── router.tsx                # cây route theo vai trò, lazy load
-│   ├── providers.tsx             # QueryClient, AntD ConfigProvider (vi_VN, theme), Socket
-│   └── layouts/                  # AuthLayout, AppLayout (sidebar theo vai trò, header, chuông, menu đổi con)
-├── lib/
-│   ├── api.ts                    # ky instance: prefix /api/v1, tự refresh khi 401, ánh xạ ErrorCode → message
-│   ├── socket.ts                 # socket.io-client + hook useSocketEvent
-│   ├── query-keys.ts
-│   ├── format.ts                 # ngày giờ VN, điểm, dung lượng
-│   └── guards.tsx                # RequireAuth, RequireRole, RequireProfile, RequireChild
-├── stores/session.store.ts       # Zustand: user, role, selectedChild
-├── components/                   # dùng chung
-│   ├── media/                    # ImageSlideshow, VideoPlayer, FigmaEmbed, FileList, SyncBadge
-│   ├── upload/                   # SubmissionUploader (Uppy + tus), SortableImageGrid
-│   ├── tables/                   # DataTable (AntD Table + lọc qua URL)
-│   ├── charts/                   # LineChart, BarChart, PieChart, Histogram (Recharts)
-│   ├── TagInput.tsx · StatusTag.tsx · Countdown.tsx · ConfirmDanger.tsx · EmptyState.tsx
-├── features/                     # theo use case, mỗi thư mục: api.ts (hooks TanStack Query), components/, pages/
-│   ├── auth/                     # Login, ForgotPassword, ResetPassword, ChangePassword, RegisterEnterprise, ChooseChild
-│   ├── admin/
-│   │   ├── dashboard/  users/  parents/  enterprises/  catalog/  academic/
-│   │   ├── view-requests/  grade-requests/  audit/  settings/  stats/
-│   ├── lecturer/
-│   │   ├── sections/  assignments/  groups/  grading/  grade-requests/  drive-link/  stats/
-│   ├── student/
-│   │   ├── profile/  sections/  assignment-work/ (nhóm, đề tài, nộp bài, lịch sử)  invitations/
-│   │   ├── grades/  stats/  enterprise-views/
-│   ├── parent/                   # overview, grades, submissions, warnings
-│   ├── enterprise/               # search, student-profile, view-requests, student-submissions, stats
-│   ├── submissions/              # SubmissionViewer, SubmissionSearch (dùng chung A/L/E)
-│   └── notifications/            # Bell, NotificationList
-└── styles/
+├── main.tsx · router.tsx
+├── layouts/AppLayout.tsx         # aside 248 px + topbar (breadcrumb, tìm kiếm, chuông, avatar) theo mẫu
+├── api/                          # axios instance /api/v1 (cookie), kiểu dữ liệu, ánh xạ ErrorCode → thông điệp
+├── auth/                         # AuthProvider, RequireRole, homeOf
+├── components/                   # ui.tsx (Card, Stat, Badge, Note, Tabs, Seg, Stepper, Modal, Toast…),
+│                                 # Icon.tsx (icon lấy từ mẫu), work.tsx (đề bài, lưới ảnh, DropZone),
+│                                 # ExcelImport.tsx (tải mẫu → tải lên → bảng xem trước + lỗi dòng → áp dụng)
+├── pages/
+│   ├── LoginPage · NotificationsPage · MediaViewer · NotFound
+│   ├── lecturer/                 # Dashboard, Classes (LHP), AssignmentForm (giao 1/nhiều LHP, sửa),
+│   │                             # AssignmentDetail (tab Thông tin · Nhóm · Bài đã nộp · Điểm),
+│   │                             # Gradebook (danh sách LHP → bảng điểm), DrivePage, Search, Stats
+│   ├── student/                  # Dashboard, Assignments, Course, AssignmentWork (4 bước), SubmitPage, Grades
+│   ├── parent/  enterprise/  admin/
+├── utils/                        # format ngày giờ VN, điểm, dung lượng; html sanitize
+└── styles/kit.css
 ```
 
 ### 5.2. Cây route
 
 ```
-/login  /forgot-password  /reset-password  /register-enterprise  /join/:code
-/change-password                                  (bắt buộc khi must_change_password)
+/login  /forgot-password  /reset-password  /register-enterprise  /change-password
+/view/:submissionId                                (trình xem dùng chung, ngoài khung)
 /admin/{dashboard, lecturers, students, students/import, parents, enterprises, catalog/*, semesters,
         courses, sections, sections/:id, view-requests, grade-requests, submissions/search,
-        stats/enterprises, stats/sections, audit-logs, settings}
-/lecturer/{sections, sections/:id (tabs: SV | Bài tập | Bảng điểm | Thống kê), assignments/new,
-           assignments/:id (tabs: Thông tin | Nhóm & đề tài | Bài nộp | Đồng bộ), submissions/:id/grade,
-           grade-requests, submissions/search, drive-link}
-/student/{profile/setup, profile, sections, sections/:id, assignments/:id (tabs: Nhóm | Đề tài | Nộp bài | Lịch sử),
-          invitations, grades, stats, enterprise-views}
-/parent/{choose-child, overview, grades, submissions, submissions/:id, warnings}
-/enterprise/{search, students/:id, students/:id/submissions, submissions/:id, view-requests, submissions/search, stats}
-/notifications  /submissions/:id (trình xem dùng chung)
+        stats/enterprises, stats/sections, stats/topics, drive-sync, audit-logs, settings}
+/lecturer/{ (tổng quan), sections, sections/:sectionId, sections/:sectionId/assignments/new,
+           assignments/new (nhiều LHP), assignments/:id (tab ?tab=info|groups|submissions|grades),
+           assignments/:id/edit, gradebook, gradebook/:sectionId, search, stats, notifications, drive}
+/student/{ (tổng quan), profile/setup, profile, assignments, courses/:sectionId,
+          assignments/:id (4 bước), assignments/:id/submit[?part=personal], grades, privacy, notifications}
+/parent/{choose-child, overview, grades, submissions, warnings}
+/enterprise/{dashboard, search, students/:id, students/:id/submissions, view-requests, submissions/search, talent-map, stats}
 ```
 
 ## 6. Quy ước mã nguồn
@@ -346,6 +332,7 @@ apps/web/src/
 | Phản hồi | Danh sách: `{ items, total, page, pageSize }` hoặc `{ items, nextCursor }`; lỗi: `{ statusCode, code, message, details? }` |
 | Transaction | Mọi thao tác ghi nhiều bảng dùng `prisma.$transaction`; job đưa vào queue bằng `afterCommit()` |
 | Quyền | Controller khai báo `@Roles`; service gọi Policy cho quyền sở hữu; repository luôn nhận `scope` người dùng |
-| Thời gian | Lưu UTC; FE format bằng `dayjs` + `Asia/Ho_Chi_Minh` |
+| Thời gian | Lưu UTC; FE format theo `Asia/Ho_Chi_Minh` (hàm trong `utils/format.ts`) |
 | Test | Mỗi service nghiệp vụ có unit test; mỗi UC P1 có ít nhất 1 e2e "happy path" + 1 ngoại lệ chính |
+| Excel | Mọi file tải lên đi qua `imports`: luôn có bước xem trước, lỗi trả theo dòng/ô, chỉ ghi khi người dùng bấm *Áp dụng* |
 | Commit | Conventional Commits (`feat(groups): ...`); nhánh `feature/<uc>-<mô-tả>` |
