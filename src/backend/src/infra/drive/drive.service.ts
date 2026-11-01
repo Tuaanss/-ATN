@@ -75,8 +75,12 @@ export class DriveService {
   authUrl(state: string) {
     return this.oauthClient().generateAuthUrl({
       access_type: 'offline',
+<<<<<<< HEAD
       // select_account: luôn cho GV chọn tài khoản Google, không tự dùng tài khoản mặc định của trình duyệt
       prompt: 'select_account consent',
+=======
+      prompt: 'consent',
+>>>>>>> b1fd9e4c892fe38462ae662b50912f41f481d8b8
       state,
       scope: ['https://www.googleapis.com/auth/drive.file', 'https://www.googleapis.com/auth/userinfo.email'],
     });
