@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Đăng nhập phụ huynh · EduPortfolio</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/app.css">
+<script src="../assets/data.js"></script>
+<script src="../assets/app.js"></script>
+</head>
+<body>
+<div class="auth">
+  <div class="auth-art">
+    <a class="logo" href="../index.html"><span class="logo-mark" id="logo-ic"></span><b>EduPortfolio</b></a>
+    <div class="stack" style="gap:18px;max-width:440px">
+      <span class="badge" style="background:rgba(255,255,255,.18);color:#fff;align-self:flex-start">Cổng phụ huynh</span>
+      <h1 style="font-size:36px;line-height:1.2;letter-spacing:-.02em">Đồng hành cùng kết quả học tập của con</h1>
+      <p style="font-size:16px;line-height:1.6;opacity:.9">Xem điểm, GPA, CPA, bài nộp và nhận cảnh báo học tập kịp thời — tài khoản được tạo tự động từ số điện thoại con khai báo.</p>
+      <div class="stack" style="gap:10px;margin-top:8px" id="feat"></div>
+    </div>
+    <p style="font-size:13px;opacity:.75">Phụ huynh chỉ có quyền xem, không chỉnh sửa hay tải bài của con.</p>
+  </div>
+  <div class="auth-form">
+    <div class="auth-box">
+      <div class="stack" style="gap:6px"><h2 style="font-size:26px;font-weight:700">Đăng nhập</h2><p class="muted">Dùng số điện thoại mà con đã khai báo trong hồ sơ sinh viên.</p></div>
+      <div id="alert"></div>
+
+      <form id="f-pw" class="stack" novalidate>
+        <div><label class="lbl" for="sdt">Số điện thoại</label><input class="inp mono" id="sdt" name="sdt" inputmode="numeric" autocomplete="username" placeholder="0xxxxxxxxx" maxlength="10"></div>
+        <div id="pw-wrap"><div class="row between"><label class="lbl" for="mk">Mật khẩu</label><a href="#" class="small" id="forgot" style="margin-bottom:6px">Quên mật khẩu?</a></div>
+          <div style="position:relative"><input class="inp" id="mk" name="mk" type="password" autocomplete="current-password" style="padding-right:44px"><button type="button" class="btn btn-g btn-ic btn-sm" id="eye" aria-label="Hiện mật khẩu" style="position:absolute;right:5px;top:5px"></button></div>
+          <div class="help">Lần đầu đăng nhập: mật khẩu tạm là chính số điện thoại.</div></div>
+        <button class="btn btn-p" style="height:46px" id="btn-login">Đăng nhập</button>
+      </form>
+
+      <form id="f-otp" class="stack hidden" novalidate>
+        <p>Mã OTP 6 số đã được gửi tới <b class="mono" id="otp-to"></b>. Mã có hiệu lực trong <b id="otp-min"></b> phút.</p>
+        <div class="otp" id="otp"></div>
+        <div class="row between small"><a href="#" id="otp-back">← Đổi số điện thoại</a><button type="button" class="btn btn-g btn-sm" id="otp-resend" disabled>Gửi lại mã</button></div>
+        <button class="btn btn-p" style="height:46px">Xác nhận</button>
+      </form>
+
+      <div class="card" style="padding:14px 16px;background:var(--soft)">
+        <b class="small">Tài khoản demo</b>
+        <div class="stack small" style="gap:6px;margin-top:8px">
+          <button type="button" class="btn btn-sm" data-demo="0912345678|Phuhuynh@123" style="justify-content:space-between"><span class="mono">0912345678</span><span class="muted">2 con · đã đổi mật khẩu</span></button>
+          <button type="button" class="btn btn-sm" data-demo="0987654321|0987654321" style="justify-content:space-between"><span class="mono">0987654321</span><span class="muted">đăng nhập lần đầu</span></button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+document.addEventListener('app:ready', () => {
+  const { ic, esc } = App, db = Store.db, $ = id => document.getElementById(id);
+  $('logo-ic').innerHTML = ic('book', 18, 2); $('eye').innerHTML = ic('eye', 18);
+  $('feat').innerHTML = [['chart', 'Điểm từng môn, GPA học kỳ và CPA tích lũy'], ['image', 'Xem bài nộp: ảnh thiết kế, video demo, link Figma'], ['bell', 'Cảnh báo khi quá hạn nộp, điểm dưới ngưỡng']]
+    .map(([i, t]) => `<div class="row" style="gap:12px;padding:12px 14px;border-radius:10px;background:rgba(255,255,255,.14)">${ic(i, 18)}<span>${t}</span></div>`).join('');
+  const cfg = db.config, otpMode = cfg.phDangNhap === 'OTP';
+  if (otpMode) { $('pw-wrap').classList.add('hidden'); $('btn-login').textContent = 'Gửi mã OTP'; }
+  const show = (msg, kind = 'bad') => $('alert').innerHTML = msg ? `<div class="alert al-${kind}">${ic(kind === 'bad' ? 'alert' : 'info', 18)}<span>${msg}</span></div>` : '';
+  const pwOf = p => p.mk || (p.doiMk ? 'Phuhuynh@123' : p.sdt);
+  const fails = db.session.fails || (db.session.fails = {});
+
+  $('eye').onclick = () => { const i = $('mk'); i.type = i.type === 'password' ? 'text' : 'password'; $('eye').setAttribute('aria-label', i.type === 'password' ? 'Hiện mật khẩu' : 'Ẩn mật khẩu'); };
+  document.querySelectorAll('[data-demo]').forEach(b => b.onclick = () => { const [s, m] = b.dataset.demo.split('|'); $('sdt').value = s; $('mk').value = m; show(''); });
+  $('forgot').onclick = e => { e.preventDefault(); show('Liên hệ phòng Công tác sinh viên hoặc yêu cầu con kiểm tra lại SĐT phụ huynh trong hồ sơ. Quản trị viên có thể đặt lại mật khẩu về mật khẩu tạm = SĐT.', 'info'); };
+
+  function enter(p) {
+    db.session = { phId: p.id, fails };
+    p.lastLogin = new Date().toISOString().slice(0, 16).replace('T', ' ');
+    Store.save();
+    // Chế độ OTP thay cho mật khẩu tạm nên không cần bước đổi mật khẩu (BR-PH-02)
+    if (!otpMode && !p.doiMk && cfg.doiMkLanDau) location.href = 'doi-mat-khau.html?first=1';
+    else location.href = p.links.length > 1 ? 'chon-con.html' : 'ket-qua.html';
+  }
+  function findPh(sdt) {
+    App.fieldErr($('f-pw'), 'sdt', '');
+    if (!App.phoneOk(sdt)) { App.fieldErr($('f-pw'), 'sdt', 'Số điện thoại gồm 10 chữ số, bắt đầu bằng 03, 05, 07, 08 hoặc 09.'); return null; }
+    const p = db.ph.find(x => x.sdt === sdt);
+    if (!p) { show('Số điện thoại chưa được đăng ký làm SĐT phụ huynh. Hãy kiểm tra với con số đã khai báo trong hồ sơ.'); return null; }
+    if (p.trangThai === 'KHOA') { show('Tài khoản đã bị khóa. Vui lòng liên hệ nhà trường.'); return null; }
+    if (p.trangThai === 'VO_HIEU') { show('Số điện thoại này không còn liên kết với sinh viên nào.'); return null; }
+    const f = fails[sdt];
+    if (f && f.until > Date.now()) { show(`Tài khoản tạm khóa do nhập sai quá ${cfg.saiMk} lần. Thử lại sau ${Math.ceil((f.until - Date.now()) / 60000)} phút.`); return null; }
+    return p;
+  }
+
+  $('f-pw').onsubmit = e => {
+    e.preventDefault(); show('');
+    const p = findPh($('sdt').value.trim()); if (!p) return;
+    if (otpMode) return startOtp(p);
+    if ($('mk').value !== pwOf(p)) {
+      const f = fails[p.sdt] = fails[p.sdt] || { n: 0 }; f.n++;
+      if (f.n >= cfg.saiMk) { f.until = Date.now() + cfg.khoaPhut * 60000; f.n = 0; show(`Sai mật khẩu ${cfg.saiMk} lần liên tiếp. Tài khoản bị tạm khóa ${cfg.khoaPhut} phút.`); }
+      else show(`Mật khẩu không đúng. Còn ${cfg.saiMk - f.n} lần thử trước khi bị tạm khóa.`);
+      Store.save(); return;
+    }
+    delete fails[p.sdt]; enter(p);
+  };
+
+  // ----- đăng nhập bằng OTP (khi Admin cấu hình) -----
+  let otpPh = null, code = '';
+  $('otp').innerHTML = Array.from({ length: 6 }, (_, i) => `<input class="inp mono" inputmode="numeric" maxlength="1" aria-label="Chữ số OTP thứ ${i + 1}">`).join('');
+  const boxes = [...$('otp').querySelectorAll('input')];
+  boxes.forEach((b, i) => {
+    b.addEventListener('input', () => { b.value = b.value.replace(/\D/g, ''); if (b.value && boxes[i + 1]) boxes[i + 1].focus(); });
+    b.addEventListener('keydown', e => { if (e.key === 'Backspace' && !b.value && boxes[i - 1]) boxes[i - 1].focus(); });
+    b.addEventListener('paste', e => { const d = (e.clipboardData.getData('text') || '').replace(/\D/g, '').slice(0, 6); if (d.length === 6) { e.preventDefault(); boxes.forEach((x, k) => x.value = d[k]); boxes[5].focus(); } });
+  });
+  function startOtp(p) {
+    otpPh = p; code = String(Math.floor(100000 + Math.random() * 900000));
+    $('otp-to').textContent = p.sdt; $('otp-min').textContent = cfg.otpPhut;
+    $('f-pw').classList.add('hidden'); $('f-otp').classList.remove('hidden'); boxes.forEach(b => b.value = ''); boxes[0].focus();
+    App.toast('Demo: mã OTP là ' + code, 'info');
+    let s = 60; $('otp-resend').disabled = true;
+    const tm = setInterval(() => { s--; $('otp-resend').textContent = s > 0 ? `Gửi lại mã (${s}s)` : 'Gửi lại mã'; if (s <= 0) { clearInterval(tm); $('otp-resend').disabled = false; } }, 1000);
+  }
+  $('otp-resend').onclick = () => startOtp(otpPh);
+  $('otp-back').onclick = e => { e.preventDefault(); $('f-otp').classList.add('hidden'); $('f-pw').classList.remove('hidden'); };
+  $('f-otp').onsubmit = e => { e.preventDefault(); const v = boxes.map(b => b.value).join(''); if (v !== code) { show('Mã OTP không đúng hoặc đã hết hạn.'); return; } enter(otpPh); };
+});
+</script>
+</body>
+</html>

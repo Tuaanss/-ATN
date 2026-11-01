@@ -1,0 +1,413 @@
+{
+ "v": 3,
+ "createdOnFiles": {
+  "v": 1,
+  "at": "2026-09-30T16:37:34Z"
+ },
+ "title": "EduPortfolio UI",
+ "launch": {
+  "view": "canvas",
+  "page": "chung"
+ },
+ "pages": [
+  {
+   "id": "chung",
+   "name": "Chung & Xác thực"
+  },
+  {
+   "id": "sv",
+   "name": "Sinh viên"
+  },
+  {
+   "id": "gv",
+   "name": "Giảng viên"
+  },
+  {
+   "id": "ph",
+   "name": "Phụ huynh"
+  },
+  {
+   "id": "dn",
+   "name": "Doanh nghiệp"
+  },
+  {
+   "id": "admin",
+   "name": "Quản trị viên"
+  }
+ ],
+ "boards": {
+  "Main.dc.html": {
+   "x": 0,
+   "y": 0,
+   "w": 1440,
+   "h": 1180,
+   "title": "Mục lục thiết kế",
+   "page": "chung",
+   "is_interactive": true
+  },
+  "Auth_Login.dc.html": {
+   "x": 1520,
+   "y": 0,
+   "w": 1440,
+   "h": 900,
+   "title": "Đăng nhập (M01)",
+   "page": "chung",
+   "is_interactive": true
+  },
+  "Auth_ChangePassword.dc.html": {
+   "x": 3040,
+   "y": 0,
+   "w": 1440,
+   "h": 900,
+   "title": "Đổi mật khẩu lần đầu / OTP (FR-01.4)",
+   "page": "chung",
+   "is_interactive": true
+  },
+  "Auth_DNRegister.dc.html": {
+   "x": 0,
+   "y": 1360,
+   "w": 1440,
+   "h": 1000,
+   "title": "Đăng ký doanh nghiệp (FR-12.1)",
+   "page": "chung",
+   "is_interactive": true
+  },
+  "Media_Viewer.dc.html": {
+   "x": 1520,
+   "y": 1360,
+   "w": 1440,
+   "h": 900,
+   "title": "Trình xem đa phương tiện (M08)",
+   "page": "chung",
+   "is_interactive": true
+  },
+  "SV_ProfileSetup.dc.html": {
+   "x": 0,
+   "y": 0,
+   "w": 1440,
+   "h": 1240,
+   "title": "Khai báo hồ sơ – chặn truy cập (M03)",
+   "page": "sv",
+   "is_interactive": true
+  },
+  "SV_Dashboard.dc.html": {
+   "x": 1520,
+   "y": 0,
+   "w": 1440,
+   "h": 1040,
+   "title": "Tổng quan sinh viên",
+   "page": "sv",
+   "is_interactive": true
+  },
+  "SV_Assignment.dc.html": {
+   "x": 3040,
+   "y": 0,
+   "w": 1440,
+   "h": 1320,
+   "title": "Bài tập, nhóm & đề tài (M05–M06)",
+   "page": "sv",
+   "is_interactive": true
+  },
+  "SV_Submit.dc.html": {
+   "x": 0,
+   "y": 1500,
+   "w": 1440,
+   "h": 1280,
+   "title": "Nộp bài đa phương tiện (M07)",
+   "page": "sv",
+   "is_interactive": true
+  },
+  "SV_ConfirmResubmit.dc.html": {
+   "x": 1520,
+   "y": 1500,
+   "w": 1440,
+   "h": 900,
+   "title": "Hộp thoại xác nhận nộp lại (FR-07.7)",
+   "page": "sv",
+   "is_interactive": true
+  },
+  "SV_Grades.dc.html": {
+   "x": 3040,
+   "y": 1500,
+   "w": 1440,
+   "h": 1080,
+   "title": "Kết quả học tập (M09)",
+   "page": "sv",
+   "is_interactive": true
+  },
+  "SV_Privacy.dc.html": {
+   "x": 0,
+   "y": 2960,
+   "w": 1440,
+   "h": 1000,
+   "title": "Doanh nghiệp & quyền riêng tư (FR-03.5, 13.8, 16.14)",
+   "page": "sv",
+   "is_interactive": true
+  },
+  "GV_Dashboard.dc.html": {
+   "x": 0,
+   "y": 0,
+   "w": 1440,
+   "h": 1000,
+   "title": "Tổng quan giảng viên",
+   "page": "gv",
+   "is_interactive": true
+  },
+  "GV_CreateAssignment.dc.html": {
+   "x": 1520,
+   "y": 0,
+   "w": 1440,
+   "h": 1480,
+   "title": "Tạo bài tập + thư mục Drive (M05, M18)",
+   "page": "gv",
+   "is_interactive": true
+  },
+  "GV_AssignmentDetail.dc.html": {
+   "x": 3040,
+   "y": 0,
+   "w": 1440,
+   "h": 1180,
+   "title": "Bài tập: nhóm, đề tài, bài nộp (M06, FR-06.14)",
+   "page": "gv",
+   "is_interactive": true
+  },
+  "GV_Grading.dc.html": {
+   "x": 0,
+   "y": 1660,
+   "w": 1440,
+   "h": 1000,
+   "title": "Chấm bài (FR-09.2)",
+   "page": "gv",
+   "is_interactive": true
+  },
+  "GV_Gradebook.dc.html": {
+   "x": 1520,
+   "y": 1660,
+   "w": 1440,
+   "h": 1000,
+   "title": "Bảng điểm học phần (FR-09.1, 09.5, 09.6)",
+   "page": "gv",
+   "is_interactive": true
+  },
+  "GV_Search.dc.html": {
+   "x": 3040,
+   "y": 1660,
+   "w": 1440,
+   "h": 1040,
+   "title": "Tìm bài theo chủ đề (M10)",
+   "page": "gv",
+   "is_interactive": true
+  },
+  "PH_Dashboard.dc.html": {
+   "x": 0,
+   "y": 0,
+   "w": 1440,
+   "h": 1040,
+   "title": "Cổng phụ huynh (M11)",
+   "page": "ph",
+   "is_interactive": true
+  },
+  "PH_SelectChild.dc.html": {
+   "x": 1520,
+   "y": 0,
+   "w": 1440,
+   "h": 900,
+   "title": "Chọn con sau đăng nhập (FR-01.7, 11.5)",
+   "page": "ph",
+   "is_interactive": true
+  },
+  "PH_Submissions.dc.html": {
+   "x": 3040,
+   "y": 0,
+   "w": 1440,
+   "h": 1000,
+   "title": "Bài nộp của con – chỉ xem (FR-11.2)",
+   "page": "ph",
+   "is_interactive": true
+  },
+  "DN_Search.dc.html": {
+   "x": 0,
+   "y": 0,
+   "w": 1440,
+   "h": 1160,
+   "title": "Tìm kiếm sinh viên (FR-12.2–12.4)",
+   "page": "dn",
+   "is_interactive": true
+  },
+  "DN_Profile.dc.html": {
+   "x": 1520,
+   "y": 0,
+   "w": 1440,
+   "h": 1040,
+   "title": "Hồ sơ SV & yêu cầu xem bài (FR-12.5, 13.1)",
+   "page": "dn",
+   "is_interactive": true
+  },
+  "DN_Dashboard.dc.html": {
+   "x": 3040,
+   "y": 0,
+   "w": 1440,
+   "h": 1000,
+   "title": "Yêu cầu & thống kê của DN (FR-12.9)",
+   "page": "dn",
+   "is_interactive": true
+  },
+  "Admin_Dashboard.dc.html": {
+   "x": 0,
+   "y": 0,
+   "w": 1440,
+   "h": 1000,
+   "title": "Tổng quan quản trị (FR-16.1)",
+   "page": "admin",
+   "is_interactive": true
+  },
+  "Admin_Users.dc.html": {
+   "x": 1520,
+   "y": 0,
+   "w": 1440,
+   "h": 1040,
+   "title": "Quản lý người dùng & import (FR-02.1–02.4)",
+   "page": "admin",
+   "is_interactive": true
+  },
+  "Admin_Academic.dc.html": {
+   "x": 3040,
+   "y": 0,
+   "w": 1440,
+   "h": 960,
+   "title": "Đào tạo & danh mục (M04, FR-02.5)",
+   "page": "admin",
+   "is_interactive": true
+  },
+  "Admin_AccessRequests.dc.html": {
+   "x": 0,
+   "y": 1220,
+   "w": 1440,
+   "h": 1000,
+   "title": "Duyệt yêu cầu xem bài (M13)",
+   "page": "admin",
+   "is_interactive": true
+  },
+  "Admin_DNStats.dc.html": {
+   "x": 1520,
+   "y": 1220,
+   "w": 1440,
+   "h": 1320,
+   "title": "Thống kê doanh nghiệp (FR-16.6–16.13)",
+   "page": "admin",
+   "is_interactive": true
+  },
+  "Admin_Tags.dc.html": {
+   "x": 3040,
+   "y": 1220,
+   "w": 1440,
+   "h": 960,
+   "title": "Chuẩn hóa từ khóa đề tài (FR-02.5a)",
+   "page": "admin",
+   "is_interactive": true
+  },
+  "Admin_AuditLog.dc.html": {
+   "x": 0,
+   "y": 2720,
+   "w": 1440,
+   "h": 960,
+   "title": "Nhật ký hệ thống (M17)",
+   "page": "admin",
+   "is_interactive": true
+  },
+  "Admin_Config.dc.html": {
+   "x": 1520,
+   "y": 2720,
+   "w": 1440,
+   "h": 1000,
+   "title": "Cấu hình hệ thống (FR-02.7)",
+   "page": "admin",
+   "is_interactive": true
+  }
+ },
+ "order": [
+  "Main.dc.html",
+  "Auth_Login.dc.html",
+  "Auth_ChangePassword.dc.html",
+  "Auth_DNRegister.dc.html",
+  "Media_Viewer.dc.html",
+  "SV_ProfileSetup.dc.html",
+  "SV_Dashboard.dc.html",
+  "SV_Assignment.dc.html",
+  "SV_Submit.dc.html",
+  "SV_ConfirmResubmit.dc.html",
+  "SV_Grades.dc.html",
+  "SV_Privacy.dc.html",
+  "GV_Dashboard.dc.html",
+  "GV_CreateAssignment.dc.html",
+  "GV_AssignmentDetail.dc.html",
+  "GV_Grading.dc.html",
+  "GV_Gradebook.dc.html",
+  "GV_Search.dc.html",
+  "PH_Dashboard.dc.html",
+  "PH_SelectChild.dc.html",
+  "PH_Submissions.dc.html",
+  "DN_Search.dc.html",
+  "DN_Profile.dc.html",
+  "DN_Dashboard.dc.html",
+  "Admin_Dashboard.dc.html",
+  "Admin_Users.dc.html",
+  "Admin_Academic.dc.html",
+  "Admin_AccessRequests.dc.html",
+  "Admin_DNStats.dc.html",
+  "Admin_Tags.dc.html",
+  "Admin_AuditLog.dc.html",
+  "Admin_Config.dc.html"
+ ],
+ "notes": {
+  "t_chung": {
+   "x": 0,
+   "y": -300,
+   "text": "Chung & Xác thực",
+   "kind": "title1",
+   "maxW": 4480,
+   "page": "chung"
+  },
+  "t_sv": {
+   "x": 0,
+   "y": -300,
+   "text": "Sinh viên",
+   "kind": "title1",
+   "maxW": 4480,
+   "page": "sv"
+  },
+  "t_gv": {
+   "x": 0,
+   "y": -300,
+   "text": "Giảng viên",
+   "kind": "title1",
+   "maxW": 4480,
+   "page": "gv"
+  },
+  "t_ph": {
+   "x": 0,
+   "y": -300,
+   "text": "Phụ huynh",
+   "kind": "title1",
+   "maxW": 4480,
+   "page": "ph"
+  },
+  "t_dn": {
+   "x": 0,
+   "y": -300,
+   "text": "Doanh nghiệp",
+   "kind": "title1",
+   "maxW": 4480,
+   "page": "dn"
+  },
+  "t_admin": {
+   "x": 0,
+   "y": -300,
+   "text": "Quản trị viên",
+   "kind": "title1",
+   "maxW": 4480,
+   "page": "admin"
+  }
+ },
+ "designSystems": []
+}

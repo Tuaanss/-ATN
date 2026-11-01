@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<title>Trình xem đa phương tiện (M08)</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@500;600&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;font-family:'Be Vietnam Pro',system-ui,sans-serif;color:#1A1C21;background:#F5F5F5;-webkit-font-smoothing:antialiased}
+*{box-sizing:border-box}
+a{color:#DB0000;text-decoration:none}a:hover{color:#A30000}
+h1,h2,h3,p{margin:0}
+.card{background:#fff;border:1px solid #E3E1D9;border-radius:12px}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:40px;padding:0 16px;border-radius:8px;font:600 14px 'Be Vietnam Pro',sans-serif;border:1px solid #D6D3C8;background:#fff;color:#1A1C21;cursor:pointer;white-space:nowrap}
+.btn:hover{background:#F7F6F2;color:#1A1C21}
+.btn-p{background:#DB0000;border-color:#DB0000;color:#fff}.btn-p:hover{background:#A30000;color:#fff}
+.btn-d{background:#fff;border-color:#E9B8B3;color:#9B1C12}.btn-d:hover{background:#FCE8E6;color:#9B1C12}
+.btn-g{border-color:transparent;background:transparent}
+.btn-sm{height:32px;padding:0 12px;font-size:13px}
+.badge{display:inline-flex;align-items:center;gap:6px;height:24px;padding:0 10px;border-radius:999px;font-size:12px;font-weight:600;white-space:nowrap}
+.b-blue{background:#E6EFFD;color:#1847A8}.b-green{background:#E3F2E8;color:#14532D}.b-amber{background:#FDF0DE;color:#8A3B06}.b-red{background:#FCE8E6;color:#9B1C12}.b-gray{background:#EEEDE7;color:#474B53}.b-dark{background:#1A1C21;color:#fff}
+.dot{width:8px;height:8px;border-radius:50%;display:inline-block;flex-shrink:0}
+.chip{display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 10px;border-radius:6px;background:#F1F0EA;border:1px solid #E3E1D9;font-size:13px;color:#30343B;white-space:nowrap}
+.mono{font-family:'JetBrains Mono',ui-monospace,monospace}
+.muted{color:#62666F}
+.lbl{font-size:13px;font-weight:600;color:#30343B;display:block;margin-bottom:6px}
+.help{font-size:12px;color:#62666F;margin-top:6px}
+.err{font-size:12px;color:#B42318;margin-top:6px;font-weight:500}
+.inp{width:100%;height:42px;border:1px solid #D6D3C8;border-radius:8px;padding:0 12px;font:400 14px 'Be Vietnam Pro',sans-serif;background:#fff;color:#1A1C21}
+.inp:focus{outline:2px solid #DB0000;outline-offset:-1px}
+.inp-err{border-color:#D9534A;background:#FFFBFA}
+textarea.inp{height:auto;padding:10px 12px;line-height:1.5;resize:vertical}
+input[type=checkbox],input[type=radio]{accent-color:#DB0000;width:18px;height:18px;margin:0}
+table{border-collapse:collapse;width:100%}
+th{text-align:left;font-size:12px;font-weight:600;color:#62666F;text-transform:uppercase;letter-spacing:.04em;padding:10px 16px;border-bottom:1px solid #E3E1D9;background:#FAFAF7;white-space:nowrap}
+td{padding:12px 16px;border-bottom:1px solid #EFEDE6;font-size:14px;vertical-align:middle}
+tr:last-child td{border-bottom:0}
+.nav a{display:flex;align-items:center;gap:12px;height:40px;padding:0 12px;border-radius:8px;color:#30343B;font-size:14px;font-weight:500}
+.nav a:hover{background:#F2F2F2;color:#1A1C21}.nav a.on{background:#FDECEC;color:#DB0000;font-weight:600}
+.h1{font-size:26px;font-weight:700;letter-spacing:-.01em}
+.sec{font-size:16px;font-weight:700}
+.ph{background-image:repeating-linear-gradient(135deg,rgba(0,0,0,.035) 0 10px,transparent 10px 20px)}
+.tabs{display:flex;gap:4px;border-bottom:1px solid #E3E1D9}
+.tab{height:44px;padding:0 16px;display:inline-flex;align-items:center;gap:8px;font-size:14px;font-weight:600;color:#62666F;border-bottom:2px solid transparent;margin-bottom:-1px}
+.tab.on{color:#1A1C21;border-bottom-color:#DB0000}
+.seg{display:inline-flex;padding:3px;background:#ECEBE4;border-radius:9px;gap:2px}
+.seg span{height:32px;padding:0 14px;display:inline-flex;align-items:center;border-radius:7px;font-size:13px;font-weight:600;color:#4A4E57}
+.seg span.on{background:#fff;color:#1A1C21;box-shadow:0 1px 2px rgba(0,0,0,.08)}
+.sw{width:40px;height:24px;border-radius:12px;background:#DB0000;position:relative;flex-shrink:0}
+.sw::after{content:'';position:absolute;top:3px;left:19px;width:18px;height:18px;border-radius:50%;background:#fff}
+.sw.off{background:#C9C6BB}.sw.off::after{left:3px}
+.av{width:36px;height:36px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#A30000;background:#FBE3E3;flex-shrink:0}
+</style>
+</helmet>
+<div style="width:1440px;height:900px;background:#0E0F12;color:#fff;display:flex;flex-direction:column">
+<header style="height:64px;display:flex;align-items:center;gap:16px;padding:0 24px;border-bottom:1px solid #23262E">
+<a href="GV_Grading.dc.html" class="btn btn-g" aria-label="Quay lại" style="color:#fff;width:40px;padding:0"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 5-7 7 7 7"/></svg></a>
+<div style="display:flex;flex-direction:column"><span style="font-size:15px;font-weight:600">Ứng dụng đặt lịch cắt tóc BarberGo</span><span style="font-size:12px;color:#9DA2B0">Nhóm 03 · BarberGo Team · BT2 – Thiết kế ứng dụng di động</span></div>
+<div style="margin-left:24px;display:flex;gap:4px;padding:3px;background:#1B1D23;border-radius:9px">
+<span style="height:34px;padding:0 14px;display:inline-flex;align-items:center;gap:8px;border-radius:7px;background:#2A2F3D;font-size:13px;font-weight:600"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="m21 17-5-5-9 8"/></svg>Ảnh (12)</span>
+<span style="height:34px;padding:0 14px;display:inline-flex;align-items:center;gap:8px;border-radius:7px;font-size:13px;font-weight:600;color:#B9BDC8"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg>Figma</span>
+<span style="height:34px;padding:0 14px;display:inline-flex;align-items:center;gap:8px;border-radius:7px;font-size:13px;font-weight:600;color:#B9BDC8"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="6" width="13" height="12" rx="2"/><path d="m16 10 5-3v10l-5-3"/></svg>Video</span>
+<span style="height:34px;padding:0 14px;display:inline-flex;align-items:center;gap:8px;border-radius:7px;font-size:13px;font-weight:600;color:#B9BDC8"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m8 7-5 5 5 5M16 7l5 5-5 5"/></svg>Mã nguồn</span></div>
+<div style="margin-left:auto;display:flex;gap:8px">
+<button class="btn btn-g" aria-label="Phóng to" style="color:#fff"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4M11 8v6M8 11h6"/></svg></button>
+<button class="btn btn-g" aria-label="Toàn màn hình" style="color:#fff"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg></button>
+<button class="btn" style="background:#1B1D23;border-color:#2E323C;color:#fff"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v12"/><path d="m7 11 5 5 5-5"/><path d="M4 20h16"/></svg>Tải xuống</button></div>
+</header>
+<div style="flex:1;display:flex;min-height:0">
+<div style="flex:1;display:flex;flex-direction:column;min-width:0">
+<div style="flex:1;display:flex;align-items:center;justify-content:center;gap:24px;padding:24px">
+<button onClick="{{prev}}" aria-label="Ảnh trước" style="width:52px;height:52px;border-radius:50%;border:1px solid #2E323C;background:#1B1D23;color:#fff;display:inline-flex;align-items:center;justify-content:center;cursor:pointer"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 5-7 7 7 7"/></svg></button>
+<div class="ph" style="width:760px;height:520px;border-radius:10px;background-color:{{cur.bg}};display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;color:#30343B">
+<svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="m21 17-5-5-9 8"/></svg><span class="mono" style="font-size:14px;font-weight:600">{{cur.label}}</span><span style="font-size:12px">[Ảnh thiết kế do sinh viên tải lên]</span></div>
+<button onClick="{{next}}" aria-label="Ảnh tiếp theo" style="width:52px;height:52px;border-radius:50%;border:1px solid #2E323C;background:#1B1D23;color:#fff;display:inline-flex;align-items:center;justify-content:center;cursor:pointer"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 5 7 7-7 7"/></svg></button>
+</div>
+<div style="display:flex;align-items:center;justify-content:center;gap:8px;font-size:13px;color:#B9BDC8"><b style="color:#fff">{{counter}}</b><span>· Phím ← → để chuyển ảnh, vuốt trên di động</span></div>
+<div style="display:flex;gap:8px;justify-content:center;padding:16px 24px 20px">
+<sc-for list="{{imgs}}" as="im" hint-placeholder-count="12">
+<sc-if value="{{im.sel}}" hint-placeholder-val="{{false}}"><button onClick="{{im.go}}" aria-label="{{im.label}}" style="width:64px;height:44px;border-radius:6px;border:2px solid #fff;background:{{im.bg}};cursor:pointer;padding:0"></button></sc-if>
+<sc-if value="{{im.unsel}}" hint-placeholder-val="{{true}}"><button onClick="{{im.go}}" aria-label="{{im.label}}" style="width:64px;height:44px;border-radius:6px;border:2px solid transparent;background:{{im.bg}};opacity:.5;cursor:pointer;padding:0"></button></sc-if>
+</sc-for></div></div>
+<aside style="width:320px;border-left:1px solid #23262E;padding:24px;display:flex;flex-direction:column;gap:18px;font-size:13px">
+<div style="display:flex;flex-direction:column;gap:6px"><span style="color:#9DA2B0">Đề tài</span><span style="font-size:15px;font-weight:600">Ứng dụng đặt lịch cắt tóc BarberGo</span>
+<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px"><span class="chip" style="background:#1B1D23;border-color:#2E323C;color:#DADDE5">UI Mobile App</span><span class="chip" style="background:#1B1D23;border-color:#2E323C;color:#DADDE5">Đặt lịch</span><span class="chip" style="background:#1B1D23;border-color:#2E323C;color:#DADDE5">Dịch vụ làm đẹp</span></div></div>
+<div style="display:flex;flex-direction:column;gap:6px"><span style="color:#9DA2B0">Người nộp</span><span>Trần Minh Khoa · 29/09/2026 14:32</span></div>
+<div style="display:flex;flex-direction:column;gap:6px"><span style="color:#9DA2B0">Link Figma</span><a href="https://www.figma.com" style="color:#FF8A8A">figma.com/design/barbergo…</a></div>
+<div style="display:flex;flex-direction:column;gap:6px"><span style="color:#9DA2B0">Lưu trữ</span><span style="display:flex;align-items:center;gap:8px;color:#86EFAC"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg>Đã đồng bộ Google Drive</span></div>
+<div style="margin-top:auto;padding:12px;border-radius:8px;background:#1B1D23;color:#B9BDC8;line-height:1.5">Nút Tải xuống chỉ hiện với Giảng viên và chủ bài. Phụ huynh và Doanh nghiệp chỉ được xem.</div>
+</aside></div></div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const n = 12;
+    const i = (this.state && this.state.i != null) ? this.state.i : 2;
+    const tones = ["#DCE4F2","#F2E3D5","#DDEBDF","#EADDF0","#F4E9C9","#D7E9EC","#F0DADA","#E1E4D0","#DCE4F2","#F2E3D5","#DDEBDF","#EADDF0"];
+    const imgs = [];
+    for (let k = 0; k < n; k++) {
+      imgs.push({ label: 'anh_' + String(k + 1).padStart(2, '0') + '.png', bg: tones[k], sel: k === i, unsel: k !== i, go: () => this.setState({ i: k }) });
+    }
+    return {
+      imgs: imgs, cur: imgs[i], counter: 'Ảnh ' + (i + 1) + '/' + n,
+      prev: () => this.setState({ i: (i - 1 + n) % n }),
+      next: () => this.setState({ i: (i + 1) % n })
+    };
+  }
+}
+</script>
+</body>
+</html>

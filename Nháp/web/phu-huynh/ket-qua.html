@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kết quả học tập của con · EduPortfolio</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/app.css">
+<style>
+  .chart{position:relative}
+  .chart svg{display:block;overflow:visible}
+  .chart .hit{fill:transparent;cursor:pointer}
+  .chart .hit:hover+.bar-m,.chart .bar-m.hl{opacity:.85}
+  .tip{position:absolute;pointer-events:none;background:#fff;border:1px solid var(--line);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.12);padding:10px 12px;font-size:13px;min-width:170px;transform:translate(-50%,-100%);display:none;z-index:5}
+  .tip .r{display:flex;align-items:center;gap:8px;justify-content:space-between}
+  .legend{display:flex;gap:16px;font-size:13px;color:var(--ink2);flex-wrap:wrap}
+  .legend span{display:inline-flex;align-items:center;gap:6px}
+  .lo{color:#B42318;font-weight:600}
+  .lo::after{content:' ▾';font-size:10px}
+</style>
+<script src="../assets/data.js"></script>
+<script src="../assets/app.js"></script>
+</head>
+<body data-role="ph" data-active="ket-qua" data-crumbs="Phụ huynh › <b>Điểm, GPA & CPA</b>">
+<div id="page" class="stack" style="gap:24px">
+  <div class="page-head">
+    <div class="t"><h1 class="h1" id="title"></h1><p class="sub-t">Bảng điểm theo học kỳ, GPA học kỳ và CPA (điểm trung bình tích lũy) — chỉ xem.</p></div>
+  </div>
+  <div class="grid g4" id="tiles"></div>
+  <section class="card">
+    <div class="card-h"><h2>GPA học kỳ và CPA tích lũy (thang 4)</h2>
+      <div class="legend"><span><i style="width:12px;height:12px;border-radius:3px;background:#DB0000"></i>GPA học kỳ</span><span><i style="width:16px;height:2px;background:#2563EB"></i><i style="width:8px;height:8px;border-radius:50%;background:#2563EB;margin-left:-12px;border:2px solid #fff;box-sizing:content-box"></i>CPA tích lũy</span></div>
+    </div>
+    <div class="card-b"><div class="chart" id="chart"></div></div>
+  </section>
+  <section class="card">
+    <div class="card-h"><h2>Bảng điểm</h2><select class="inp" id="hk" style="width:auto;height:38px" aria-label="Chọn học kỳ"></select></div>
+    <div id="hk-note"></div>
+    <div class="tbl-wrap"><table><thead><tr><th>Mã môn</th><th>Tên môn</th><th class="num">TC</th><th class="num">Chuyên cần</th><th class="num">Bài tập</th><th class="num">Giữa kỳ</th><th class="num">Cuối kỳ</th><th class="num">Tổng kết</th><th class="num">Điểm chữ</th><th class="num">Hệ 4</th></tr></thead><tbody id="rows"></tbody></table></div>
+    <div class="pager" id="sum"></div>
+  </section>
+  <p class="muted small">Quy đổi: A (8.5–10) = 4.0 · B+ (8.0–8.4) = 3.5 · B (7.0–7.9) = 3.0 · C+ (6.5–6.9) = 2.5 · C (5.5–6.4) = 2.0 · D+ (5.0–5.4) = 1.5 · D (4.0–4.9) = 1.0 · F (&lt; 4.0) = 0. Môn học lại lấy điểm cao nhất.</p>
+</div>
+<script>
+document.addEventListener('app:ready', () => {
+  const { ic, esc, badge } = App, db = Store.db, $ = id => document.getElementById(id);
+  const { child } = App.phSession();
+  const g = App.gpa(child.id), TH = db.config.canhBaoDiem;
+  $('title').textContent = 'Kết quả học tập · ' + child.hoTen;
+  const done = g.perHk.filter(h => h.gpa != null);
+  const last = done[done.length - 1], prev = done[done.length - 2];
+  const cur = g.perHk[g.perHk.length - 1];
+  const lowNow = cur ? cur.mon.filter(m => [m.cc, m.bt, m.gk, m.ck, m.tk].some(x => x != null && x < TH)).length : 0;
+  const delta = last && prev ? Math.round((last.gpa - prev.gpa) * 100) / 100 : null;
+
+  $('tiles').innerHTML = [
+    ['CPA tích lũy', g.cpa != null ? g.cpa.toFixed(2) : '—', g.cpa != null ? 'Xếp loại: <b>' + App.xepLoai(g.cpa) + '</b>' : 'Chưa có học kỳ hoàn thành', 'chart'],
+    ['GPA học kỳ gần nhất', last ? last.gpa.toFixed(2) : '—', last ? `${esc(last.full)}${delta != null ? ` · <span style="color:${delta >= 0 ? 'var(--green)' : '#B42318'};font-weight:600">${delta >= 0 ? '▲' : '▼'} ${Math.abs(delta).toFixed(2)}</span>` : ''}` : 'Chưa có', 'trend'],
+    ['Tín chỉ tích lũy', g.tcTichLuy, 'Môn đạt (không tính F)', 'book'],
+    ['Điểm dưới ngưỡng kỳ này', lowNow, lowNow ? `<span style="color:#B42318;font-weight:600">${ic('alert', 13)} Cần quan tâm</span> · ngưỡng ${TH.toFixed(1)}` : `Ngưỡng cảnh báo ${TH.toFixed(1)}`, 'alert'],
+  ].map(([k, v, s, i]) => `<div class="tile"><span class="k">${ic(i, 16)} ${k}</span><span class="v">${v}</span><span class="s">${s}</span></div>`).join('');
+
+  // ---------- biểu đồ: cột GPA + đường CPA, cùng một trục 0–4 ----------
+  function chart() {
+    const el = $('chart');
+    if (!done.length) { el.innerHTML = `<div class="empty">Chưa có học kỳ nào hoàn thành để vẽ biểu đồ.</div>`; return; }
+    const W = Math.max(320, el.clientWidth), H = 260, L = 34, R = 84, T = 18, B = 34, iw = W - L - R, ih = H - T - B, n = done.length;
+    const x = i => L + iw * (i + 0.5) / n, y = v => T + ih * (1 - v / 4), bw = Math.min(56, iw / n * 0.45);
+    const grid = [0, 1, 2, 3, 4].map(v => `<line x1="${L}" x2="${W - R}" y1="${y(v)}" y2="${y(v)}" stroke="#E1E0D9" stroke-width="1"/><text x="${L - 8}" y="${y(v) + 4}" text-anchor="end" font-size="11" fill="#8A8E97">${v}</text>`).join('');
+    const bars = done.map((h, i) => { const top = y(h.gpa), hh = ih + T - top, r = Math.min(4, hh);
+      return `<path class="bar-m" data-i="${i}" d="M${x(i) - bw / 2},${T + ih} V${top + r} Q${x(i) - bw / 2},${top} ${x(i) - bw / 2 + r},${top} H${x(i) + bw / 2 - r} Q${x(i) + bw / 2},${top} ${x(i) + bw / 2},${top + r} V${T + ih} Z" fill="#DB0000"/>
+        <text x="${x(i)}" y="${H - 12}" text-anchor="middle" font-size="12" fill="#62666F">${esc(h.label)}</text>`; }).join('');
+    const pts = done.map((h, i) => [x(i), y(h.cpa)]);
+    const line = `<polyline points="${pts.map(p => p.join(',')).join(' ')}" fill="none" stroke="#2563EB" stroke-width="2" stroke-linejoin="round"/>` +
+      pts.map(([px, py]) => `<circle cx="${px}" cy="${py}" r="4.5" fill="#2563EB" stroke="#fff" stroke-width="2"/>`).join('');
+    const lastI = n - 1;
+    const labels = `<text x="${x(lastI)}" y="${y(done[lastI].gpa) - 8}" text-anchor="middle" font-size="12" font-weight="700" fill="#1A1C21">${done[lastI].gpa.toFixed(2)}</text>` +
+      `<text x="${x(lastI) + bw / 2 + 8}" y="${y(done[lastI].cpa) + 4}" font-size="12" font-weight="600" fill="#30343B">CPA ${done[lastI].cpa.toFixed(2)}</text>`;
+    const hits = done.map((h, i) => `<rect class="hit" data-i="${i}" x="${L + iw * i / n}" y="${T}" width="${iw / n}" height="${ih}"/>`).join('');
+    el.innerHTML = `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="Biểu đồ GPA học kỳ và CPA tích lũy">${grid}${bars}${line}${labels}<line id="xh" y1="${T}" y2="${T + ih}" stroke="#8A8E97" stroke-dasharray="3 3" opacity="0"/>${hits}</svg><div class="tip" id="tip"></div>`;
+    const tip = $('tip'), svg = el.querySelector('svg');
+    el.onmousemove = e => {
+      const hit = e.target.closest('.hit');
+      el.querySelectorAll('.bar-m').forEach(b => b.classList.remove('hl'));
+      if (!hit) { tip.style.display = 'none'; $('xh').setAttribute('opacity', 0); return; }
+      const i = +hit.dataset.i, h = done[i], sc = 1;
+      el.querySelector(`.bar-m[data-i="${i}"]`).classList.add('hl');
+      $('xh').setAttribute('x1', x(i)); $('xh').setAttribute('x2', x(i)); $('xh').setAttribute('opacity', 1);
+      tip.innerHTML = `<b>${esc(h.full)}</b><div class="r" style="margin-top:6px"><span class="row" style="gap:6px"><i style="width:10px;height:10px;border-radius:2px;background:#DB0000"></i>GPA học kỳ</span><b>${h.gpa.toFixed(2)}</b></div>
+        <div class="r"><span class="row" style="gap:6px"><i style="width:10px;height:10px;border-radius:50%;background:#2563EB"></i>CPA tích lũy</span><b>${h.cpa.toFixed(2)}</b></div><div class="muted small" style="margin-top:4px">${h.tc} tín chỉ trong kỳ</div>`;
+      tip.style.display = 'block'; tip.style.left = Math.min(Math.max(x(i) * sc, 90), el.clientWidth - 90) + 'px'; tip.style.top = (Math.min(y(h.gpa), y(h.cpa)) * sc - 10) + 'px';
+    };
+    el.onmouseleave = () => { tip.style.display = 'none'; $('xh').setAttribute('opacity', 0); };
+  }
+  chart();
+  let rz; window.addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(chart, 150); });
+
+  // ---------- bảng điểm ----------
+  $('hk').innerHTML = [...g.perHk].reverse().map(h => `<option value="${h.hk}">${esc(h.full)}${h.dangHoc ? ' (đang học)' : ''}</option>`).join('');
+  const f = v => v == null ? '<span class="muted">—</span>' : v < TH ? `<span class="lo" title="Dưới ngưỡng ${TH}">${v.toFixed(1)}</span>` : v.toFixed(1);
+  function table() {
+    const h = g.perHk.find(x => x.hk === $('hk').value);
+    $('hk-note').innerHTML = h.dangHoc ? `<div class="alert al-info" style="margin:16px 20px 0">${ic('info', 18)}<span>Học kỳ đang diễn ra — điểm thành phần được cập nhật khi giảng viên nhập; điểm tổng kết có sau khi giảng viên công bố.</span></div>` : '';
+    $('rows').innerHTML = h.mon.map(m => `<tr><td class="mono">${m.ma}</td><td>${esc(m.ten)}</td><td class="num">${m.tc}</td><td class="num">${f(m.cc)}</td><td class="num">${f(m.bt)}</td><td class="num">${f(m.gk)}</td><td class="num">${f(m.ck)}</td>
+      <td class="num"><b>${m.tk == null ? '<span class="muted">—</span>' : f(m.tk)}</b></td><td class="num">${m.chu ? badge(m.chu, m.he4 >= 3.5 ? 'green' : m.he4 >= 2 ? 'blue' : m.he4 > 0 ? 'amber' : 'red') : '<span class="muted">—</span>'}</td><td class="num">${m.he4 == null ? '<span class="muted">—</span>' : m.he4.toFixed(1)}</td></tr>`).join('');
+    $('sum').innerHTML = h.gpa != null ? `<span>${h.mon.length} môn · ${h.tc} tín chỉ</span><span>GPA học kỳ: <b style="color:var(--ink)">${h.gpa.toFixed(2)}</b> · CPA đến kỳ này: <b style="color:var(--ink)">${h.cpa.toFixed(2)}</b></span>`
+      : `<span>${h.mon.length} môn đang học</span><span>Chưa có GPA học kỳ</span>`;
+  }
+  $('hk').onchange = table; table();
+});
+</script>
+</body>
+</html>

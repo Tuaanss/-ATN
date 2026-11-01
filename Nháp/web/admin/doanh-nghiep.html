@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Duyệt tài khoản doanh nghiệp · EduPortfolio</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/app.css">
+<script src="../assets/data.js"></script>
+<script src="../assets/app.js"></script>
+</head>
+<body data-role="admin" data-active="doanh-nghiep" data-crumbs="Quản trị › <b>Duyệt tài khoản doanh nghiệp</b>">
+<div id="page" class="stack" style="gap:24px">
+  <div class="page-head">
+    <div class="t"><h1 class="h1">Duyệt tài khoản doanh nghiệp</h1><p class="sub-t">Doanh nghiệp tự đăng ký và chỉ dùng được hệ thống sau khi được duyệt (FR-02.3, BR-DN-01).</p></div>
+  </div>
+  <section class="card">
+    <div class="tabs" id="tabs" role="tablist" style="padding:0 12px"></div>
+    <div class="toolbar">
+      <label class="search"><span id="ic-s"></span><input id="q" placeholder="Tìm theo tên, mã số thuế, email…" aria-label="Tìm doanh nghiệp"></label>
+      <select class="inp" id="f-lv" aria-label="Lọc theo lĩnh vực"><option value="">Mọi lĩnh vực</option><option>CNTT</option><option>Thiết kế</option><option>Marketing</option><option>Khác</option></select>
+    </div>
+    <div id="tbl"></div>
+  </section>
+</div>
+<script>
+document.addEventListener('app:ready', () => {
+  const { ic, esc, badge } = App, db = Store.db, $ = id => document.getElementById(id);
+  $('ic-s').innerHTML = ic('search', 16);
+  const TABS = [['CHO', 'Chờ duyệt', 'amber'], ['DUYET', 'Đã duyệt', 'green'], ['TU_CHOI', 'Đã từ chối', 'gray'], ['KHOA', 'Đã khóa', 'red']];
+  let tab = new URLSearchParams(location.search).get('tab') || 'CHO';
+  const ST = Object.fromEntries(TABS.map(([k, l, c]) => [k, [l, c]]));
+
+  function tabs() {
+    $('tabs').innerHTML = TABS.map(([k, l]) => `<button class="tab ${k === tab ? 'on' : ''}" role="tab" aria-selected="${k === tab}" data-tab="${k}">${l}<span class="n">${db.dn.filter(d => d.trangThai === k).length}</span></button>`).join('');
+  }
+  $('tabs').onclick = e => { const b = e.target.closest('[data-tab]'); if (b) { tab = b.dataset.tab; refresh(); } };
+
+  const checks = d => [
+    [/^\d{10}(\d{3})?$/.test(d.mst) && d.mst !== '0000000001', 'Mã số thuế đúng định dạng (10 hoặc 13 số)'],
+    [!/@(gmail|yahoo|outlook|hotmail)\./.test(d.email), 'Email thuộc tên miền doanh nghiệp'],
+    [!!d.website, 'Có website doanh nghiệp'],
+    [!!d.giayPhep, 'Đính kèm giấy phép kinh doanh'],
+  ];
+
+  const t = App.table('#tbl', { columns: [
+    { h: 'Doanh nghiệp', r: d => `<div class="cell-user"><span class="av" style="background:#EFE9FD;color:#5B21B6">${ic('building', 16)}</span><div><b>${esc(d.ten)}</b><span>MST <span class="mono">${d.mst}</span></span></div></div>` },
+    { h: 'Lĩnh vực', r: d => `<span class="chip">${esc(d.linhVuc)}</span>` },
+    { h: 'Người liên hệ', r: d => `<div style="display:flex;flex-direction:column;gap:2px"><span>${esc(d.nguoiLienHe)}</span><span class="muted small">${esc(d.email)}</span></div>` },
+    { h: 'Ngày đăng ký', r: d => App.fmtDate(d.ngayDK) },
+    { h: 'Kiểm tra', r: d => { const c = checks(d), ok = c.filter(x => x[0]).length; return `<span class="badge ${ok === c.length ? 'b-green' : 'b-amber'}">${ok}/${c.length} tiêu chí</span>`; } },
+    { h: '', cls: 'act', r: d => d.trangThai === 'CHO'
+      ? `<button class="btn btn-sm" data-view="${d.id}">Xem</button> <button class="btn btn-sm btn-d" data-reject="${d.id}">Từ chối</button> <button class="btn btn-sm btn-p" data-approve="${d.id}">Duyệt</button>`
+      : `<button class="btn btn-sm" data-view="${d.id}">Chi tiết</button>` },
+  ], empty: 'Không có doanh nghiệp nào trong mục này.' });
+
+  function refresh(keep) {
+    tabs();
+    const q = App.norm($('q').value), lv = $('f-lv').value;
+    t.set(db.dn.filter(d => d.trangThai === tab && (!q || App.norm(d.ten + ' ' + d.mst + ' ' + d.email).includes(q)) && (!lv || d.linhVuc === lv)), keep);
+  }
+  ['q', 'f-lv'].forEach(id => $(id).addEventListener('input', () => refresh()));
+
+  async function approve(d, m) {
+    if (!await App.confirm({ title: 'Duyệt doanh nghiệp', msg: `Duyệt tài khoản <b>${esc(d.ten)}</b>? Doanh nghiệp sẽ nhận email thông báo và có thể đăng nhập để tìm kiếm sinh viên.`, ok: 'Duyệt' })) return;
+    d.trangThai = 'DUYET'; d.lyDo = '';
+    Store.log('DUYET_DN', 'Duyệt tài khoản DN', 'DoanhNghiep', d.ten, { trang_thai: 'CHO' }, { trang_thai: 'DUYET' });
+    App.save(); m && m.close(); refresh(); App.toast('Đã duyệt ' + d.ten);
+  }
+  async function reject(d, m) {
+    const r = await App.confirm({ title: 'Từ chối đăng ký', msg: `Từ chối đăng ký của <b>${esc(d.ten)}</b>. Lý do sẽ được gửi qua email <b>${esc(d.email)}</b>.`, ok: 'Từ chối', danger: true, reason: 'Lý do từ chối' });
+    if (!r) return;
+    d.trangThai = 'TU_CHOI'; d.lyDo = r;
+    Store.log('TU_CHOI_DN', 'Từ chối tài khoản DN', 'DoanhNghiep', d.ten, { trang_thai: 'CHO' }, { trang_thai: 'TU_CHOI', ly_do: r });
+    App.save(); m && m.close(); refresh(); App.toast('Đã từ chối ' + d.ten);
+  }
+  async function lock(d, m) {
+    const isLock = d.trangThai === 'DUYET';
+    const r = await App.confirm({ title: isLock ? 'Khóa doanh nghiệp vi phạm' : 'Mở khóa doanh nghiệp', msg: isLock ? `Khóa <b>${esc(d.ten)}</b>? Mọi quyền xem bài đang còn hạn của doanh nghiệp này sẽ bị thu hồi.` : `Mở khóa <b>${esc(d.ten)}</b>?`, ok: isLock ? 'Khóa' : 'Mở khóa', danger: isLock, reason: isLock ? 'Lý do khóa' : null });
+    if (!r) return;
+    d.trangThai = isLock ? 'KHOA' : 'DUYET'; d.lyDo = isLock ? r : '';
+    Store.log('KHOA_TK', isLock ? 'Khóa tài khoản DN' : 'Mở khóa tài khoản DN', 'DoanhNghiep', d.ten, null, isLock ? { ly_do: r } : null);
+    App.save(); m && m.close(); refresh(); App.toast(isLock ? 'Đã khóa doanh nghiệp.' : 'Đã mở khóa.');
+  }
+
+  function view(d) {
+    const c = checks(d), s = ST[d.trangThai];
+    const foot = d.trangThai === 'CHO' ? `<button class="btn btn-d" id="a-rej">${ic('x', 16)} Từ chối</button><button class="btn btn-p" id="a-ok">${ic('check', 16)} Duyệt</button>`
+      : d.trangThai === 'DUYET' ? `<button class="btn" data-x>Đóng</button><button class="btn btn-d" id="a-lock">${ic('lock', 16)} Khóa doanh nghiệp</button>`
+      : d.trangThai === 'KHOA' ? `<button class="btn" data-x>Đóng</button><button class="btn" id="a-lock">${ic('unlock', 16)} Mở khóa</button>`
+      : `<button class="btn" data-x>Đóng</button>`;
+    const m = App.modal({ drawer: true, title: 'Hồ sơ doanh nghiệp', body: `
+      <div class="row between"><div class="cell-user"><span class="av" style="width:48px;height:48px;background:#EFE9FD;color:#5B21B6">${ic('building', 22)}</span><div><b style="font-size:17px">${esc(d.ten)}</b><span>Đăng ký ${App.fmtDate(d.ngayDK)}</span></div></div>${badge(s[0], s[1], 1)}</div>
+      ${d.lyDo ? `<div class="alert ${d.trangThai === 'KHOA' ? 'al-bad' : 'al-warn'}">${ic('alert', 18)}<span><b>Lý do ${d.trangThai === 'KHOA' ? 'khóa' : 'từ chối'}:</b> ${esc(d.lyDo)}</span></div>` : ''}
+      <dl class="kv">
+        <dt>Mã số thuế</dt><dd class="mono">${d.mst}</dd><dt>Lĩnh vực</dt><dd>${esc(d.linhVuc)}</dd><dt>Quy mô</dt><dd>${d.quyMo} nhân sự</dd>
+        <dt>Địa chỉ</dt><dd>${esc(d.diaChi)}</dd><dt>Website</dt><dd>${d.website ? `<a href="${esc(d.website)}" target="_blank" rel="noopener">${esc(d.website)}</a>` : '—'}</dd>
+        <dt>Người liên hệ</dt><dd>${esc(d.nguoiLienHe)}</dd><dt>Email</dt><dd>${esc(d.email)}</dd><dt>Điện thoại</dt><dd class="mono">${d.sdt}</dd>
+        <dt>Giấy phép KD</dt><dd>${d.giayPhep ? `<span class="chip">${ic('file', 14)} ${esc(d.giayPhep)}</span>` : '<span class="muted">Không đính kèm</span>'}</dd>
+      </dl>
+      <div class="divider"></div>
+      <h3 style="font-size:15px">Kiểm tra tự động</h3>
+      <div class="stack" style="gap:8px">${c.map(([ok, txt]) => `<div class="row" style="font-size:14px;color:${ok ? '#14532D' : '#9B1C12'}"><span>${ic(ok ? 'check' : 'x', 16, 2.2)}</span>${txt}</div>`).join('')}</div>
+      <p class="muted small">Gợi ý: tra cứu mã số thuế tại cổng thông tin của Tổng cục Thuế trước khi duyệt.</p>`, foot });
+    m.$('#a-ok') && (m.$('#a-ok').onclick = () => approve(d, m));
+    m.$('#a-rej') && (m.$('#a-rej').onclick = () => reject(d, m));
+    m.$('#a-lock') && (m.$('#a-lock').onclick = () => lock(d, m));
+  }
+
+  $('tbl').addEventListener('click', e => {
+    const b = e.target.closest('button'); if (!b) return;
+    const d = db.dn.find(x => x.id === (b.dataset.view || b.dataset.approve || b.dataset.reject)); if (!d) return;
+    if (b.dataset.view) view(d); if (b.dataset.approve) approve(d); if (b.dataset.reject) reject(d);
+  });
+  refresh();
+});
+</script>
+</body>
+</html>

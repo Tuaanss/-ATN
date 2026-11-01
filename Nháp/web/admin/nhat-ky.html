@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nhật ký hệ thống · EduPortfolio</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/app.css">
+<script src="../assets/data.js"></script>
+<script src="../assets/app.js"></script>
+</head>
+<body data-role="admin" data-active="nhat-ky" data-crumbs="Quản trị › <b>Nhật ký hệ thống</b>">
+<div id="page" class="stack" style="gap:24px">
+  <div class="page-head">
+    <div class="t"><h1 class="h1">Nhật ký hệ thống</h1><p class="sub-t">Tra cứu các thao tác quan trọng: đăng nhập, sửa điểm, nộp/xóa bài, duyệt doanh nghiệp, thay đổi tài khoản (FR-17, FR-02.8).</p></div>
+    <div class="actions"><button class="btn" id="btn-exp"></button></div>
+  </div>
+  <section class="card">
+    <div class="toolbar">
+      <label class="search"><span id="ic-s"></span><input id="q" placeholder="Người dùng, đối tượng, IP…" aria-label="Tìm trong nhật ký"></label>
+      <select class="inp" id="f-role" aria-label="Vai trò"><option value="">Mọi vai trò</option><option value="ADMIN">Admin</option><option value="GV">Giảng viên</option><option value="SV">Sinh viên</option><option value="PH">Phụ huynh</option><option value="DN">Doanh nghiệp</option></select>
+      <select class="inp" id="f-act" aria-label="Loại thao tác"><option value="">Mọi thao tác</option></select>
+      <label class="row small muted">Từ <input class="inp" type="date" id="f-from" style="min-width:0"></label>
+      <label class="row small muted">đến <input class="inp" type="date" id="f-to" style="min-width:0"></label>
+      <button class="btn btn-g btn-sm" id="btn-clear">Xóa lọc</button>
+    </div>
+    <div id="tbl"></div>
+  </section>
+</div>
+<script>
+document.addEventListener('app:ready', () => {
+  const { ic, esc, badge } = App, db = Store.db, $ = id => document.getElementById(id);
+  $('ic-s').innerHTML = ic('search', 16); $('btn-exp').innerHTML = ic('download', 18) + ' Xuất CSV';
+  const acts = [...new Map(db.log.map(l => [l.action, l.actionName])).entries()];
+  acts.forEach(([k, v]) => $('f-act').insertAdjacentHTML('beforeend', `<option value="${k}">${esc(v)}</option>`));
+  const ROLE = { ADMIN: ['Admin', 'red'], GV: ['GV', 'blue'], SV: ['SV', 'green'], PH: ['PH', 'amber'], DN: ['DN', 'violet'] };
+  const ACT_C = a => /XOA|KHOA|TU_CHOI|LOI/.test(a) ? 'red' : /SUA|DOI|DAT_LAI/.test(a) ? 'amber' : /DUYET|TAO|IMPORT|NOP/.test(a) ? 'green' : 'gray';
+  let rows = [];
+
+  const t = App.table('#tbl', { pageSize: 15, rowAttr: l => `data-id="${l.id}" style="cursor:pointer"`, columns: [
+    { h: 'Thời gian', r: l => `<span class="mono small">${App.fmtDate(l.time)}:${l.time.slice(-2)}</span>` },
+    { h: 'Người thực hiện', r: l => `<div class="row" style="gap:8px">${badge(ROLE[l.role][0], ROLE[l.role][1])}<span class="mono small">${esc(l.user)}</span></div>` },
+    { h: 'Thao tác', r: l => badge(l.actionName, ACT_C(l.action)) },
+    { h: 'Đối tượng', r: l => `<div style="display:flex;flex-direction:column;gap:2px"><span>${esc(l.target)}</span><span class="muted small mono">${esc(l.obj)}</span></div>` },
+    { h: 'IP', r: l => `<span class="mono small muted">${l.ip}</span>` },
+    { h: '', cls: 'act', r: l => `<span class="muted">${ic('right', 16)}</span>` },
+  ], empty: 'Không có bản ghi phù hợp bộ lọc.' });
+
+  function refresh() {
+    const q = App.norm($('q').value), r = $('f-role').value, a = $('f-act').value, f = $('f-from').value, to = $('f-to').value;
+    rows = db.log.filter(l => (!q || App.norm(l.user + ' ' + l.target + ' ' + l.ip + ' ' + l.obj).includes(q)) && (!r || l.role === r) && (!a || l.action === a)
+      && (!f || l.time.slice(0, 10) >= f) && (!to || l.time.slice(0, 10) <= to));
+    t.set(rows);
+  }
+  ['q', 'f-role', 'f-act', 'f-from', 'f-to'].forEach(id => $(id).addEventListener('input', refresh));
+  $('btn-clear').onclick = () => { ['q', 'f-role', 'f-act', 'f-from', 'f-to'].forEach(id => $(id).value = ''); refresh(); };
+
+  const js = o => o ? `<pre class="mono" style="margin:0;font-size:12px;white-space:pre-wrap;word-break:break-all">${esc(JSON.stringify(o, null, 2))}</pre>` : '<span class="muted small">(không có)</span>';
+  $('tbl').addEventListener('click', e => {
+    const tr = e.target.closest('tr[data-id]'); if (!tr) return;
+    const l = db.log.find(x => x.id === tr.dataset.id);
+    App.modal({ size: 'lg', title: 'Chi tiết nhật ký #' + l.id, body: `
+      <dl class="kv"><dt>Thời gian</dt><dd class="mono">${l.time}</dd><dt>Người thực hiện</dt><dd>${badge(ROLE[l.role][0], ROLE[l.role][1])} <span class="mono">${esc(l.user)}</span></dd>
+      <dt>Thao tác</dt><dd>${esc(l.actionName)} <span class="muted mono small">(${l.action})</span></dd><dt>Đối tượng</dt><dd>${esc(l.target)} <span class="muted mono small">${esc(l.obj)}</span></dd><dt>Địa chỉ IP</dt><dd class="mono">${l.ip}</dd></dl>
+      <div class="grid g2" style="gap:12px">
+        <div class="card" style="background:#FFF8F7"><div class="card-h" style="padding:10px 14px"><h2 style="font-size:13px">Dữ liệu cũ</h2></div><div class="card-b" style="padding:12px 14px">${js(l.old)}</div></div>
+        <div class="card" style="background:#F4FBF6"><div class="card-h" style="padding:10px 14px"><h2 style="font-size:13px">Dữ liệu mới</h2></div><div class="card-b" style="padding:12px 14px">${js(l.new)}</div></div>
+      </div>`, foot: '<button class="btn" data-x>Đóng</button>' });
+  });
+
+  $('btn-exp').onclick = () => {
+    const q = v => `"${String(v ?? '').replace(/"/g, '""')}"`;
+    const csv = [['Thời gian', 'Người dùng', 'Vai trò', 'Thao tác', 'Đối tượng', 'Mô tả', 'IP', 'Dữ liệu cũ', 'Dữ liệu mới'].map(q).join(','),
+      ...rows.map(l => [l.time, l.user, l.role, l.actionName, l.obj, l.target, l.ip, l.old ? JSON.stringify(l.old) : '', l.new ? JSON.stringify(l.new) : ''].map(q).join(','))].join('\n');
+    const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob(['﻿' + csv], { type: 'text/csv' })); a.download = 'nhat_ky_he_thong.csv'; a.click();
+    App.toast(`Đã xuất ${rows.length} bản ghi.`);
+  };
+  refresh();
+});
+</script>
+</body>
+</html>

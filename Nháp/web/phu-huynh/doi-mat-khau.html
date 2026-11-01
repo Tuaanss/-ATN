@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Đổi mật khẩu · EduPortfolio</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/app.css">
+<style>
+  .first-wrap{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:32px 16px;gap:24px}
+  .rule{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--mut)}
+  .rule.ok{color:#14532D}.rule .i{color:#A5A8AF;display:inline-flex}.rule.ok .i{color:var(--green)}
+  .meter{display:flex;gap:4px;margin-top:8px}.meter span{flex:1;height:4px;border-radius:2px;background:var(--line)}
+</style>
+<script src="../assets/data.js"></script>
+<script src="../assets/app.js"></script>
+</head>
+<body data-active="doi-mat-khau" data-crumbs="Phụ huynh › <b>Đổi mật khẩu</b>">
+<script>
+  // Lần đăng nhập đầu: màn hình độc lập, chưa vào được chức năng khác (FR-01.4). Ngược lại: trang trong khung cổng phụ huynh.
+  window.FIRST = new URLSearchParams(location.search).get('first') === '1';
+  if (!FIRST) document.body.dataset.role = 'ph';
+</script>
+<div id="page">
+  <div id="head-first" class="hidden" style="display:flex;flex-direction:column;align-items:center;gap:14px;text-align:center;max-width:460px">
+    <a class="logo" href="../index.html"><span class="logo-mark" id="logo-ic"></span><b>EduPortfolio</b></a>
+    <div class="steps" style="justify-content:center"><div class="step done"><i id="st1"></i>Đăng nhập</div><span class="step-line" style="max-width:40px"></span><div class="step on"><i>2</i>Đổi mật khẩu</div><span class="step-line" style="max-width:40px"></span><div class="step"><i>3</i>Chọn con</div></div>
+    <h1 class="h1">Đặt mật khẩu mới</h1>
+    <p class="muted" style="line-height:1.6">Đây là lần đăng nhập đầu tiên. Mật khẩu tạm (bằng số điện thoại) ai biết số của bạn cũng đoán được — hãy đặt mật khẩu riêng trước khi xem kết quả học tập của con.</p>
+  </div>
+  <div id="head-normal" class="page-head hidden"><div class="t"><h1 class="h1">Đổi mật khẩu</h1><p class="sub-t">Mật khẩu đăng nhập cổng phụ huynh.</p></div></div>
+  <form id="f" class="card card-b stack" style="max-width:480px;width:100%" novalidate>
+    <div id="old-wrap"><label class="lbl" for="old">Mật khẩu hiện tại <span class="req">*</span></label><input class="inp" id="old" name="old" type="password" autocomplete="current-password"></div>
+    <div><label class="lbl" for="new">Mật khẩu mới <span class="req">*</span></label><input class="inp" id="new" name="new" type="password" autocomplete="new-password">
+      <div class="meter" id="meter"><span></span><span></span><span></span><span></span></div></div>
+    <div class="stack" style="gap:6px" id="rules"></div>
+    <div><label class="lbl" for="cf">Nhập lại mật khẩu mới <span class="req">*</span></label><input class="inp" id="cf" name="cf" type="password" autocomplete="new-password"></div>
+    <label class="row small"><input type="checkbox" id="show"> Hiện mật khẩu</label>
+    <button class="btn btn-p" style="height:46px" id="btn">Lưu mật khẩu</button>
+  </form>
+</div>
+<script>
+document.addEventListener('app:ready', () => {
+  const { ic } = App, db = Store.db, $ = id => document.getElementById(id);
+  const { ph } = App.phSession();
+  const pwOf = p => p.mk || (p.doiMk ? 'Phuhuynh@123' : p.sdt);
+  if (FIRST) {
+    document.body.style.background = '#F5F5F5';
+    $('page').className = 'first-wrap';
+    $('head-first').classList.remove('hidden'); $('old-wrap').classList.add('hidden');
+    $('logo-ic').innerHTML = ic('book', 18, 2); $('st1').innerHTML = ic('check', 14, 2.6);
+    $('btn').textContent = 'Lưu và tiếp tục';
+  } else { $('head-normal').classList.remove('hidden'); $('page').className = 'stack'; }
+
+  const RULES = [
+    [v => v.length >= 8, 'Ít nhất 8 ký tự'],
+    [v => /[A-Z]/.test(v) && /[a-z]/.test(v), 'Có chữ hoa và chữ thường'],
+    [v => /\d/.test(v), 'Có ít nhất 1 chữ số'],
+    [v => /[^A-Za-z0-9]/.test(v), 'Có ít nhất 1 ký tự đặc biệt (!@#$…)'],
+    [v => v && !v.includes(ph.sdt), 'Không chứa số điện thoại của bạn'],
+  ];
+  function live() {
+    const v = $('new').value, pass = RULES.map(([f]) => f(v));
+    $('rules').innerHTML = RULES.map(([, t], i) => `<div class="rule ${pass[i] ? 'ok' : ''}"><span class="i">${ic(pass[i] ? 'check' : 'x', 15, 2.4)}</span>${t}</div>`).join('');
+    const n = pass.filter(Boolean).length, col = n <= 2 ? '#D9534A' : n <= 4 ? '#D97706' : '#15803D';
+    [...$('meter').children].forEach((s, i) => s.style.background = v && i < Math.ceil(n * 4 / 5) ? col : '');
+    return pass.every(Boolean);
+  }
+  $('new').addEventListener('input', live); live();
+  $('show').onchange = e => ['old', 'new', 'cf'].forEach(id => $(id).type = e.target.checked ? 'text' : 'password');
+
+  $('f').onsubmit = e => {
+    e.preventDefault();
+    const f = $('f'); let bad = false;
+    const chk = (n, msg) => { App.fieldErr(f, n, msg); if (msg) bad = true; };
+    if (!FIRST) chk('old', $('old').value !== pwOf(ph) ? 'Mật khẩu hiện tại không đúng.' : '');
+    chk('new', !live() ? 'Mật khẩu mới chưa đáp ứng đủ yêu cầu.' : $('new').value === pwOf(ph) ? 'Mật khẩu mới phải khác mật khẩu cũ.' : '');
+    chk('cf', $('cf').value !== $('new').value ? 'Mật khẩu nhập lại không khớp.' : '');
+    if (bad) return;
+    ph.mk = $('new').value; ph.doiMk = true; if (ph.trangThai === 'CHUA_KICH_HOAT') ph.trangThai = 'HOAT_DONG';
+    Store.save();
+    if (FIRST) location.href = ph.links.length > 1 ? 'chon-con.html' : 'ket-qua.html';
+    else { f.reset(); live(); App.toast('Đã đổi mật khẩu.'); }
+  };
+});
+</script>
+</body>
+</html>

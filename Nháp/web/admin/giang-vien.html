@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tài khoản giảng viên · EduPortfolio</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/app.css">
+<script src="../assets/data.js"></script>
+<script src="../assets/app.js"></script>
+</head>
+<body data-role="admin" data-active="giang-vien" data-crumbs="Quản trị › <b>Tài khoản giảng viên</b>">
+<div id="page" class="stack" style="gap:24px">
+  <div class="page-head">
+    <div class="t"><h1 class="h1">Tài khoản giảng viên</h1><p class="sub-t">Thêm, sửa, khóa / mở khóa và đặt lại mật khẩu cho giảng viên (FR-02.1).</p></div>
+    <div class="actions"><button class="btn btn-p" id="btn-add"></button></div>
+  </div>
+  <div class="grid g4" id="tiles"></div>
+  <section class="card">
+    <div class="toolbar">
+      <label class="search"><span id="ic-s"></span><input id="q" placeholder="Tìm theo mã GV, họ tên, email…" aria-label="Tìm kiếm giảng viên"></label>
+      <select class="inp" id="f-khoa" aria-label="Lọc theo khoa"><option value="">Tất cả khoa</option></select>
+      <select class="inp" id="f-tt" aria-label="Lọc theo trạng thái"><option value="">Mọi trạng thái</option><option value="HOAT_DONG">Hoạt động</option><option value="KHOA">Đã khóa</option></select>
+    </div>
+    <div id="tbl"></div>
+  </section>
+</div>
+<script>
+document.addEventListener('app:ready', () => {
+  const { ic, esc, badge, initials } = App, db = Store.db;
+  document.getElementById('btn-add').innerHTML = ic('plus', 18) + ' Thêm giảng viên';
+  document.getElementById('ic-s').innerHTML = ic('search', 16);
+  const fk = document.getElementById('f-khoa');
+  db.khoa.forEach(k => fk.insertAdjacentHTML('beforeend', `<option value="${k.id}">${esc(k.ten)}</option>`));
+  const khoaTen = id => (db.khoa.find(k => k.id === id) || {}).ten || '';
+
+  function tiles() {
+    const all = db.gv, on = all.filter(g => g.trangThai === 'HOAT_DONG').length;
+    document.getElementById('tiles').innerHTML = [
+      ['Tổng giảng viên', all.length, 'users'], ['Đang hoạt động', on, 'check'],
+      ['Đã khóa', all.length - on, 'lock'], ['Đã liên kết Google Drive', all.filter(g => g.google).length, 'folder'],
+    ].map(([k, v, i]) => `<div class="tile"><span class="k">${ic(i, 16)} ${k}</span><span class="v">${v}</span></div>`).join('');
+  }
+
+  const t = App.table('#tbl', { columns: [
+    { h: 'Giảng viên', r: g => `<div class="cell-user"><span class="av">${esc(initials(g.hoTen))}</span><div><b>${esc(g.hoTen)}</b><span class="mono">${g.ma}</span></div></div>` },
+    { h: 'Khoa', r: g => esc(khoaTen(g.khoaId)) },
+    { h: 'Liên hệ', r: g => `<div style="display:flex;flex-direction:column;gap:2px"><span>${esc(g.email)}</span><span class="muted small mono">${g.sdt}</span></div>` },
+    { h: 'Google Drive', r: g => g.google ? badge('Đã liên kết', 'green') : '<span class="muted small">Chưa liên kết</span>' },
+    { h: 'Trạng thái', r: g => g.trangThai === 'HOAT_DONG' ? badge('Hoạt động', 'green', 1) : badge('Đã khóa', 'red', 1) },
+    { h: '', cls: 'act', r: g => `<button class="btn btn-sm btn-g btn-ic" data-edit="${g.id}" title="Sửa" aria-label="Sửa ${esc(g.hoTen)}">${ic('edit', 16)}</button>
+      <button class="btn btn-sm btn-g btn-ic" data-reset="${g.id}" title="Đặt lại mật khẩu" aria-label="Đặt lại mật khẩu">${ic('key', 16)}</button>
+      <button class="btn btn-sm btn-g btn-ic" data-lock="${g.id}" title="${g.trangThai === 'KHOA' ? 'Mở khóa' : 'Khóa'}" aria-label="${g.trangThai === 'KHOA' ? 'Mở khóa' : 'Khóa'} tài khoản">${ic(g.trangThai === 'KHOA' ? 'unlock' : 'lock', 16)}</button>` },
+  ] });
+
+  function refresh(keep) {
+    const q = App.norm(document.getElementById('q').value), k = fk.value, tt = document.getElementById('f-tt').value;
+    t.set(db.gv.filter(g => (!q || App.norm(g.ma + ' ' + g.hoTen + ' ' + g.email).includes(q)) && (!k || g.khoaId === k) && (!tt || g.trangThai === tt)), keep);
+    tiles();
+  }
+  ['q', 'f-khoa', 'f-tt'].forEach(id => document.getElementById(id).addEventListener('input', () => refresh()));
+
+  function edit(g) {
+    const isNew = !g; g = g || { ma: '', hoTen: '', khoaId: db.khoa[0].id, email: '', sdt: '', hocVi: '' };
+    const m = App.modal({ title: isNew ? 'Thêm giảng viên' : 'Sửa thông tin giảng viên', body: `
+      <form id="f" class="form-grid" novalidate>
+        <div><label class="lbl">Mã giảng viên <span class="req">*</span></label><input class="inp mono" name="ma" value="${esc(g.ma)}" ${isNew ? '' : 'readonly'} placeholder="VD: GV0100"><div class="help">Dùng làm tên đăng nhập.</div></div>
+        <div><label class="lbl">Khoa <span class="req">*</span></label><select class="inp" name="khoaId">${db.khoa.map(k => `<option value="${k.id}" ${k.id === g.khoaId ? 'selected' : ''}>${esc(k.ten)}</option>`).join('')}</select></div>
+        <div class="full"><label class="lbl">Họ tên (kèm học hàm, học vị) <span class="req">*</span></label><input class="inp" name="hoTen" value="${esc(g.hoTen)}" placeholder="VD: TS. Nguyễn Văn A"></div>
+        <div><label class="lbl">Email <span class="req">*</span></label><input class="inp" name="email" type="email" value="${esc(g.email)}"></div>
+        <div><label class="lbl">Số điện thoại</label><input class="inp mono" name="sdt" value="${esc(g.sdt)}"></div>
+        ${isNew ? `<div class="full alert al-info">${ic('info', 18)}<span>Hệ thống sinh mật khẩu tạm thời và gửi tới email giảng viên. Giảng viên phải đổi mật khẩu ở lần đăng nhập đầu tiên.</span></div>` : ''}
+      </form>`,
+      foot: `<button class="btn" data-x>Hủy</button><button class="btn btn-p" id="ok">${isNew ? 'Tạo tài khoản' : 'Lưu thay đổi'}</button>` });
+    m.$('#ok').onclick = () => {
+      const f = m.$('#f'), v = App.form(f); let bad = false;
+      const chk = (n, msg) => { App.fieldErr(f, n, msg); if (msg) bad = true; };
+      chk('ma', !v.ma ? 'Bắt buộc nhập mã GV.' : isNew && db.gv.some(x => x.ma.toLowerCase() === v.ma.toLowerCase()) ? 'Mã GV đã tồn tại.' : '');
+      chk('hoTen', !v.hoTen ? 'Bắt buộc nhập họ tên.' : '');
+      chk('email', !App.emailOk(v.email) ? 'Email không hợp lệ.' : db.gv.some(x => x.email === v.email && x.id !== g.id) ? 'Email đã được dùng.' : '');
+      chk('sdt', v.sdt && !App.phoneOk(v.sdt) ? 'SĐT gồm 10 số, bắt đầu 03/05/07/08/09.' : '');
+      if (bad) return;
+      if (isNew) { db.gv.unshift({ id: Store.nextId('G', db.gv), ...v, trangThai: 'HOAT_DONG', google: '', ngayTao: new Date().toISOString().slice(0, 10) }); Store.log('TAO_TK', 'Tạo tài khoản GV', 'NguoiDung', v.ma); }
+      else { Object.assign(g, v); Store.log('SUA_TK', 'Sửa tài khoản GV', 'NguoiDung', g.ma); }
+      App.save(); m.close(); refresh(!isNew); App.toast(isNew ? `Đã tạo tài khoản ${v.ma}, mật khẩu tạm đã gửi qua email.` : 'Đã lưu thay đổi.');
+    };
+  }
+
+  document.getElementById('btn-add').onclick = () => edit();
+  document.getElementById('tbl').addEventListener('click', async e => {
+    const b = e.target.closest('button'); if (!b) return;
+    const g = db.gv.find(x => x.id === (b.dataset.edit || b.dataset.reset || b.dataset.lock)); if (!g) return;
+    if (b.dataset.edit) edit(g);
+    if (b.dataset.reset) {
+      if (!await App.confirm({ title: 'Đặt lại mật khẩu', msg: `Đặt lại mật khẩu cho <b>${esc(g.hoTen)}</b> (${g.ma})? Mật khẩu tạm thời sẽ được gửi tới <b>${esc(g.email)}</b> và giảng viên phải đổi ở lần đăng nhập tiếp theo.`, ok: 'Đặt lại' })) return;
+      Store.log('DAT_LAI_MK', 'Đặt lại mật khẩu', 'NguoiDung', g.ma); App.save(); App.toast('Đã gửi mật khẩu tạm tới ' + g.email);
+    }
+    if (b.dataset.lock) {
+      const lock = g.trangThai !== 'KHOA';
+      const r = await App.confirm({ title: lock ? 'Khóa tài khoản' : 'Mở khóa tài khoản', msg: lock ? `Khóa tài khoản <b>${esc(g.hoTen)}</b>? Giảng viên sẽ không đăng nhập được; bài tập, điểm đã nhập vẫn được giữ.` : `Mở khóa tài khoản <b>${esc(g.hoTen)}</b>?`, ok: lock ? 'Khóa' : 'Mở khóa', danger: lock, reason: lock ? 'Lý do khóa' : null });
+      if (!r) return;
+      g.trangThai = lock ? 'KHOA' : 'HOAT_DONG'; Store.log('KHOA_TK', lock ? 'Khóa tài khoản' : 'Mở khóa tài khoản', 'NguoiDung', g.ma, null, lock ? { ly_do: r } : null);
+      App.save(); refresh(true); App.toast(lock ? 'Đã khóa tài khoản.' : 'Đã mở khóa tài khoản.');
+    }
+  });
+  refresh();
+});
+</script>
+</body>
+</html>

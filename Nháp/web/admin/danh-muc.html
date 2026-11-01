@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Quản lý danh mục · EduPortfolio</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/app.css">
+<script src="../assets/data.js"></script>
+<script src="../assets/app.js"></script>
+</head>
+<body data-role="admin" data-active="danh-muc" data-crumbs="Quản trị › <b>Quản lý danh mục</b>">
+<div id="page" class="stack" style="gap:24px">
+  <div class="page-head">
+    <div class="t"><h1 class="h1">Quản lý danh mục</h1><p class="sub-t">Khoa, ngành, khóa, lớp sinh hoạt và loại môn học dùng chung toàn hệ thống (FR-02.5).</p></div>
+    <div class="actions"><button class="btn btn-p" id="btn-add"></button></div>
+  </div>
+  <section class="card">
+    <div class="tabs" id="tabs" role="tablist" style="padding:0 12px"></div>
+    <div class="toolbar"><label class="search"><span id="ic-s"></span><input id="q" placeholder="Tìm trong danh mục…" aria-label="Tìm trong danh mục"></label><span class="muted small" id="hint"></span></div>
+    <div id="tbl"></div>
+  </section>
+</div>
+<script>
+document.addEventListener('app:ready', () => {
+  const { ic, esc, badge } = App, db = Store.db, $ = id => document.getElementById(id);
+  $('ic-s').innerHTML = ic('search', 16);
+  const name = (list, id, f = 'ten') => (db[list].find(x => x.id === id) || {})[f] || '—';
+  const svCount = lopIds => db.sv.filter(s => lopIds.includes(s.lopId)).length;
+
+  // Cấu hình từng danh mục: cột, form, kiểm tra ràng buộc khi xóa
+  const CATS = {
+    khoa: { label: 'Khoa', key: 'khoa', prefix: 'K', hint: 'Khoa quản lý ngành, giảng viên và môn học.',
+      cols: [['Mã khoa', x => `<span class="mono">${esc(x.ma)}</span>`], ['Tên khoa', x => `<b>${esc(x.ten)}</b>`], ['Số ngành', x => db.nganh.filter(n => n.khoaId === x.id).length, 'num'], ['Số giảng viên', x => db.gv.filter(g => g.khoaId === x.id).length, 'num']],
+      fields: [['ma', 'Mã khoa', 'text', true], ['ten', 'Tên khoa', 'text', true]],
+      used: x => db.nganh.some(n => n.khoaId === x.id) || db.gv.some(g => g.khoaId === x.id) ? 'Khoa đang có ngành hoặc giảng viên.' : '' },
+    nganh: { label: 'Ngành', key: 'nganh', prefix: 'N', hint: 'Mã ngành theo danh mục đào tạo của Bộ GD&ĐT.',
+      cols: [['Mã ngành', x => `<span class="mono">${esc(x.ma)}</span>`], ['Tên ngành', x => `<b>${esc(x.ten)}</b>`], ['Khoa', x => esc(name('khoa', x.khoaId))], ['Số sinh viên', x => svCount(db.lopSH.filter(l => l.nganhId === x.id).map(l => l.id)), 'num']],
+      fields: [['ma', 'Mã ngành', 'text', true], ['ten', 'Tên ngành', 'text', true], ['khoaId', 'Khoa', 'khoa', true]],
+      used: x => db.lopSH.some(l => l.nganhId === x.id) ? 'Ngành đang có lớp sinh hoạt.' : '' },
+    khoaHoc: { label: 'Khóa', key: 'khoaHoc', prefix: 'KH', hint: 'Khóa tuyển sinh, VD: K68 nhập học năm 2025.',
+      cols: [['Tên khóa', x => `<b>${esc(x.ten)}</b>`], ['Năm nhập học', x => x.namBatDau], ['Số lớp', x => db.lopSH.filter(l => l.khoaHocId === x.id).length, 'num'], ['Số sinh viên', x => svCount(db.lopSH.filter(l => l.khoaHocId === x.id).map(l => l.id)), 'num']],
+      fields: [['ten', 'Tên khóa', 'text', true], ['namBatDau', 'Năm nhập học', 'number', true]],
+      used: x => db.lopSH.some(l => l.khoaHocId === x.id) ? 'Khóa đang có lớp sinh hoạt.' : '' },
+    lopSH: { label: 'Lớp sinh hoạt', key: 'lopSH', prefix: 'L', hint: 'Lớp hành chính; ngành và khóa của sinh viên lấy theo lớp.',
+      cols: [['Mã lớp', x => `<b class="mono">${esc(x.ma)}</b>`], ['Ngành', x => esc(name('nganh', x.nganhId))], ['Khóa', x => esc(name('khoaHoc', x.khoaHocId))], ['Sĩ số', x => svCount([x.id]), 'num']],
+      fields: [['ma', 'Mã lớp', 'text', true], ['nganhId', 'Ngành', 'nganh', true], ['khoaHocId', 'Khóa', 'khoaHoc', true]],
+      used: x => db.sv.some(s => s.lopId === x.id) ? 'Lớp đang có sinh viên.' : '' },
+    loaiMon: { label: 'Loại môn học', key: 'loaiMon', prefix: 'LM', fixedId: true, hint: 'Loại môn quyết định loại sản phẩm gợi ý khi GV giao bài (FR-05.5).',
+      cols: [['Mã', x => `<span class="mono">${esc(x.id)}</span>`], ['Tên loại', x => `<b>${esc(x.ten)}</b>`], ['Sản phẩm nộp mặc định', x => esc(x.moTa)], ['Số môn', x => db.monHoc.filter(m => m.loai === x.id).length, 'num']],
+      fields: [['id', 'Mã (viết hoa, không dấu)', 'text', true], ['ten', 'Tên loại', 'text', true], ['moTa', 'Sản phẩm nộp mặc định', 'text', false]],
+      used: x => db.monHoc.some(m => m.loai === x.id) ? 'Đang có môn học thuộc loại này.' : '' },
+  };
+  let cur = 'khoa';
+
+  function tabs() {
+    $('tabs').innerHTML = Object.entries(CATS).map(([k, c]) => `<button class="tab ${k === cur ? 'on' : ''}" role="tab" aria-selected="${k === cur}" data-tab="${k}">${c.label}<span class="n">${db[c.key].length}</span></button>`).join('');
+    $('btn-add').innerHTML = ic('plus', 18) + ' Thêm ' + CATS[cur].label.toLowerCase();
+    $('hint').textContent = CATS[cur].hint;
+  }
+  $('tabs').onclick = e => { const b = e.target.closest('[data-tab]'); if (b) { cur = b.dataset.tab; $('q').value = ''; build(); } };
+
+  let t;
+  function build() {
+    tabs();
+    const c = CATS[cur];
+    t = App.table('#tbl', { pageSize: 10, columns: [...c.cols.map(([h, r, cls]) => ({ h, r, cls })),
+      { h: '', cls: 'act', r: x => `<button class="btn btn-sm btn-g btn-ic" data-edit="${x.id}" title="Sửa" aria-label="Sửa">${ic('edit', 16)}</button><button class="btn btn-sm btn-g btn-ic" data-del="${x.id}" title="Xóa" aria-label="Xóa">${ic('trash', 16)}</button>` }] });
+    refresh();
+  }
+  function refresh(keep) {
+    const q = App.norm($('q').value);
+    t.set(db[CATS[cur].key].filter(x => !q || App.norm(Object.values(x).join(' ')).includes(q)), keep);
+    tabs();
+  }
+  $('q').addEventListener('input', () => refresh());
+
+  function edit(x) {
+    const c = CATS[cur], list = db[c.key], isNew = !x; x = x || {};
+    const input = ([k, l, type, req]) => {
+      const opts = { khoa: db.khoa, nganh: db.nganh, khoaHoc: db.khoaHoc }[type];
+      const ctl = opts ? `<select class="inp" name="${k}">${opts.map(o => `<option value="${o.id}" ${o.id === x[k] ? 'selected' : ''}>${esc(o.ten)}</option>`).join('')}</select>`
+        : `<input class="inp ${k === 'ma' || k === 'id' ? 'mono' : ''}" name="${k}" type="${type}" value="${esc(x[k] ?? '')}" ${k === 'id' && !isNew ? 'readonly' : ''}>`;
+      return `<div class="full"><label class="lbl">${l} ${req ? '<span class="req">*</span>' : ''}</label>${ctl}</div>`;
+    };
+    const m = App.modal({ title: (isNew ? 'Thêm ' : 'Sửa ') + c.label.toLowerCase(), body: `<form id="f" class="form-grid" novalidate>${c.fields.map(input).join('')}</form>`,
+      foot: `<button class="btn" data-x>Hủy</button><button class="btn btn-p" id="ok">${isNew ? 'Thêm' : 'Lưu'}</button>` });
+    m.$('#ok').onclick = () => {
+      const f = m.$('#f'), v = App.form(f); let bad = false;
+      c.fields.forEach(([k, l, type, req]) => {
+        let msg = req && !v[k] ? 'Bắt buộc nhập.' : '';
+        if (!msg && (k === 'ma' || k === 'ten' || k === 'id') && list.some(o => o.id !== x.id && App.norm(o[k]) === App.norm(v[k]))) msg = 'Giá trị đã tồn tại.';
+        if (!msg && k === 'id' && !/^[A-Z_]+$/.test(v[k])) msg = 'Chỉ dùng chữ in hoa và dấu gạch dưới.';
+        if (!msg && type === 'number' && (v[k] < 2000 || v[k] > 2100)) msg = 'Năm không hợp lệ.';
+        App.fieldErr(f, k, msg); if (msg) bad = true;
+      });
+      if (bad) return;
+      c.fields.filter(fd => fd[2] === 'number').forEach(fd => { v[fd[0]] = +v[fd[0]]; });
+      if (isNew) list.push({ id: c.fixedId ? v.id : Store.nextId(c.prefix, list), ...v }); else Object.assign(x, v);
+      Store.log('SUA_DANH_MUC', (isNew ? 'Thêm ' : 'Sửa ') + c.label.toLowerCase(), 'DanhMuc', v.ma || v.ten);
+      App.save(); m.close(); refresh(!isNew); App.toast(isNew ? 'Đã thêm.' : 'Đã lưu thay đổi.');
+    };
+  }
+
+  $('btn-add').onclick = () => edit();
+  $('tbl').addEventListener('click', async e => {
+    const b = e.target.closest('button'); if (!b) return;
+    const c = CATS[cur], x = db[c.key].find(o => o.id === (b.dataset.edit || b.dataset.del)); if (!x) return;
+    if (b.dataset.edit) edit(x);
+    if (b.dataset.del) {
+      const used = c.used(x);
+      if (used) return App.modal({ title: 'Không thể xóa', body: `<div class="alert al-warn">${ic('alert', 18)}<span><b>${esc(x.ten || x.ma)}</b>: ${used} Hãy chuyển hoặc xóa dữ liệu liên quan trước.</span></div>`, foot: '<button class="btn btn-p" data-x>Đã hiểu</button>' });
+      if (!await App.confirm({ title: 'Xóa ' + c.label.toLowerCase(), msg: `Xóa <b>${esc(x.ten || x.ma)}</b> khỏi danh mục?`, ok: 'Xóa', danger: true })) return;
+      db[c.key].splice(db[c.key].indexOf(x), 1);
+      Store.log('SUA_DANH_MUC', 'Xóa ' + c.label.toLowerCase(), 'DanhMuc', x.ma || x.ten); App.save(); refresh(true); App.toast('Đã xóa.');
+    }
+  });
+  build();
+});
+</script>
+</body>
+</html>

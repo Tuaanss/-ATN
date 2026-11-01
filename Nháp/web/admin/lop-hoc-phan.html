@@ -1,0 +1,295 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lớp học phần · EduPortfolio</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/app.css">
+<style>
+  .sch{display:inline-flex;align-items:center;gap:6px;height:26px;padding:0 8px;border-radius:6px;background:#F1F0EA;border:1px solid var(--line);font-size:12px;white-space:nowrap}
+  .sch b{font-weight:700}
+  .lich-row{display:grid;grid-template-columns:120px 160px 160px minmax(0,1fr) 36px;gap:8px;align-items:center}
+  .lich-row .inp{height:38px}
+  .conf{display:flex;flex-direction:column;gap:6px}
+  /* thời khóa biểu */
+  .tkb-wrap{overflow-x:auto}
+  .tkb{display:grid;grid-template-columns:64px repeat(7,minmax(130px,1fr));grid-template-rows:40px repeat(12,46px);min-width:980px;position:relative}
+  .tkb .hd{display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;color:var(--mut);text-transform:uppercase;letter-spacing:.04em;background:var(--soft);border-bottom:1px solid var(--line)}
+  .tkb .tt{font-size:11px;color:var(--mut);display:flex;flex-direction:column;align-items:center;justify-content:center;border-bottom:1px solid var(--line2);border-right:1px solid var(--line)}
+  .tkb .tt b{font-size:12px;color:var(--ink2)}
+  .tkb .cell{border-bottom:1px solid var(--line2);border-right:1px solid var(--line2)}
+  .tkb .noon{border-bottom:2px solid var(--line)}
+  .blk{margin:2px;border-radius:8px;padding:6px 8px;font-size:12px;line-height:1.35;overflow:hidden;cursor:pointer;border-left:4px solid;display:flex;flex-direction:column;gap:1px;z-index:1}
+  .blk:hover{filter:brightness(.97);box-shadow:0 2px 8px rgba(0,0,0,.08)}
+  .blk b{font-size:12px}
+  .blk span{color:var(--ink2)}
+  @media (max-width:860px){.lich-row{grid-template-columns:1fr 1fr;}.lich-row .room{grid-column:1/-1}}
+</style>
+<script src="../assets/data.js"></script>
+<script src="../assets/app.js"></script>
+</head>
+<body data-role="admin" data-active="lop-hoc-phan" data-crumbs="Quản trị › <b>Lớp học phần</b>">
+<div id="page" class="stack" style="gap:24px">
+  <div class="page-head">
+    <div class="t"><h1 class="h1">Lớp học phần</h1><p class="sub-t">Mở lớp học phần cho môn học trong học kỳ — một môn có thể mở nhiều lớp với giảng viên, lịch học, phòng khác nhau (FR-04.3).</p></div>
+    <div class="actions"><button class="btn btn-p" id="btn-add"></button></div>
+  </div>
+  <div class="grid g4" id="tiles"></div>
+  <section class="card">
+    <div class="toolbar">
+      <select class="inp" id="f-hk" aria-label="Học kỳ"></select>
+      <label class="search"><span id="ic-s"></span><input id="q" placeholder="Mã lớp, tên môn, phòng…" aria-label="Tìm lớp học phần"></label>
+      <select class="inp" id="f-mon" aria-label="Môn học"><option value="">Tất cả môn</option></select>
+      <select class="inp" id="f-gv" aria-label="Giảng viên"><option value="">Tất cả giảng viên</option></select>
+      <div class="seg" id="view" style="margin-left:auto"><button class="on" data-v="list">Danh sách</button><button data-v="tkb">Thời khóa biểu</button></div>
+    </div>
+    <div id="tbl"></div>
+    <div id="tkb" class="hidden"></div>
+  </section>
+</div>
+<script>
+document.addEventListener('app:ready', () => {
+  const { ic, esc, badge, initials } = App, db = Store.db, $ = id => document.getElementById(id);
+  const TODAY = '2026-10-03';
+  $('btn-add').innerHTML = ic('plus', 18) + ' Tạo lớp học phần';
+  $('ic-s').innerHTML = ic('search', 16);
+
+  // ---------- tiện ích ----------
+  const THU = { 2: 'Thứ 2', 3: 'Thứ 3', 4: 'Thứ 4', 5: 'Thứ 5', 6: 'Thứ 6', 7: 'Thứ 7', 8: 'Chủ nhật' };
+  const THU_S = { 2: 'T2', 3: 'T3', 4: 'T4', 5: 'T5', 6: 'T6', 7: 'T7', 8: 'CN' };
+  const GIO = ['07:00', '07:55', '08:50', '09:45', '10:40', '13:00', '13:55', '14:50', '15:45', '16:40', '17:40', '18:35'];
+  const het = t => { const [h, m] = GIO[t - 1].split(':').map(Number), x = h * 60 + m + 50; return String(Math.floor(x / 60)).padStart(2, '0') + ':' + String(x % 60).padStart(2, '0'); };
+  const mon = id => db.monHoc.find(m => m.id === id) || {};
+  const gv = id => db.gv.find(g => g.id === id) || {};
+  const hk = id => db.hocKy.find(h => h.id === id) || {};
+  const hkName = h => `Học kỳ ${h.ky} · ${h.namHoc}`;
+  const schTxt = l => `<span class="sch"><b>${THU_S[l.thu]}</b> Tiết ${l.tietBd}–${l.tietKt} <span class="muted">· ${esc(l.phong)}</span></span>`;
+  const overlap = (a, b) => a.thu === b.thu && a.tietBd <= b.tietKt && b.tietBd <= a.tietKt;
+  const weeksOverlap = (a, b) => a.tuanBd <= b.tuanKt && b.tuanBd <= a.tuanKt;
+  // Màu theo môn (màu đi theo thực thể, không theo thứ tự hiển thị)
+  const TINTS = [['#FDECEC', '#DB0000'], ['#E6EFFD', '#2563EB'], ['#E3F2E8', '#15803D'], ['#FDF0DE', '#B45309'], ['#EFE9FD', '#7C3AED'], ['#E0F4F4', '#0F766E'], ['#FCE7F3', '#BE185D'], ['#EEEDE7', '#474B53']];
+  const tint = monId => TINTS[db.monHoc.findIndex(m => m.id === monId) % TINTS.length];
+
+  // ---------- bộ lọc ----------
+  const curHk = (db.hocKy.find(h => h.batDau <= TODAY && h.ketThuc >= TODAY) || db.hocKy[db.hocKy.length - 1]).id;
+  [...db.hocKy].sort((a, b) => b.batDau.localeCompare(a.batDau)).forEach(h => $('f-hk').insertAdjacentHTML('beforeend', `<option value="${h.id}" ${h.id === curHk ? 'selected' : ''}>${hkName(h)}${h.id === curHk ? ' (hiện tại)' : ''}</option>`));
+  db.monHoc.forEach(m => $('f-mon').insertAdjacentHTML('beforeend', `<option value="${m.id}">${m.ma} – ${esc(m.ten)}</option>`));
+  db.gv.forEach(g => $('f-gv').insertAdjacentHTML('beforeend', `<option value="${g.id}">${esc(g.hoTen)}</option>`));
+  const qs = new URLSearchParams(location.search);
+  if (qs.get('mon')) $('f-mon').value = qs.get('mon');
+  if (qs.get('hk')) $('f-hk').value = qs.get('hk');
+  let view = 'list', rows = [];
+
+  function tiles() {
+    const inHk = db.lopHocPhan.filter(l => l.hkId === $('f-hk').value);
+    const svN = new Set(inHk.flatMap(l => l.svIds)).size, mons = new Set(inHk.map(l => l.monId)).size;
+    const full = inHk.filter(l => l.svIds.length >= l.siSoMax).length;
+    $('tiles').innerHTML = [['Lớp học phần trong kỳ', inHk.length, 'calendar'], ['Môn được mở', mons, 'book'], ['Sinh viên đã xếp lớp', svN, 'users'], ['Lớp đã đủ sĩ số', full, 'check']]
+      .map(([k, v, i]) => `<div class="tile"><span class="k">${ic(i, 16)} ${k}</span><span class="v">${v}</span></div>`).join('');
+  }
+
+  const t = App.table('#tbl', { pageSize: 12, columns: [
+    { h: 'Mã lớp', r: l => `<b class="mono">${esc(l.ma)}</b>` },
+    { h: 'Môn học', r: l => { const m = mon(l.monId), n = db.lopHocPhan.filter(o => o.monId === l.monId && o.hkId === l.hkId).length;
+      return `<div style="display:flex;flex-direction:column;gap:2px"><span>${esc(m.ten)}</span><span class="muted small"><span class="mono">${m.ma}</span> · ${m.tinChi} TC${n > 1 ? ` · môn mở ${n} lớp` : ''}</span></div>`; } },
+    { h: 'Giảng viên', r: l => esc(gv(l.gvId).hoTen || '—') },
+    { h: 'Lịch học', r: l => `<div class="row wrap" style="gap:4px">${l.lich.map(schTxt).join('')}</div><span class="muted small">Tuần ${l.tuanBd}–${l.tuanKt}</span>` },
+    { h: 'Sĩ số', r: l => { const p = Math.min(100, Math.round(l.svIds.length / l.siSoMax * 100));
+      return `<div style="display:flex;flex-direction:column;gap:4px;min-width:90px"><span class="small"><b>${l.svIds.length}</b>/${l.siSoMax}</span><div class="bar" style="height:6px"><span style="width:${p}%;background:${p >= 100 ? '#B45309' : 'var(--red)'}"></span></div></div>`; } },
+    { h: '', cls: 'act', r: l => `<button class="btn btn-sm btn-g btn-ic" data-view="${l.id}" title="Chi tiết & danh sách SV" aria-label="Chi tiết">${ic('users', 16)}</button>
+      <button class="btn btn-sm btn-g btn-ic" data-edit="${l.id}" title="Sửa" aria-label="Sửa">${ic('edit', 16)}</button>
+      <button class="btn btn-sm btn-g btn-ic" data-copy="${l.id}" title="Mở thêm lớp cho môn này" aria-label="Mở thêm lớp">${ic('plus', 16)}</button>
+      <button class="btn btn-sm btn-g btn-ic" data-del="${l.id}" title="Xóa" aria-label="Xóa">${ic('trash', 16)}</button>` },
+  ], empty: 'Chưa có lớp học phần nào phù hợp. Bấm “Tạo lớp học phần” để mở lớp.' });
+
+  function refresh(keep) {
+    const q = App.norm($('q').value), h = $('f-hk').value, m = $('f-mon').value, g = $('f-gv').value;
+    rows = db.lopHocPhan.filter(l => l.hkId === h && (!m || l.monId === m) && (!g || l.gvId === g)
+      && (!q || App.norm(l.ma + ' ' + mon(l.monId).ten + ' ' + l.lich.map(x => x.phong).join(' ')).includes(q)))
+      .sort((a, b) => a.ma.localeCompare(b.ma));
+    t.set(rows, keep); tkb(); tiles();
+  }
+  ['q', 'f-hk', 'f-mon', 'f-gv'].forEach(id => $(id).addEventListener('input', () => refresh()));
+  $('view').onclick = e => { const b = e.target.closest('[data-v]'); if (!b) return; view = b.dataset.v;
+    $('view').querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b)); $('tbl').classList.toggle('hidden', view !== 'list'); $('tkb').classList.toggle('hidden', view !== 'tkb'); };
+
+  // ---------- thời khóa biểu tuần ----------
+  function tkb() {
+    let h = `<div class="tkb-wrap"><div class="tkb"><div class="hd"></div>${[2, 3, 4, 5, 6, 7, 8].map(d => `<div class="hd">${THU[d]}</div>`).join('')}`;
+    for (let r = 1; r <= 12; r++) {
+      h += `<div class="tt ${r === 5 ? 'noon' : ''}" style="grid-row:${r + 1};grid-column:1"><b>Tiết ${r}</b>${GIO[r - 1]}</div>`;
+      for (let d = 2; d <= 8; d++) h += `<div class="cell ${r === 5 ? 'noon' : ''}" style="grid-row:${r + 1};grid-column:${d}"></div>`;
+    }
+    rows.forEach(l => l.lich.forEach(s => { const [bg, fg] = tint(l.monId);
+      h += `<div class="blk" data-view="${l.id}" style="grid-column:${s.thu};grid-row:${s.tietBd + 1}/${s.tietKt + 2};background:${bg};border-color:${fg}" title="${esc(l.ma)} · ${esc(mon(l.monId).ten)}">
+        <b class="mono">${esc(l.ma)}</b><span>${esc(mon(l.monId).ten)}</span><span class="muted">${esc(s.phong)} · ${esc((gv(l.gvId).hoTen || '').replace(/^(PGS\.TS\.|TS\.|ThS\.)\s*/, ''))}</span></div>`; }));
+    h += `</div></div>`;
+    $('tkb').innerHTML = rows.length ? h + `<p class="muted small" style="padding:12px 20px">Mỗi màu là một môn; các lớp cùng màu là các lớp khác nhau của cùng một môn. Bấm vào ô để xem chi tiết lớp.</p>` : `<div class="empty">Không có lớp nào để hiển thị.</div>`;
+  }
+  $('tkb').addEventListener('click', e => { const b = e.target.closest('[data-view]'); if (b) detail(db.lopHocPhan.find(l => l.id === b.dataset.view)); });
+
+  // ---------- kiểm tra trùng lịch ----------
+  function conflicts(cand, ignoreId) {
+    const out = [];
+    cand.lich.forEach((s, i) => cand.lich.forEach((s2, j) => { if (j > i && overlap(s, s2)) out.push(`Buổi ${i + 1} và buổi ${j + 1} của lớp này trùng giờ (${THU[s.thu]}).`); }));
+    db.lopHocPhan.filter(o => o.id !== ignoreId && o.hkId === cand.hkId && weeksOverlap(o, cand)).forEach(o => o.lich.forEach(os => cand.lich.forEach(s => {
+      if (!overlap(s, os)) return;
+      const when = `${THU[s.thu]}, tiết ${Math.max(s.tietBd, os.tietBd)}–${Math.min(s.tietKt, os.tietKt)}`;
+      if (o.gvId === cand.gvId) out.push(`Giảng viên ${esc(gv(o.gvId).hoTen)} đã dạy lớp <b class="mono">${o.ma}</b> vào ${when}.`);
+      if (App.norm(os.phong) && App.norm(os.phong) === App.norm(s.phong)) out.push(`Phòng <b>${esc(s.phong)}</b> đã được lớp <b class="mono">${o.ma}</b> dùng vào ${when}.`);
+    })));
+    return [...new Set(out)];
+  }
+  const nextMa = (monId, hkId) => { const m = mon(monId); const used = db.lopHocPhan.filter(l => l.monId === monId && l.hkId === hkId).map(l => +(l.ma.split('_')[1] || 0));
+    return `${m.ma}_${String((used.length ? Math.max(...used) : 0) + 1).padStart(2, '0')}`; };
+
+  // ---------- tạo / sửa / nhân bản ----------
+  function edit(l, copyFrom) {
+    const isNew = !l;
+    const base = l || (copyFrom ? { ...copyFrom, id: null, svIds: [], lich: copyFrom.lich.map(s => ({ ...s })) } : { monId: $('f-mon').value || db.monHoc[0].id, hkId: $('f-hk').value, gvId: '', siSoMax: 60, tuanBd: 1, tuanKt: 15, lich: [{ thu: 2, tietBd: 1, tietKt: 3, phong: '' }] });
+    if (isNew) base.ma = nextMa(base.monId, base.hkId);
+    const rooms = [...new Set(db.lopHocPhan.flatMap(x => x.lich.map(s => s.phong)))];
+    const gvOpts = sel => db.gv.filter(g => g.trangThai === 'HOAT_DONG' || g.id === sel).map(g => `<option value="${g.id}" ${g.id === sel ? 'selected' : ''}>${esc(g.hoTen)} — ${esc((db.khoa.find(k => k.id === g.khoaId) || {}).ma || '')}</option>`).join('');
+    const tietOpts = (v) => Array.from({ length: 12 }, (_, i) => `<option value="${i + 1}" ${i + 1 === v ? 'selected' : ''}>Tiết ${i + 1} (${GIO[i]})</option>`).join('');
+    const lichRow = (s) => `<div class="lich-row">
+        <select class="inp" data-k="thu" aria-label="Thứ">${Object.entries(THU).map(([k, v]) => `<option value="${k}" ${+k === s.thu ? 'selected' : ''}>${v}</option>`).join('')}</select>
+        <select class="inp" data-k="tietBd" aria-label="Tiết bắt đầu">${tietOpts(s.tietBd)}</select>
+        <select class="inp" data-k="tietKt" aria-label="Tiết kết thúc">${tietOpts(s.tietKt)}</select>
+        <input class="inp room" data-k="phong" list="dl-room" value="${esc(s.phong)}" placeholder="Phòng, VD: P.301-G2" aria-label="Phòng học">
+        <button type="button" class="btn btn-g btn-ic btn-sm" data-rm aria-label="Xóa buổi học">${ic('x', 16)}</button></div>`;
+    const title = isNew ? (copyFrom ? 'Mở thêm lớp cho môn ' + mon(copyFrom.monId).ma : 'Tạo lớp học phần') : 'Sửa lớp học phần ' + l.ma;
+    const m = App.modal({ size: 'lg', title, body: `
+      ${copyFrom ? `<div class="alert al-info">${ic('info', 18)}<span>Đã sao chép thông tin từ lớp <b class="mono">${copyFrom.ma}</b>. Hãy chọn lịch học, phòng hoặc giảng viên khác cho lớp mới.</span></div>` : ''}
+      <form id="f" class="form-grid" novalidate>
+        <div><label class="lbl">Học kỳ <span class="req">*</span></label><select class="inp" name="hkId" ${isNew ? '' : 'disabled'}>${[...db.hocKy].sort((a, b) => b.batDau.localeCompare(a.batDau)).map(h => `<option value="${h.id}" ${h.id === base.hkId ? 'selected' : ''}>${hkName(h)}</option>`).join('')}</select></div>
+        <div><label class="lbl">Môn học <span class="req">*</span></label><select class="inp" name="monId" ${isNew ? '' : 'disabled'}>${db.monHoc.map(x => `<option value="${x.id}" ${x.id === base.monId ? 'selected' : ''}>${x.ma} – ${esc(x.ten)} (${x.tinChi} TC)</option>`).join('')}</select></div>
+        <div><label class="lbl">Mã lớp học phần <span class="req">*</span></label><input class="inp mono" name="ma" value="${esc(base.ma)}"><div class="help" id="ma-help"></div></div>
+        <div><label class="lbl">Giảng viên phụ trách <span class="req">*</span></label><select class="inp" name="gvId"><option value="">— Chọn giảng viên —</option>${gvOpts(base.gvId)}</select></div>
+        <div><label class="lbl">Sĩ số tối đa <span class="req">*</span></label><input class="inp" type="number" min="1" max="300" name="siSoMax" value="${base.siSoMax}"></div>
+        <div><label class="lbl">Tuần học <span class="req">*</span></label><div class="row"><input class="inp" type="number" min="1" max="25" name="tuanBd" value="${base.tuanBd}" aria-label="Từ tuần"><span class="muted">đến</span><input class="inp" type="number" min="1" max="25" name="tuanKt" value="${base.tuanKt}" aria-label="Đến tuần"></div></div>
+        <div class="full"><div class="row between" style="margin-bottom:6px"><label class="lbl" style="margin:0">Lịch học hằng tuần <span class="req">*</span></label><button type="button" class="btn btn-sm" id="add-row">${ic('plus', 15)} Thêm buổi</button></div>
+          <div class="stack" style="gap:8px" id="lich">${base.lich.map(lichRow).join('')}</div>
+          <datalist id="dl-room">${rooms.map(r => `<option value="${esc(r)}">`).join('')}</datalist>
+          <div class="help">Mỗi lớp có thể học nhiều buổi/tuần (VD: lý thuyết + thực hành). Buổi sáng tiết 1–5, chiều tiết 6–10, tối tiết 11–12.</div></div>
+        <div class="full conf" id="conf"></div>
+      </form>`, foot: `<button class="btn" data-x>Hủy</button><button class="btn btn-p" id="ok">${isNew ? 'Tạo lớp' : 'Lưu thay đổi'}</button>` });
+    const f = m.$('#f');
+    const read = () => { const v = App.form(f);
+      return { hkId: isNew ? v.hkId : base.hkId, monId: isNew ? v.monId : base.monId, ma: (v.ma || '').toUpperCase(), gvId: v.gvId, siSoMax: +v.siSoMax, tuanBd: +v.tuanBd, tuanKt: +v.tuanKt,
+        lich: m.$$('#lich .lich-row').map(r => ({ thu: +r.querySelector('[data-k=thu]').value, tietBd: +r.querySelector('[data-k=tietBd]').value, tietKt: +r.querySelector('[data-k=tietKt]').value, phong: r.querySelector('[data-k=phong]').value.trim() })) }; };
+    function live() {
+      const c = read();
+      const n = db.lopHocPhan.filter(x => x.monId === c.monId && x.hkId === c.hkId && x.id !== base.id).length;
+      m.$('#ma-help').textContent = n ? `Môn này đã có ${n} lớp trong học kỳ: ${db.lopHocPhan.filter(x => x.monId === c.monId && x.hkId === c.hkId && x.id !== base.id).map(x => x.ma).join(', ')}` : 'Đây là lớp đầu tiên của môn trong học kỳ.';
+      m.$$('#lich .lich-row').forEach((r, i) => { const s = c.lich[i]; r.querySelector('[data-k=tietKt]').classList.toggle('bad', s.tietKt < s.tietBd); });
+      const cf = c.gvId ? conflicts(c, base.id) : [];
+      m.$('#conf').innerHTML = cf.length ? `<div class="alert al-bad">${ic('alert', 18)}<div><b>Trùng lịch — chưa thể lưu</b><ul style="margin:6px 0 0;padding-left:18px">${cf.map(x => `<li>${x}</li>`).join('')}</ul></div></div>`
+        : c.gvId && c.lich.length ? `<div class="alert al-ok">${ic('check', 18)}<span>Không trùng lịch giảng viên và phòng học.</span></div>` : '';
+      m.$$('[data-rm]').forEach(b => b.disabled = c.lich.length <= 1);
+      return cf;
+    }
+    f.addEventListener('input', live); f.addEventListener('change', e => {
+      if (isNew && (e.target.name === 'monId' || e.target.name === 'hkId')) { const c = read(); f.ma.value = nextMa(c.monId, c.hkId); }
+      live(); });
+    m.$('#add-row').onclick = () => { const last = read().lich.slice(-1)[0] || { thu: 2, tietBd: 1, tietKt: 3, phong: '' }; m.$('#lich').insertAdjacentHTML('beforeend', lichRow({ ...last, thu: Math.min(8, last.thu + 2) })); live(); };
+    m.$('#lich').onclick = e => { const b = e.target.closest('[data-rm]'); if (b && !b.disabled) { b.closest('.lich-row').remove(); live(); } };
+    live();
+    m.$('#ok').onclick = () => {
+      const c = read(); let bad = false;
+      const chk = (n, msg) => { App.fieldErr(f, n, msg); if (msg) bad = true; };
+      chk('ma', !/^[A-Z0-9]+_\d{2,3}$/.test(c.ma) ? 'Định dạng: MÃMÔN_số, VD: INT3306_02.' : db.lopHocPhan.some(x => x.id !== base.id && x.ma === c.ma && x.hkId === c.hkId) ? 'Mã lớp đã tồn tại trong học kỳ.' : '');
+      chk('gvId', !c.gvId ? 'Chọn giảng viên.' : '');
+      chk('siSoMax', !(c.siSoMax >= 1 && c.siSoMax <= 300) ? '1–300 sinh viên.' : !isNew && c.siSoMax < l.svIds.length ? `Lớp đã có ${l.svIds.length} SV.` : '');
+      chk('tuanKt', !(c.tuanBd >= 1 && c.tuanKt >= c.tuanBd) ? 'Tuần kết thúc phải ≥ tuần bắt đầu.' : '');
+      if (c.lich.some(s => s.tietKt < s.tietBd)) { bad = true; App.toast('Tiết kết thúc phải sau tiết bắt đầu.', 'bad'); }
+      if (c.lich.some(s => !s.phong)) { bad = true; App.toast('Nhập phòng học cho mọi buổi.', 'bad'); m.$$('#lich [data-k=phong]').forEach(i => i.classList.toggle('bad', !i.value.trim())); }
+      if (live().length) bad = true;
+      if (bad) return;
+      if (isNew) db.lopHocPhan.push({ id: Store.nextId('LHP', db.lopHocPhan), ...c, svIds: [], ngayTao: new Date().toISOString().slice(0, 10) });
+      else Object.assign(l, c);
+      Store.log(isNew ? 'TAO_LHP' : 'SUA_LHP', isNew ? 'Mở lớp học phần' : 'Sửa lớp học phần', 'LopHocPhan', c.ma, null, { gv: gv(c.gvId).ma, lich: c.lich.map(s => `${THU_S[s.thu]} T${s.tietBd}-${s.tietKt} ${s.phong}`) });
+      App.save(); m.close();
+      if ($('f-hk').value !== c.hkId) $('f-hk').value = c.hkId;
+      refresh(!isNew); App.toast(isNew ? `Đã mở lớp ${c.ma}. Thêm sinh viên trong mục chi tiết lớp.` : 'Đã lưu thay đổi.');
+    };
+  }
+
+  // ---------- chi tiết lớp & danh sách sinh viên ----------
+  function detail(l) {
+    const m0 = mon(l.monId), g = gv(l.gvId);
+    const m = App.modal({ drawer: true, title: 'Lớp học phần ' + l.ma, body: `<div id="dbody" class="stack" style="gap:16px"></div>`, foot: `<button class="btn" data-x>Đóng</button><button class="btn" id="d-edit">${ic('edit', 16)} Sửa lớp</button>` });
+    m.$('#d-edit').onclick = () => { m.close(); edit(l); };
+    function render() {
+      const svs = l.svIds.map(id => db.sv.find(s => s.id === id)).filter(Boolean);
+      const p = Math.min(100, Math.round(svs.length / l.siSoMax * 100));
+      m.$('#dbody').innerHTML = `
+        <div><b style="font-size:17px">${esc(m0.ten)}</b><div class="muted small"><span class="mono">${m0.ma}</span> · ${m0.tinChi} tín chỉ · ${hkName(hk(l.hkId))}</div></div>
+        <dl class="kv"><dt>Giảng viên</dt><dd>${esc(g.hoTen || '—')}</dd><dt>Tuần học</dt><dd>Tuần ${l.tuanBd} – ${l.tuanKt}</dd>
+          <dt>Lịch học</dt><dd class="stack" style="gap:6px">${l.lich.map(s => `<span>${THU[s.thu]}, tiết ${s.tietBd}–${s.tietKt} <span class="muted">(${GIO[s.tietBd - 1]}–${het(s.tietKt)})</span> · <b>${esc(s.phong)}</b></span>`).join('')}</dd></dl>
+        <div class="stack" style="gap:6px"><div class="row between small"><b>Sĩ số ${svs.length}/${l.siSoMax}</b><span class="muted">${l.siSoMax - svs.length > 0 ? `còn ${l.siSoMax - svs.length} chỗ` : 'đã đủ'}</span></div><div class="bar"><span style="width:${p}%"></span></div></div>
+        <div class="divider"></div>
+        <div class="row between wrap"><h3 style="font-size:15px">Danh sách sinh viên</h3><button class="btn btn-sm" id="bulk">${ic('sheet', 15)} Thêm hàng loạt</button></div>
+        <form id="add" class="row" style="gap:8px"><input class="inp" name="mssv" list="dl-sv" placeholder="Nhập MSSV hoặc họ tên để thêm…" aria-label="Thêm sinh viên" style="flex:1"><button class="btn btn-p">${ic('plus', 16)} Thêm</button></form>
+        <datalist id="dl-sv">${db.sv.filter(s => s.trangThai === 'HOAT_DONG' && !l.svIds.includes(s.id)).map(s => `<option value="${s.mssv}">${esc(s.hoTen)}</option>`).join('')}</datalist>
+        <div class="err hidden" id="add-err"></div>
+        <div style="border:1px solid var(--line);border-radius:10px;overflow:hidden">${svs.length ? `<table><thead><tr><th>#</th><th>Sinh viên</th><th>Lớp SH</th><th></th></tr></thead><tbody>${svs.map((s, i) => `<tr><td class="muted small">${i + 1}</td><td><div class="cell-user"><div><b>${esc(s.hoTen)}</b><span class="mono">${s.mssv}</span></div></div></td><td class="mono small">${esc(App.lopOf(s).lop)}</td><td class="act"><button class="btn btn-g btn-sm btn-ic" data-rm="${s.id}" aria-label="Xóa ${esc(s.hoTen)} khỏi lớp" title="Xóa khỏi lớp">${ic('x', 15)}</button></td></tr>`).join('')}</tbody></table>`
+          : `<div class="empty">Lớp chưa có sinh viên.</div>`}</div>`;
+      m.$('#add').onsubmit = e => { e.preventDefault(); const v = m.$('#add').mssv.value.trim(); const r = addMany([v]); showErr(r); render(); };
+      m.$('#bulk').onclick = bulk;
+      m.$('#dbody').onclick = async e => { const b = e.target.closest('[data-rm]'); if (!b) return; const s = db.sv.find(x => x.id === b.dataset.rm);
+        if (!await App.confirm({ title: 'Xóa khỏi lớp', msg: `Xóa <b>${esc(s.hoTen)}</b> (${s.mssv}) khỏi lớp ${l.ma}?`, ok: 'Xóa', danger: true })) return;
+        l.svIds = l.svIds.filter(x => x !== s.id); Store.log('SUA_LHP', 'Xóa SV khỏi lớp học phần', 'LHP_SinhVien', l.ma + ' · ' + s.mssv); App.save(); render(); refresh(true); };
+    }
+    function showErr(r) { const e = m.$('#add-err'); if (!e) return; e.innerHTML = r.errs.join('<br>'); e.classList.toggle('hidden', !r.errs.length); if (r.ok) App.toast(`Đã thêm ${r.ok} sinh viên vào ${l.ma}.`); }
+    // Thêm SV: phải đang hoạt động, chưa học lớp khác của cùng môn trong kỳ, không trùng lịch, còn chỗ
+    function addMany(keys) {
+      const errs = []; let ok = 0;
+      keys.map(k => k.trim()).filter(Boolean).forEach(k => {
+        const s = db.sv.find(x => x.mssv === k) || db.sv.find(x => App.norm(x.hoTen) === App.norm(k));
+        if (!s) return errs.push(`${esc(k)}: không tìm thấy sinh viên.`);
+        if (s.trangThai !== 'HOAT_DONG') return errs.push(`${s.mssv}: tài khoản đang bị khóa.`);
+        if (l.svIds.includes(s.id)) return errs.push(`${s.mssv}: đã có trong lớp.`);
+        const same = db.lopHocPhan.find(o => o.id !== l.id && o.hkId === l.hkId && o.monId === l.monId && o.svIds.includes(s.id));
+        if (same) return errs.push(`${s.mssv}: đã học lớp ${same.ma} của cùng môn.`);
+        const clash = db.lopHocPhan.find(o => o.id !== l.id && o.hkId === l.hkId && o.svIds.includes(s.id) && weeksOverlap(o, l) && o.lich.some(a => l.lich.some(b => overlap(a, b))));
+        if (clash) return errs.push(`${s.mssv}: trùng lịch với lớp ${clash.ma}.`);
+        if (l.svIds.length >= l.siSoMax) return errs.push(`${s.mssv}: lớp đã đủ sĩ số.`);
+        l.svIds.push(s.id); ok++;
+      });
+      if (ok) { Store.log('SUA_LHP', 'Thêm SV vào lớp học phần', 'LHP_SinhVien', l.ma, null, { so_sv: ok }); App.save(); refresh(true); }
+      return { ok, errs };
+    }
+    function bulk() {
+      const b = App.modal({ title: 'Thêm sinh viên hàng loạt vào ' + l.ma, body: `
+        <p class="muted small">Dán danh sách MSSV (mỗi dòng một MSSV, hoặc phân cách bằng dấu phẩy) — có thể copy trực tiếp từ một cột trong Excel.</p>
+        <textarea class="inp mono" rows="8" id="ta" placeholder="22511203&#10;24510045&#10;…"></textarea>
+        <div id="res"></div>`, foot: '<button class="btn" data-x>Đóng</button><button class="btn btn-p" id="go">Thêm vào lớp</button>' });
+      b.$('#go').onclick = () => {
+        const r = addMany(b.$('#ta').value.split(/[\s,;]+/));
+        b.$('#res').innerHTML = `<div class="alert ${r.errs.length ? 'al-warn' : 'al-ok'}">${ic(r.errs.length ? 'alert' : 'check', 18)}<div>Đã thêm <b>${r.ok}</b> sinh viên.${r.errs.length ? `<ul style="margin:6px 0 0;padding-left:18px">${r.errs.map(x => `<li>${x}</li>`).join('')}</ul>` : ''}</div></div>`;
+        b.$('#ta').value = ''; render();
+      };
+    }
+    render();
+  }
+
+  $('btn-add').onclick = () => edit();
+  $('tbl').addEventListener('click', async e => {
+    const b = e.target.closest('button'); if (!b) return;
+    const l = db.lopHocPhan.find(x => x.id === (b.dataset.view || b.dataset.edit || b.dataset.copy || b.dataset.del)); if (!l) return;
+    if (b.dataset.view) detail(l);
+    if (b.dataset.edit) edit(l);
+    if (b.dataset.copy) edit(null, l);
+    if (b.dataset.del) {
+      if (l.svIds.length) return App.modal({ title: 'Không thể xóa', body: `<div class="alert al-warn">${ic('alert', 18)}<span>Lớp <b class="mono">${l.ma}</b> đang có ${l.svIds.length} sinh viên. Hãy chuyển hoặc xóa sinh viên khỏi lớp trước khi xóa lớp.</span></div>`, foot: '<button class="btn btn-p" data-x>Đã hiểu</button>' });
+      if (!await App.confirm({ title: 'Xóa lớp học phần', msg: `Xóa lớp <b class="mono">${l.ma}</b> – ${esc(mon(l.monId).ten)}?`, ok: 'Xóa', danger: true })) return;
+      db.lopHocPhan.splice(db.lopHocPhan.indexOf(l), 1); Store.log('XOA_LHP', 'Xóa lớp học phần', 'LopHocPhan', l.ma); App.save(); refresh(true); App.toast('Đã xóa lớp ' + l.ma);
+    }
+  });
+  refresh();
+});
+</script>
+</body>
+</html>

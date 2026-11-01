@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<title>Đăng nhập (M01)</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@500;600&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;font-family:'Be Vietnam Pro',system-ui,sans-serif;color:#1A1C21;background:#F5F5F5;-webkit-font-smoothing:antialiased}
+*{box-sizing:border-box}
+a{color:#DB0000;text-decoration:none}a:hover{color:#A30000}
+h1,h2,h3,p{margin:0}
+.card{background:#fff;border:1px solid #E3E1D9;border-radius:12px}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:40px;padding:0 16px;border-radius:8px;font:600 14px 'Be Vietnam Pro',sans-serif;border:1px solid #D6D3C8;background:#fff;color:#1A1C21;cursor:pointer;white-space:nowrap}
+.btn:hover{background:#F7F6F2;color:#1A1C21}
+.btn-p{background:#DB0000;border-color:#DB0000;color:#fff}.btn-p:hover{background:#A30000;color:#fff}
+.btn-d{background:#fff;border-color:#E9B8B3;color:#9B1C12}.btn-d:hover{background:#FCE8E6;color:#9B1C12}
+.btn-g{border-color:transparent;background:transparent}
+.btn-sm{height:32px;padding:0 12px;font-size:13px}
+.badge{display:inline-flex;align-items:center;gap:6px;height:24px;padding:0 10px;border-radius:999px;font-size:12px;font-weight:600;white-space:nowrap}
+.b-blue{background:#E6EFFD;color:#1847A8}.b-green{background:#E3F2E8;color:#14532D}.b-amber{background:#FDF0DE;color:#8A3B06}.b-red{background:#FCE8E6;color:#9B1C12}.b-gray{background:#EEEDE7;color:#474B53}.b-dark{background:#1A1C21;color:#fff}
+.dot{width:8px;height:8px;border-radius:50%;display:inline-block;flex-shrink:0}
+.chip{display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 10px;border-radius:6px;background:#F1F0EA;border:1px solid #E3E1D9;font-size:13px;color:#30343B;white-space:nowrap}
+.mono{font-family:'JetBrains Mono',ui-monospace,monospace}
+.muted{color:#62666F}
+.lbl{font-size:13px;font-weight:600;color:#30343B;display:block;margin-bottom:6px}
+.help{font-size:12px;color:#62666F;margin-top:6px}
+.err{font-size:12px;color:#B42318;margin-top:6px;font-weight:500}
+.inp{width:100%;height:42px;border:1px solid #D6D3C8;border-radius:8px;padding:0 12px;font:400 14px 'Be Vietnam Pro',sans-serif;background:#fff;color:#1A1C21}
+.inp:focus{outline:2px solid #DB0000;outline-offset:-1px}
+.inp-err{border-color:#D9534A;background:#FFFBFA}
+textarea.inp{height:auto;padding:10px 12px;line-height:1.5;resize:vertical}
+input[type=checkbox],input[type=radio]{accent-color:#DB0000;width:18px;height:18px;margin:0}
+table{border-collapse:collapse;width:100%}
+th{text-align:left;font-size:12px;font-weight:600;color:#62666F;text-transform:uppercase;letter-spacing:.04em;padding:10px 16px;border-bottom:1px solid #E3E1D9;background:#FAFAF7;white-space:nowrap}
+td{padding:12px 16px;border-bottom:1px solid #EFEDE6;font-size:14px;vertical-align:middle}
+tr:last-child td{border-bottom:0}
+.nav a{display:flex;align-items:center;gap:12px;height:40px;padding:0 12px;border-radius:8px;color:#30343B;font-size:14px;font-weight:500}
+.nav a:hover{background:#F2F2F2;color:#1A1C21}.nav a.on{background:#FDECEC;color:#DB0000;font-weight:600}
+.h1{font-size:26px;font-weight:700;letter-spacing:-.01em}
+.sec{font-size:16px;font-weight:700}
+.ph{background-image:repeating-linear-gradient(135deg,rgba(0,0,0,.035) 0 10px,transparent 10px 20px)}
+.tabs{display:flex;gap:4px;border-bottom:1px solid #E3E1D9}
+.tab{height:44px;padding:0 16px;display:inline-flex;align-items:center;gap:8px;font-size:14px;font-weight:600;color:#62666F;border-bottom:2px solid transparent;margin-bottom:-1px}
+.tab.on{color:#1A1C21;border-bottom-color:#DB0000}
+.seg{display:inline-flex;padding:3px;background:#ECEBE4;border-radius:9px;gap:2px}
+.seg span{height:32px;padding:0 14px;display:inline-flex;align-items:center;border-radius:7px;font-size:13px;font-weight:600;color:#4A4E57}
+.seg span.on{background:#fff;color:#1A1C21;box-shadow:0 1px 2px rgba(0,0,0,.08)}
+.sw{width:40px;height:24px;border-radius:12px;background:#DB0000;position:relative;flex-shrink:0}
+.sw::after{content:'';position:absolute;top:3px;left:19px;width:18px;height:18px;border-radius:50%;background:#fff}
+.sw.off{background:#C9C6BB}.sw.off::after{left:3px}
+.av{width:36px;height:36px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#A30000;background:#FBE3E3;flex-shrink:0}
+</style>
+</helmet>
+<div style="width:1440px;height:900px;display:flex;background:#F5F5F5">
+<div style="width:600px;background:#DB0000;color:#fff;padding:56px;display:flex;flex-direction:column;justify-content:space-between">
+<a href="Main.dc.html" style="display:flex;align-items:center;gap:10px;color:#fff">
+<span style="width:32px;height:32px;border-radius:8px;background:#fff;display:inline-flex;align-items:center;justify-content:center;color:#DB0000"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4h11a4 4 0 0 1 4 4v12H8a4 4 0 0 1-4-4z"/><path d="M4 16a4 4 0 0 1 4-4h11"/></svg></span>
+<span style="font-size:17px;font-weight:700;letter-spacing:-.01em">EduPortfolio</span></a>
+<div style="display:flex;flex-direction:column;gap:20px">
+<h1 style="font-size:38px;line-height:1.15;font-weight:700;letter-spacing:-.02em">Điểm số và sản phẩm thật của sinh viên, ở cùng một nơi.</h1>
+<p style="font-size:15px;line-height:1.7;color:rgba(255,255,255,.88)">Nộp ảnh thiết kế, link Figma, video demo và mã nguồn. Làm bài nhóm bằng mã mời. Phụ huynh theo dõi, doanh nghiệp tìm sinh viên tiềm năng — có kiểm soát quyền xem.</p>
+<div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:8px">
+<div style="display:flex;align-items:center;gap:10px;padding:12px;border-radius:10px;background:rgba(255,255,255,.14);font-size:13px;color:#fff"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="m21 17-5-5-9 8"/></svg>Ảnh + Figma</div><div style="display:flex;align-items:center;gap:10px;padding:12px;border-radius:10px;background:rgba(255,255,255,.14);font-size:13px;color:#fff"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="6" width="13" height="12" rx="2"/><path d="m16 10 5-3v10l-5-3"/></svg>Video demo</div><div style="display:flex;align-items:center;gap:10px;padding:12px;border-radius:10px;background:rgba(255,255,255,.14);font-size:13px;color:#fff"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m8 7-5 5 5 5M16 7l5 5-5 5"/></svg>Mã nguồn / GitHub</div><div style="display:flex;align-items:center;gap:10px;padding:12px;border-radius:10px;background:rgba(255,255,255,.14);font-size:13px;color:#fff"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h6l2 2h10v12H3z"/></svg>Lưu vào Google Drive của GV</div></div></div>
+<span style="font-size:12px;color:rgba(255,255,255,.75)">Trường Đại học [TÊN TRƯỜNG] · Phiên bản 1.1</span></div>
+<div style="flex:1;display:flex;align-items:center;justify-content:center">
+<div style="width:460px;display:flex;flex-direction:column;gap:22px">
+<div style="display:flex;flex-direction:column;gap:6px"><h2 style="font-size:26px;font-weight:700">Đăng nhập</h2><p class="muted" style="font-size:14px">Chọn vai trò của bạn để đăng nhập đúng cách.</p></div>
+<div role="tablist" aria-label="Vai trò" style="display:grid;grid-template-columns:repeat(5,minmax(0,1fr));padding:4px;background:#ECEBE4;border-radius:10px;gap:2px">
+<sc-for list="{{roles}}" as="r" hint-placeholder-count="5">
+<sc-if value="{{r.on}}" hint-placeholder-val="{{false}}"><button role="tab" aria-selected="true" onClick="{{r.pick}}" style="height:36px;border:0;border-radius:8px;background:#fff;font:600 12px 'Be Vietnam Pro',sans-serif;color:#1A1C21;box-shadow:0 1px 2px rgba(0,0,0,.1);cursor:pointer">{{r.label}}</button></sc-if>
+<sc-if value="{{r.off}}" hint-placeholder-val="{{true}}"><button role="tab" aria-selected="false" onClick="{{r.pick}}" style="height:36px;border:0;border-radius:8px;background:transparent;font:600 12px 'Be Vietnam Pro',sans-serif;color:#4A4E57;cursor:pointer">{{r.label}}</button></sc-if>
+</sc-for></div>
+<div><label class="lbl" for="u">{{fieldLabel}}</label><input id="u" class="inp" placeholder="{{placeholder}}" style="height:46px"><div class="help">{{hint}}</div></div>
+<div><div style="display:flex;justify-content:space-between"><label class="lbl" for="p">Mật khẩu</label><a href="Auth_ChangePassword.dc.html" style="font-size:13px;font-weight:600">Quên mật khẩu?</a></div><input id="p" class="inp" type="password" defaultValue="password" style="height:46px"></div>
+<div style="display:flex;gap:10px;align-items:flex-start;padding:12px 14px;border-radius:8px;background:#FDF0DE;color:#8A3B06;font-size:13px;line-height:1.5"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 2 20h20z"/><path d="M12 10v4M12 17h.01"/></svg><span>Sai mật khẩu 3/5 lần. Sau 5 lần liên tiếp, tài khoản sẽ bị khóa tạm thời 15 phút.</span></div>
+<a class="btn btn-p" href="{{next}}" style="height:48px;font-size:15px">Đăng nhập</a>
+<sc-if value="{{isDn}}" hint-placeholder-val="{{false}}"><p style="font-size:14px;text-align:center" class="muted">Chưa có tài khoản doanh nghiệp? <a href="Auth_DNRegister.dc.html" style="font-weight:600">Đăng ký</a></p></sc-if>
+</div></div></div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const cur = (this.state && this.state.role) || 'sv';
+    const defs = [
+      { id: 'sv', label: 'Sinh viên', f: 'Mã số sinh viên', p: 'VD: 22511203', h: 'Lần đầu đăng nhập, bạn sẽ được yêu cầu đổi mật khẩu và khai báo hồ sơ.', n: 'Auth_ChangePassword.dc.html' },
+      { id: 'gv', label: 'Giảng viên', f: 'Mã giảng viên', p: 'VD: GV0417', h: 'Tài khoản do Quản trị viên cấp.', n: 'GV_Dashboard.dc.html' },
+      { id: 'ad', label: 'Quản trị', f: 'Tên đăng nhập', p: 'admin', h: 'Chỉ dành cho quản trị hệ thống.', n: 'Admin_Dashboard.dc.html' },
+      { id: 'ph', label: 'Phụ huynh', f: 'Số điện thoại', p: 'VD: 0912 345 678', h: 'Dùng SĐT mà con bạn đã khai báo. Mật khẩu ban đầu là SĐT, bắt buộc đổi ở lần đầu.', n: 'PH_Dashboard.dc.html' },
+      { id: 'dn', label: 'Doanh nghiệp', f: 'Email doanh nghiệp', p: 'hr@congty.vn', h: 'Chỉ đăng nhập được sau khi tài khoản đã được Quản trị viên duyệt.', n: 'DN_Search.dc.html' }
+    ];
+    const d = defs.find((x) => x.id === cur);
+    return {
+      roles: defs.map((x) => ({ label: x.label, on: x.id === cur, off: x.id !== cur, pick: () => this.setState({ role: x.id }) })),
+      fieldLabel: d.f, placeholder: d.p, hint: d.h, next: d.n, isDn: cur === 'dn'
+    };
+  }
+}
+</script>
+</body>
+</html>

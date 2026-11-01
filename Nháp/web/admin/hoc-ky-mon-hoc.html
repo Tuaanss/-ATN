@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Học kỳ & môn học · EduPortfolio</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/app.css">
+<script src="../assets/data.js"></script>
+<script src="../assets/app.js"></script>
+</head>
+<body data-role="admin" data-active="hoc-ky-mon-hoc" data-crumbs="Quản trị › <b>Học kỳ & môn học</b>">
+<div id="page" class="stack" style="gap:24px">
+  <div class="page-head">
+    <div class="t"><h1 class="h1">Học kỳ & môn học</h1><p class="sub-t">Khai báo học kỳ (FR-04.1) và môn học với số tín chỉ, loại môn, trọng số điểm thành phần (FR-04.2).</p></div>
+    <div class="actions"><button class="btn btn-p" id="btn-add"></button></div>
+  </div>
+  <div class="card card-b row wrap" id="cur-hk" style="gap:16px"></div>
+  <section class="card">
+    <div class="tabs" id="tabs" role="tablist" style="padding:0 12px">
+      <button class="tab on" data-tab="hk" role="tab">Học kỳ</button><button class="tab" data-tab="mh" role="tab">Môn học</button>
+    </div>
+    <div class="toolbar">
+      <label class="search"><span id="ic-s"></span><input id="q" placeholder="Tìm…" aria-label="Tìm kiếm"></label>
+      <select class="inp hidden" id="f-loai" aria-label="Lọc loại môn"><option value="">Mọi loại môn</option></select>
+      <select class="inp hidden" id="f-khoa" aria-label="Lọc khoa"><option value="">Mọi khoa</option></select>
+    </div>
+    <div id="tbl"></div>
+  </section>
+</div>
+<script>
+document.addEventListener('app:ready', () => {
+  const { ic, esc, badge } = App, db = Store.db, $ = id => document.getElementById(id);
+  const TODAY = '2026-10-03';
+  const curHkId = (db.hocKy.find(h => h.batDau <= TODAY && h.ketThuc >= TODAY) || {}).id;
+  $('ic-s').innerHTML = ic('search', 16);
+  db.loaiMon.forEach(l => $('f-loai').insertAdjacentHTML('beforeend', `<option value="${l.id}">${esc(l.ten)}</option>`));
+  db.khoa.forEach(k => $('f-khoa').insertAdjacentHTML('beforeend', `<option value="${k.id}">${esc(k.ten)}</option>`));
+  const dmy = s => s.split('-').reverse().join('/');
+  const hkState = h => h.ketThuc < TODAY ? ['Đã kết thúc', 'gray'] : h.batDau > TODAY ? ['Sắp tới', 'blue'] : ['Đang diễn ra', 'green'];
+  const LOAI_C = { THIET_KE: 'violet', LAP_TRINH: 'blue', KHAC: 'gray' };
+  let tab = 'hk', t;
+
+  function curHk() {
+    const h = db.hocKy.find(x => x.batDau <= TODAY && x.ketThuc >= TODAY);
+    if (!h) { $('cur-hk').innerHTML = `<span class="muted">Hiện không có học kỳ nào đang diễn ra.</span>`; return; }
+    const total = (new Date(h.ketThuc) - new Date(h.batDau)), done = (new Date(TODAY) - new Date(h.batDau));
+    const pct = Math.round(done / total * 100);
+    $('cur-hk').innerHTML = `<span class="av" style="background:#E3F2E8;color:var(--green)">${ic('calendar', 18)}</span>
+      <div style="display:flex;flex-direction:column;gap:2px"><span class="muted small">Học kỳ hiện tại</span><b>Học kỳ ${h.ky} · ${h.namHoc}</b></div>
+      <div style="flex:1;min-width:200px;display:flex;flex-direction:column;gap:6px"><div class="row between small"><span>${dmy(h.batDau)}</span><span class="muted">Tuần ${Math.ceil(done / 6048e5)} · ${pct}%</span><span>${dmy(h.ketThuc)}</span></div><div class="bar"><span style="width:${pct}%"></span></div></div>`;
+  }
+
+  function build() {
+    document.querySelectorAll('#tabs .tab').forEach(b => { b.classList.toggle('on', b.dataset.tab === tab); b.setAttribute('aria-selected', b.dataset.tab === tab); });
+    $('btn-add').innerHTML = ic('plus', 18) + (tab === 'hk' ? ' Thêm học kỳ' : ' Thêm môn học');
+    $('f-loai').classList.toggle('hidden', tab === 'hk'); $('f-khoa').classList.toggle('hidden', tab === 'hk');
+    $('q').placeholder = tab === 'hk' ? 'Tìm theo năm học…' : 'Tìm theo mã môn, tên môn…';
+    t = tab === 'hk' ? App.table('#tbl', { columns: [
+      { h: 'Học kỳ', r: h => `<b>Học kỳ ${h.ky}</b>` }, { h: 'Năm học', r: h => esc(h.namHoc) },
+      { h: 'Bắt đầu', r: h => dmy(h.batDau) }, { h: 'Kết thúc', r: h => dmy(h.ketThuc) },
+      { h: 'Lớp học phần', cls: 'num', r: h => { const n = db.lopHocPhan.filter(l => l.hkId === h.id).length; return n ? `<a href="lop-hoc-phan.html?hk=${h.id}">${n} lớp</a>` : '<span class="muted">0</span>'; } },
+      { h: 'Số tuần', cls: 'num', r: h => Math.round((new Date(h.ketThuc) - new Date(h.batDau)) / 6048e5) },
+      { h: 'Trạng thái', r: h => { const s = hkState(h); return badge(s[0], s[1], 1); } },
+      { h: '', cls: 'act', r: h => `<button class="btn btn-sm btn-g btn-ic" data-edit="${h.id}" title="Sửa" aria-label="Sửa">${ic('edit', 16)}</button><button class="btn btn-sm btn-g btn-ic" data-del="${h.id}" title="Xóa" aria-label="Xóa">${ic('trash', 16)}</button>` },
+    ] }) : App.table('#tbl', { columns: [
+      { h: 'Mã môn', r: m => `<b class="mono">${esc(m.ma)}</b>` }, { h: 'Tên môn', r: m => esc(m.ten) },
+      { h: 'Tín chỉ', cls: 'num', r: m => m.tinChi },
+      { h: 'Loại môn', r: m => badge((db.loaiMon.find(l => l.id === m.loai) || {}).ten || m.loai, LOAI_C[m.loai] || 'gray') },
+      { h: 'Khoa', r: m => esc((db.khoa.find(k => k.id === m.khoaId) || {}).ten || '') },
+      { h: 'Lớp HP kỳ này', cls: 'num', r: m => { const n = db.lopHocPhan.filter(l => l.monId === m.id && l.hkId === curHkId).length; return `<a href="lop-hoc-phan.html?mon=${m.id}">${n ? n + ' lớp' : 'Mở lớp'}</a>`; } },
+      { h: 'Trọng số CC · BT · GK · CK', r: m => `<span class="mono small">${m.ts.join(' · ')}</span>` },
+      { h: '', cls: 'act', r: m => `<button class="btn btn-sm btn-g btn-ic" data-edit="${m.id}" title="Sửa" aria-label="Sửa">${ic('edit', 16)}</button><button class="btn btn-sm btn-g btn-ic" data-del="${m.id}" title="Xóa" aria-label="Xóa">${ic('trash', 16)}</button>` },
+    ] });
+    refresh();
+  }
+  function refresh(keep) {
+    const q = App.norm($('q').value);
+    if (tab === 'hk') t.set([...db.hocKy].sort((a, b) => b.batDau.localeCompare(a.batDau)).filter(h => !q || App.norm(h.namHoc + ' hoc ky ' + h.ky).includes(q)), keep);
+    else t.set(db.monHoc.filter(m => (!q || App.norm(m.ma + ' ' + m.ten).includes(q)) && (!$('f-loai').value || m.loai === $('f-loai').value) && (!$('f-khoa').value || m.khoaId === $('f-khoa').value)), keep);
+    curHk();
+  }
+  $('tabs').onclick = e => { const b = e.target.closest('[data-tab]'); if (b) { tab = b.dataset.tab; $('q').value = ''; build(); } };
+  ['q', 'f-loai', 'f-khoa'].forEach(id => $(id).addEventListener('input', () => refresh()));
+
+  function editHk(h) {
+    const isNew = !h; h = h || { namHoc: '2026–2027', ky: 2, batDau: '', ketThuc: '' };
+    const m = App.modal({ title: isNew ? 'Thêm học kỳ' : 'Sửa học kỳ', body: `<form id="f" class="form-grid" novalidate>
+      <div><label class="lbl">Năm học <span class="req">*</span></label><input class="inp" name="namHoc" value="${esc(h.namHoc)}" placeholder="VD: 2026–2027"></div>
+      <div><label class="lbl">Học kỳ <span class="req">*</span></label><select class="inp" name="ky">${[1, 2, 3].map(k => `<option value="${k}" ${k == h.ky ? 'selected' : ''}>Học kỳ ${k}${k === 3 ? ' (hè)' : ''}</option>`).join('')}</select></div>
+      <div><label class="lbl">Ngày bắt đầu <span class="req">*</span></label><input class="inp" type="date" name="batDau" value="${h.batDau}"></div>
+      <div><label class="lbl">Ngày kết thúc <span class="req">*</span></label><input class="inp" type="date" name="ketThuc" value="${h.ketThuc}"></div>
+      <div class="full help">Hạn nộp bài tập của GV phải nằm trong thời gian học kỳ (BR-BT-01).</div></form>`,
+      foot: `<button class="btn" data-x>Hủy</button><button class="btn btn-p" id="ok">${isNew ? 'Thêm' : 'Lưu'}</button>` });
+    m.$('#ok').onclick = () => {
+      const f = m.$('#f'), v = App.form(f); v.ky = +v.ky; let bad = false;
+      const chk = (n, msg) => { App.fieldErr(f, n, msg); if (msg) bad = true; };
+      chk('namHoc', !/^\d{4}\s*[–-]\s*\d{4}$/.test(v.namHoc) ? 'Định dạng: 2026–2027.' : '');
+      chk('ky', db.hocKy.some(x => x.id !== h.id && App.norm(x.namHoc).replace(/\D/g, '') === App.norm(v.namHoc).replace(/\D/g, '') && x.ky === v.ky) ? 'Học kỳ này đã tồn tại.' : '');
+      chk('batDau', !v.batDau ? 'Chọn ngày bắt đầu.' : '');
+      chk('ketThuc', !v.ketThuc ? 'Chọn ngày kết thúc.' : v.ketThuc <= v.batDau ? 'Phải sau ngày bắt đầu.' : db.hocKy.some(x => x.id !== h.id && v.batDau <= x.ketThuc && v.ketThuc >= x.batDau) ? 'Trùng thời gian với học kỳ khác.' : '');
+      if (bad) return;
+      if (isNew) db.hocKy.push({ id: Store.nextId('HK', db.hocKy), ...v }); else Object.assign(h, v);
+      Store.log('SUA_DANH_MUC', isNew ? 'Thêm học kỳ' : 'Sửa học kỳ', 'HocKy', `HK${v.ky} ${v.namHoc}`);
+      App.save(); m.close(); refresh(!isNew); App.toast('Đã lưu học kỳ.');
+    };
+  }
+
+  function editMh(x) {
+    const isNew = !x; x = x || { ma: '', ten: '', tinChi: 3, loai: 'LAP_TRINH', khoaId: db.khoa[0].id, ts: [10, 20, 20, 50] };
+    const TS = ['Chuyên cần', 'Bài tập', 'Giữa kỳ', 'Cuối kỳ'];
+    const m = App.modal({ size: 'lg', title: isNew ? 'Thêm môn học' : 'Sửa môn học', body: `<form id="f" class="form-grid" novalidate>
+      <div><label class="lbl">Mã môn <span class="req">*</span></label><input class="inp mono" name="ma" value="${esc(x.ma)}" placeholder="VD: INT3306"></div>
+      <div><label class="lbl">Số tín chỉ <span class="req">*</span></label><input class="inp" type="number" min="1" max="10" name="tinChi" value="${x.tinChi}"></div>
+      <div class="full"><label class="lbl">Tên môn <span class="req">*</span></label><input class="inp" name="ten" value="${esc(x.ten)}"></div>
+      <div><label class="lbl">Loại môn <span class="req">*</span></label><select class="inp" name="loai">${db.loaiMon.map(l => `<option value="${l.id}" ${l.id === x.loai ? 'selected' : ''}>${esc(l.ten)} — ${esc(l.moTa)}</option>`).join('')}</select></div>
+      <div><label class="lbl">Khoa phụ trách</label><select class="inp" name="khoaId">${db.khoa.map(k => `<option value="${k.id}" ${k.id === x.khoaId ? 'selected' : ''}>${esc(k.ten)}</option>`).join('')}</select></div>
+      <div class="full"><label class="lbl">Trọng số điểm thành phần (%) <span class="req">*</span></label>
+        <div class="grid g4" style="gap:12px">${TS.map((l, i) => `<div><span class="help" style="margin:0 0 4px;display:block">${l}</span><input class="inp" type="number" min="0" max="100" name="ts${i}" value="${x.ts[i]}"></div>`).join('')}</div>
+        <div class="row between" style="margin-top:10px"><span class="help" style="margin:0">Tổng trọng số phải bằng 100% (BR-DI-02).</span><b id="sum"></b></div><div class="err hidden" id="ts-err">Tổng trọng số phải bằng 100%.</div></div>
+      </form>`, foot: `<button class="btn" data-x>Hủy</button><button class="btn btn-p" id="ok">${isNew ? 'Thêm' : 'Lưu'}</button>` });
+    const f = m.$('#f');
+    const sum = () => { const s = [0, 1, 2, 3].reduce((a, i) => a + (+f['ts' + i].value || 0), 0); m.$('#sum').textContent = 'Tổng: ' + s + '%'; m.$('#sum').style.color = s === 100 ? 'var(--green)' : '#B42318'; return s; };
+    f.addEventListener('input', sum); sum();
+    m.$('#ok').onclick = () => {
+      const v = App.form(f); let bad = false;
+      const chk = (n, msg) => { App.fieldErr(f, n, msg); if (msg) bad = true; };
+      chk('ma', !v.ma ? 'Bắt buộc.' : db.monHoc.some(o => o.id !== x.id && o.ma.toLowerCase() === v.ma.toLowerCase()) ? 'Mã môn đã tồn tại.' : '');
+      chk('ten', !v.ten ? 'Bắt buộc.' : '');
+      chk('tinChi', !(+v.tinChi >= 1 && +v.tinChi <= 10) ? '1–10 tín chỉ.' : '');
+      const okSum = sum() === 100; m.$('#ts-err').classList.toggle('hidden', okSum); if (!okSum) bad = true;
+      if (bad) return;
+      const data = { ma: v.ma.toUpperCase(), ten: v.ten, tinChi: +v.tinChi, loai: v.loai, khoaId: v.khoaId, ts: [0, 1, 2, 3].map(i => +v['ts' + i] || 0) };
+      if (isNew) db.monHoc.push({ id: Store.nextId('M', db.monHoc), ...data }); else Object.assign(x, data);
+      Store.log('SUA_DANH_MUC', isNew ? 'Thêm môn học' : 'Sửa môn học', 'MonHoc', data.ma);
+      App.save(); m.close(); refresh(!isNew); App.toast('Đã lưu môn học.');
+    };
+  }
+
+  $('btn-add').onclick = () => tab === 'hk' ? editHk() : editMh();
+  $('tbl').addEventListener('click', async e => {
+    const b = e.target.closest('button'); if (!b) return;
+    const list = tab === 'hk' ? db.hocKy : db.monHoc, x = list.find(o => o.id === (b.dataset.edit || b.dataset.del)); if (!x) return;
+    if (b.dataset.edit) return tab === 'hk' ? editHk(x) : editMh(x);
+    const nLhp = db.lopHocPhan.filter(l => tab === 'hk' ? l.hkId === x.id : l.monId === x.id).length;
+    const used = nLhp ? `Đang có ${nLhp} lớp học phần thuộc ${tab === 'hk' ? 'học kỳ' : 'môn'} này. Xóa các lớp học phần trước.` : tab === 'hk' ? (x.batDau <= TODAY ? 'Học kỳ đã bắt đầu và có lớp học phần, điểm gắn với học kỳ.' : '') : (Object.values(db.diem).some(arr => arr.some(h => h.mon.some(mm => mm.monId === x.id))) ? 'Môn học đã có lớp học phần và bảng điểm.' : '');
+    if (used) return App.modal({ title: 'Không thể xóa', body: `<div class="alert al-warn">${ic('alert', 18)}<span>${used}</span></div>`, foot: '<button class="btn btn-p" data-x>Đã hiểu</button>' });
+    if (!await App.confirm({ title: 'Xóa', msg: `Xóa <b>${esc(tab === 'hk' ? 'Học kỳ ' + x.ky + ' · ' + x.namHoc : x.ma + ' – ' + x.ten)}</b>?`, ok: 'Xóa', danger: true })) return;
+    list.splice(list.indexOf(x), 1); App.save(); refresh(true); App.toast('Đã xóa.');
+  });
+  build();
+});
+</script>
+</body>
+</html>

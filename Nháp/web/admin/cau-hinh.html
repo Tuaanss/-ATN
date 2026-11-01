@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cấu hình hệ thống · EduPortfolio</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/app.css">
+<style>
+  .cfg{display:grid;grid-template-columns:220px minmax(0,1fr);gap:24px;align-items:start}
+  .cfg-nav{position:sticky;top:88px;display:flex;flex-direction:column;gap:2px}
+  .cfg-nav a{padding:9px 12px;border-radius:8px;color:var(--ink2);font-weight:500;font-size:14px}
+  .cfg-nav a:hover{background:#ECEBE4;color:var(--ink)}
+  .set{display:grid;grid-template-columns:minmax(0,1fr) 240px;gap:16px;align-items:center;padding:14px 0;border-top:1px solid var(--line2)}
+  .set:first-child{border-top:0;padding-top:0}
+  .set b{font-weight:600;font-size:14px}
+  .set p{font-size:12px;color:var(--mut);margin-top:3px;line-height:1.5}
+  .unit{display:flex;align-items:center;border:1px solid #D6D3C8;border-radius:8px;overflow:hidden;background:#fff}
+  .unit input{border:0;height:40px;padding:0 12px;flex:1;min-width:0;font:400 14px 'Be Vietnam Pro',sans-serif;outline:0}
+  .unit span{padding:0 12px;color:var(--mut);font-size:13px;background:var(--soft);height:40px;display:flex;align-items:center;border-left:1px solid var(--line)}
+  .unit:focus-within{outline:2px solid var(--red);outline-offset:-1px}
+  .fmt{display:flex;flex-wrap:wrap;gap:6px}
+  .fmt label{display:inline-flex;align-items:center;gap:6px;height:32px;padding:0 10px;border:1px solid var(--line);border-radius:6px;font-size:13px;cursor:pointer;font-family:'JetBrains Mono',monospace}
+  .fmt label:has(input:checked){border-color:var(--red);background:#FFF5F5;color:var(--red-d)}
+  .fmt input{width:14px;height:14px}
+  .savebar{position:sticky;bottom:0;z-index:10;display:flex;justify-content:space-between;align-items:center;gap:12px;padding:14px 20px;background:#fff;border:1px solid var(--line);border-radius:12px;box-shadow:0 -6px 24px rgba(0,0,0,.06);flex-wrap:wrap}
+  @media (max-width:860px){.cfg{grid-template-columns:1fr}.cfg-nav{display:none}.set{grid-template-columns:1fr}}
+</style>
+<script src="../assets/data.js"></script>
+<script src="../assets/app.js"></script>
+</head>
+<body data-role="admin" data-active="cau-hinh" data-crumbs="Quản trị › <b>Cấu hình hệ thống</b>">
+<div id="page" class="stack" style="gap:24px">
+  <div class="page-head">
+    <div class="t"><h1 class="h1">Cấu hình hệ thống</h1><p class="sub-t">Giới hạn tệp, định dạng cho phép, thang điểm và quy đổi GPA, chính sách đăng nhập (FR-02.7).</p></div>
+  </div>
+  <div class="cfg">
+    <nav class="cfg-nav" aria-label="Mục cấu hình">
+      <a href="#c-tep">Tệp nộp bài</a><a href="#c-diem">Thang điểm & GPA</a><a href="#c-bm">Bảo mật đăng nhập</a><a href="#c-cb">Cảnh báo học tập</a><a href="#c-dn">Quyền xem của DN</a><a href="#c-mail">Email hệ thống</a>
+    </nav>
+    <form id="f" class="stack" style="gap:20px" novalidate>
+      <section class="card" id="c-tep"><div class="card-h"><h2>Tệp nộp bài</h2><span class="muted small">BR-NB-07, BR-NB-08</span></div><div class="card-b" id="b-tep"></div></section>
+      <section class="card" id="c-diem"><div class="card-h"><h2>Thang điểm & quy đổi GPA</h2><span class="muted small">BR-DI-01 → 04</span></div><div class="card-b stack" id="b-diem"></div></section>
+      <section class="card" id="c-bm"><div class="card-h"><h2>Bảo mật đăng nhập</h2><span class="muted small">FR-01.4, FR-01.6, BR-PH-02</span></div><div class="card-b" id="b-bm"></div></section>
+      <section class="card" id="c-cb"><div class="card-h"><h2>Cảnh báo học tập gửi phụ huynh</h2><span class="muted small">FR-11.4</span></div><div class="card-b" id="b-cb"></div></section>
+      <section class="card" id="c-dn"><div class="card-h"><h2>Quyền xem bài của doanh nghiệp</h2><span class="muted small">BR-DN-04</span></div><div class="card-b" id="b-dn"></div></section>
+      <section class="card" id="c-mail"><div class="card-h"><h2>Email hệ thống</h2></div><div class="card-b" id="b-mail"></div></section>
+      <div class="savebar"><span class="muted small" id="dirty">Chưa có thay đổi.</span><div class="actions"><button type="button" class="btn" id="btn-reset">Khôi phục mặc định</button><button type="submit" class="btn btn-p" id="btn-save"></button></div></div>
+    </form>
+  </div>
+</div>
+<script>
+document.addEventListener('app:ready', () => {
+  const { ic, esc } = App, db = Store.db, $ = id => document.getElementById(id);
+  const DEF = JSON.parse(JSON.stringify(db.config));
+  const c = db.config;
+  $('btn-save').innerHTML = ic('save', 18) + ' Lưu cấu hình';
+  const num = (name, val, unit, min, max, step = 1) => `<div class="unit"><input type="number" name="${name}" value="${val}" min="${min}" max="${max}" step="${step}" aria-label="${name}"><span>${unit}</span></div>`;
+  const set = (title, desc, ctl) => `<div class="set"><div><b>${title}</b>${desc ? `<p>${desc}</p>` : ''}</div><div>${ctl}</div></div>`;
+  const fmts = (name, all, on) => `<div class="fmt">${all.map(x => `<label><input type="checkbox" name="${name}" value="${x}" ${on.includes(x) ? 'checked' : ''}>${x}</label>`).join('')}</div>`;
+  const sw = (name, on) => `<button type="button" class="sw" role="switch" aria-checked="${on}" data-name="${name}" aria-label="${name}"></button>`;
+  const sel = (name, opts, v) => `<select class="inp" name="${name}">${opts.map(([k, l]) => `<option value="${k}" ${k === v ? 'selected' : ''}>${l}</option>`).join('')}</select>`;
+
+  function render() {
+    $('b-tep').innerHTML =
+      `<h3 class="row" style="font-size:14px;margin-bottom:8px">${ic('image', 16)} Môn Thiết kế — ảnh</h3>` +
+      set('Dung lượng tối đa mỗi ảnh', '', num('anhMaxMB', c.anhMaxMB, 'MB', 1, 50)) +
+      set('Số ảnh mỗi bài nộp', 'Tối thiểu – tối đa', `<div class="row">${num('anhMin', c.anhMin, 'ảnh', 1, 100)}${num('anhMax', c.anhMax, 'ảnh', 1, 100)}</div>`) +
+      set('Định dạng ảnh cho phép', 'Hệ thống kiểm tra định dạng thực (magic bytes), không chỉ đuôi tệp.', fmts('anhDinhDang', ['JPG', 'JPEG', 'PNG', 'WEBP', 'GIF', 'SVG'], c.anhDinhDang)) +
+      `<h3 class="row" style="font-size:14px;margin:18px 0 8px">${ic('video', 16)} Môn Lập trình — video & mã nguồn</h3>` +
+      set('Dung lượng video tối đa', 'Video lớn được tải lên Drive theo kiểu resumable upload.', num('videoMaxMB', c.videoMaxMB, 'MB', 10, 2000)) +
+      set('Định dạng video', '', fmts('videoDinhDang', ['MP4', 'WEBM', 'MOV', 'AVI', 'MKV'], c.videoDinhDang)) +
+      set('Dung lượng mã nguồn tối đa', '', num('srcMaxMB', c.srcMaxMB, 'MB', 1, 1000)) +
+      set('Định dạng mã nguồn', '', fmts('srcDinhDang', ['ZIP', 'RAR', '7Z', 'TAR.GZ'], c.srcDinhDang)) +
+      set('Tên miền link được chấp nhận', 'Phân cách bằng dấu phẩy.', `<input class="inp mono" name="linkCho" value="${esc(c.linkCho.join(', '))}">`);
+
+    $('b-diem').innerHTML = `<div class="tbl-wrap" style="border:1px solid var(--line);border-radius:10px"><table><thead><tr><th>Điểm chữ</th><th>Từ điểm (thang 10)</th><th>Đến</th><th>Thang 4</th></tr></thead><tbody>
+      ${c.thangDiem.map(([min, chu, h4], i) => `<tr><td><input class="inp mono" style="width:80px;height:36px" name="td_chu_${i}" value="${chu}" aria-label="Điểm chữ"></td>
+        <td><input class="inp" style="width:110px;height:36px" type="number" step="0.1" min="0" max="10" name="td_min_${i}" value="${min}" aria-label="Từ điểm" ${i === c.thangDiem.length - 1 ? 'readonly' : ''}></td>
+        <td class="muted mono" data-to="${i}">${i ? (c.thangDiem[i - 1][0] - 0.1).toFixed(1) : '10.0'}</td>
+        <td><input class="inp" style="width:90px;height:36px" type="number" step="0.5" min="0" max="4" name="td_h4_${i}" value="${h4}" aria-label="Thang 4"></td></tr>`).join('')}
+      </tbody></table></div><div class="err hidden" id="td-err"></div>` +
+      `<div>${set('Làm tròn điểm', 'Điểm thành phần và điểm học phần.', sel('lamTron', [['1', '1 chữ số thập phân'], ['2', '2 chữ số thập phân']], String(c.lamTron)))}
+      ${set('Môn học lại', 'Cách lấy điểm khi tính GPA tích lũy (CPA).', sel('hocLai', [['CAO_NHAT', 'Lấy điểm cao nhất'], ['GAN_NHAT', 'Lấy điểm lần học gần nhất']], c.hocLai))}
+      <div class="alert al-info" style="margin-top:6px">${ic('info', 18)}<span class="small">GPA / CPA = Σ(điểm hệ 4 × số tín chỉ) / Σ số tín chỉ. Thay đổi thang điểm chỉ áp dụng cho các bảng điểm chưa công bố.</span></div></div>`;
+
+    $('b-bm').innerHTML =
+      set('Số lần nhập sai mật khẩu tối đa', 'Vượt quá thì tạm khóa tài khoản.', num('saiMk', c.saiMk, 'lần', 3, 10)) +
+      set('Thời gian tạm khóa', '', num('khoaPhut', c.khoaPhut, 'phút', 1, 1440)) +
+      set('Bắt buộc đổi mật khẩu lần đầu', 'Áp dụng cho tài khoản do hệ thống sinh (SV, PH, GV).', sw('doiMkLanDau', c.doiMkLanDau)) +
+      set('Phương thức đăng nhập của phụ huynh', 'Mật khẩu tạm = SĐT (bắt buộc đổi) hoặc SĐT + mã OTP.', sel('phDangNhap', [['MK_TAM', 'SĐT + mật khẩu (tạm = SĐT)'], ['OTP', 'SĐT + mã OTP qua SMS']], c.phDangNhap)) +
+      set('Hiệu lực mã OTP', '', num('otpPhut', c.otpPhut, 'phút', 1, 30));
+
+    $('b-cb').innerHTML =
+      set('Ngưỡng điểm cảnh báo', 'Gửi cảnh báo khi điểm thành phần / học phần thấp hơn ngưỡng.', num('canhBaoDiem', c.canhBaoDiem, 'điểm', 0, 10, 0.1)) +
+      set('GPA giảm so với kỳ trước', 'Cảnh báo khi GPA học kỳ giảm từ mức này trở lên.', num('canhBaoGpaGiam', c.canhBaoGpaGiam, 'điểm', 0, 4, 0.1)) +
+      set('Quá hạn nộp bài', 'Luôn gửi khi con quá hạn mà chưa nộp.', `<span class="badge b-green">Luôn bật</span>`);
+
+    $('b-dn').innerHTML = set('Thời hạn xem bài', 'Admin chọn trong khoảng này khi duyệt yêu cầu.', `<div class="row">${num('dnHanMin', c.dnHanMin, 'ngày', 1, 90)}${num('dnHanMax', c.dnHanMax, 'ngày', 1, 90)}</div>`);
+    $('b-mail').innerHTML = set('Địa chỉ gửi', 'Dùng cho thông báo, đặt lại mật khẩu.', `<input class="inp" name="emailNguoiGui" value="${esc(c.emailNguoiGui)}">`);
+  }
+  render();
+
+  const f = $('f');
+  let dirty = false;
+  const markDirty = () => { dirty = true; $('dirty').innerHTML = `<span style="color:var(--amber);font-weight:600">${ic('alert', 14)} Có thay đổi chưa lưu</span>`; };
+  f.addEventListener('input', markDirty); f.addEventListener('change', markDirty);
+  window.addEventListener('beforeunload', e => { if (dirty) { e.preventDefault(); e.returnValue = ''; } });
+
+  f.onsubmit = e => {
+    e.preventDefault();
+    const g = n => f.elements[n], v = n => +g(n).value;
+    const errs = [];
+    const chk = (n, cond, msg) => { g(n).classList.toggle('bad', !cond); if (!cond) errs.push(msg); };
+    chk('anhMaxMB', v('anhMaxMB') >= 1 && v('anhMaxMB') <= 50, 'Dung lượng ảnh 1–50 MB');
+    chk('anhMax', v('anhMax') >= v('anhMin') && v('anhMin') >= 1, 'Số ảnh tối đa phải ≥ tối thiểu');
+    chk('videoMaxMB', v('videoMaxMB') >= 10, 'Dung lượng video ≥ 10 MB');
+    chk('dnHanMax', v('dnHanMax') >= v('dnHanMin') && v('dnHanMin') >= 1, 'Thời hạn DN: tối đa phải ≥ tối thiểu');
+    chk('saiMk', v('saiMk') >= 3 && v('saiMk') <= 10, 'Số lần sai 3–10');
+    chk('emailNguoiGui', App.emailOk(g('emailNguoiGui').value), 'Email gửi không hợp lệ');
+    const checked = n => [...f.querySelectorAll(`[name=${n}]:checked`)].map(x => x.value);
+    ['anhDinhDang', 'videoDinhDang', 'srcDinhDang'].forEach(n => { if (!checked(n).length) errs.push('Chọn ít nhất một định dạng ' + ({ anhDinhDang: 'ảnh', videoDinhDang: 'video', srcDinhDang: 'mã nguồn' })[n]); });
+    const td = c.thangDiem.map((_, i) => [+g('td_min_' + i).value, g('td_chu_' + i).value.trim(), +g('td_h4_' + i).value]);
+    const tdOk = td.every((r, i) => r[1] && (i === 0 || r[0] < td[i - 1][0]) && (i === 0 || r[2] <= td[i - 1][2]));
+    $('td-err').textContent = 'Ngưỡng điểm phải giảm dần từ trên xuống, điểm chữ không để trống.'; $('td-err').classList.toggle('hidden', tdOk);
+    if (!tdOk) errs.push('Thang điểm chưa hợp lệ');
+    if (errs.length) { App.toast(errs[0], 'bad'); return; }
+    const old = JSON.parse(JSON.stringify(c));
+    Object.assign(c, {
+      anhMaxMB: v('anhMaxMB'), anhMin: v('anhMin'), anhMax: v('anhMax'), anhDinhDang: checked('anhDinhDang'), videoMaxMB: v('videoMaxMB'), videoDinhDang: checked('videoDinhDang'),
+      srcMaxMB: v('srcMaxMB'), srcDinhDang: checked('srcDinhDang'), linkCho: g('linkCho').value.split(',').map(s => s.trim()).filter(Boolean), thangDiem: td,
+      lamTron: v('lamTron'), hocLai: g('hocLai').value, saiMk: v('saiMk'), khoaPhut: v('khoaPhut'), doiMkLanDau: f.querySelector('[data-name=doiMkLanDau]').getAttribute('aria-checked') === 'true',
+      phDangNhap: g('phDangNhap').value, otpPhut: v('otpPhut'), canhBaoDiem: v('canhBaoDiem'), canhBaoGpaGiam: v('canhBaoGpaGiam'), dnHanMin: v('dnHanMin'), dnHanMax: v('dnHanMax'), emailNguoiGui: g('emailNguoiGui').value.trim(),
+    });
+    const changed = Object.keys(c).filter(k => JSON.stringify(c[k]) !== JSON.stringify(old[k]));
+    Store.log('SUA_CAU_HINH', 'Sửa cấu hình', 'CauHinh', changed.join(', ') || '—', Object.fromEntries(changed.map(k => [k, old[k]])), Object.fromEntries(changed.map(k => [k, c[k]])));
+    App.save(); dirty = false; $('dirty').textContent = 'Đã lưu lúc ' + new Date().toLocaleTimeString('vi-VN');
+    App.toast(changed.length ? `Đã lưu ${changed.length} thay đổi.` : 'Không có gì thay đổi.');
+  };
+  $('btn-reset').onclick = async () => {
+    if (!await App.confirm({ title: 'Khôi phục mặc định', msg: 'Đặt lại toàn bộ cấu hình về giá trị đề xuất trong SRS? Bạn vẫn cần bấm <b>Lưu cấu hình</b> để áp dụng.', ok: 'Khôi phục' })) return;
+    Object.assign(c, { anhMaxMB: 10, anhMax: 30, anhMin: 1, anhDinhDang: ['JPG', 'JPEG', 'PNG', 'WEBP'], videoMaxMB: 500, videoDinhDang: ['MP4', 'WEBM', 'MOV'], srcMaxMB: 100, srcDinhDang: ['ZIP', 'RAR', '7Z'], linkCho: ['figma.com', 'github.com', 'gitlab.com'], thangDiem: [[8.5, 'A', 4], [8.0, 'B+', 3.5], [7.0, 'B', 3], [6.5, 'C+', 2.5], [5.5, 'C', 2], [5.0, 'D+', 1.5], [4.0, 'D', 1], [0, 'F', 0]], lamTron: 1, hocLai: 'CAO_NHAT', saiMk: 5, khoaPhut: 15, doiMkLanDau: true, phDangNhap: 'MK_TAM', otpPhut: 5, canhBaoDiem: 5.0, canhBaoGpaGiam: 0.3, dnHanMin: 14, dnHanMax: 28 });
+    render(); Object.assign(c, DEF); markDirty();
+  };
+});
+</script>
+</body>
+</html>

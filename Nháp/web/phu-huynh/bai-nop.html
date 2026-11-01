@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bài nộp của con · EduPortfolio</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/app.css">
+<style>
+  .sub{display:grid;grid-template-columns:120px minmax(0,1fr) auto;gap:18px;align-items:center;padding:18px 20px;border-top:1px solid var(--line2)}
+  .sub:first-child{border-top:0}
+  .cover{width:120px;height:80px;border-radius:10px;overflow:hidden;background:#EEEDE7;display:flex;align-items:center;justify-content:center;color:var(--mut);position:relative}
+  .cover img{width:100%;height:100%;object-fit:cover}
+  .cover .n{position:absolute;right:6px;bottom:6px;background:rgba(20,22,26,.75);color:#fff;font-size:11px;padding:2px 6px;border-radius:4px}
+  .meta{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:13px;color:var(--mut)}
+  .meta span{display:inline-flex;align-items:center;gap:5px}
+  .vw{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:20px}
+  .viewer-stage img{max-width:100%;max-height:100%;object-fit:contain;user-select:none;-webkit-user-drag:none}
+  .vw>.viewer{align-self:start}
+  .vw-info{display:flex;flex-direction:column;gap:14px;font-size:14px}
+  @media (max-width:860px){.sub{grid-template-columns:80px minmax(0,1fr)}.sub .go{grid-column:1/-1}.cover{width:80px;height:60px}.vw{grid-template-columns:1fr}}
+</style>
+<script src="../assets/data.js"></script>
+<script src="../assets/app.js"></script>
+</head>
+<body data-role="ph" data-active="bai-nop" data-crumbs="Phụ huynh › <b>Bài nộp của con</b>">
+<div id="page" class="stack" style="gap:24px">
+  <div class="page-head">
+    <div class="t"><h1 class="h1" id="title"></h1><p class="sub-t">Bài chung của nhóm và bài cá nhân của con — chỉ xem, không tải xuống (BR-PH-04).</p></div>
+  </div>
+  <div class="grid g4" id="tiles"></div>
+  <section class="card">
+    <div class="toolbar">
+      <label class="search"><span id="ic-s"></span><input id="q" placeholder="Tìm theo môn, bài tập, đề tài…" aria-label="Tìm bài nộp"></label>
+      <select class="inp" id="f-hk" aria-label="Học kỳ"><option value="">Mọi học kỳ</option></select>
+      <select class="inp" id="f-tt" aria-label="Trạng thái"><option value="">Mọi trạng thái</option><option value="CHUA_NOP">Chưa nộp</option><option value="QUA_HAN">Quá hạn</option><option value="DA_NOP">Đã nộp</option><option value="NOP_MUON">Nộp muộn</option><option value="DA_CHAM">Đã chấm</option></select>
+    </div>
+    <div id="list"></div>
+  </section>
+</div>
+<script>
+document.addEventListener('app:ready', () => {
+  const { ic, esc, badge } = App, db = Store.db, $ = id => document.getElementById(id);
+  const { child } = App.phSession();
+  $('title').textContent = 'Bài nộp · ' + child.hoTen;
+  $('ic-s').innerHTML = ic('search', 16);
+  const mine = db.baiNop.filter(b => b.svId === child.id);
+  [...new Set(mine.map(b => b.hk))].forEach(hk => { const h = db.hocKy.find(x => x.id === hk); $('f-hk').insertAdjacentHTML('beforeend', `<option value="${hk}">Học kỳ ${h.ky} · ${h.namHoc}</option>`); });
+  const ST = { CHUA_NOP: ['Chưa nộp', 'gray'], QUA_HAN: ['Quá hạn – chưa nộp', 'red'], DA_NOP: ['Đã nộp', 'blue'], NOP_MUON: ['Nộp muộn', 'amber'], DA_CHAM: ['Đã chấm', 'green'], TRA_LAI: ['Bị trả lại', 'amber'] };
+
+  // Ảnh minh họa cho bản demo (bản thật lấy từ Google Drive qua proxy của hệ thống — FR-18.7)
+  const HUES = [350, 210, 160, 30, 270, 190, 10, 120];
+  function shot(seed, i, w = 1200, h = 750) {
+    const hu = HUES[(seed + i) % HUES.length], bg = `hsl(${hu},45%,92%)`, ac = `hsl(${hu},60%,45%)`, sf = `hsl(${hu},30%,98%)`;
+    const ph = (x) => `<g transform="translate(${x},70)"><rect width="300" height="610" rx="36" fill="#1A1C21"/><rect x="12" y="12" width="276" height="586" rx="26" fill="${sf}"/>
+      <rect x="32" y="48" width="140" height="18" rx="9" fill="${ac}"/><rect x="32" y="84" width="236" height="120" rx="14" fill="${ac}" opacity=".18"/>
+      ${[0, 1, 2].map(k => `<rect x="32" y="${226 + k * 76}" width="236" height="60" rx="12" fill="#fff" stroke="#E3E1D9"/><circle cx="62" cy="${256 + k * 76}" r="16" fill="${ac}" opacity=".5"/><rect x="88" y="${246 + k * 76}" width="${120 - k * 20}" height="10" rx="5" fill="#30343B" opacity=".6"/><rect x="88" y="${262 + k * 76}" width="80" height="8" rx="4" fill="#8A8E97" opacity=".5"/>`).join('')}
+      <rect x="32" y="532" width="236" height="44" rx="12" fill="${ac}"/></g>`;
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 1200 750"><rect width="1200" height="750" fill="${bg}"/>${ph(250)}${ph(650)}
+      <text x="1170" y="725" text-anchor="end" font-family="monospace" font-size="22" fill="#30343B" opacity=".6">anh_${String(i + 1).padStart(2, '0')}.png</text></svg>`;
+    return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+  }
+
+  function tiles() {
+    const c = s => mine.filter(b => b.trangThai === s).length;
+    const graded = mine.filter(b => b.diem != null);
+    $('tiles').innerHTML = [['Tổng bài tập', mine.length, 'file'], ['Đã nộp', c('DA_NOP') + c('NOP_MUON') + c('DA_CHAM'), 'check'],
+      ['Chưa nộp / quá hạn', c('CHUA_NOP') + c('QUA_HAN'), 'clock'], ['Điểm TB các bài đã chấm', graded.length ? (graded.reduce((a, b) => a + b.diem, 0) / graded.length).toFixed(1) : '—', 'chart']]
+      .map(([k, v, i]) => `<div class="tile"><span class="k">${ic(i, 16)} ${k}</span><span class="v">${v}</span></div>`).join('');
+  }
+
+  function list() {
+    const q = App.norm($('q').value), hk = $('f-hk').value, tt = $('f-tt').value;
+    const rows = mine.filter(b => (!q || App.norm(b.mon + ' ' + b.baiTap + ' ' + b.deTai + ' ' + b.lhp).includes(q)) && (!hk || b.hk === hk) && (!tt || b.trangThai === tt));
+    $('list').innerHTML = rows.length ? rows.map(b => {
+      const has = b.thoiGian, s = ST[b.trangThai];
+      const cover = !has ? ic(b.trangThai === 'QUA_HAN' ? 'alert' : 'clock', 26) : b.loaiSP === 'THIET_KE' ? `<img src="${shot(b.id.charCodeAt(1), 0, 240, 150)}" alt=""><span class="n">${b.anh} ảnh</span>` : `<span style="color:#fff;background:#14161A;width:100%;height:100%;display:flex;align-items:center;justify-content:center">${ic('play', 26)}</span>`;
+      return `<div class="sub">
+        <div class="cover">${cover}</div>
+        <div class="stack" style="gap:6px;min-width:0">
+          <div class="row wrap" style="gap:8px">${badge(s[0], s[1], 1)}${badge(b.hinhThuc === 'NHOM' ? 'Bài chung của nhóm' : 'Bài cá nhân', b.hinhThuc === 'NHOM' ? 'violet' : 'gray')}${b.diem != null ? `<span class="badge b-green">Điểm ${b.diem.toFixed(1)}</span>` : ''}</div>
+          <b style="font-size:15px">${esc(b.baiTap)}</b>
+          <div class="meta"><span>${ic('book', 14)} ${esc(b.mon)} · <span class="mono">${b.lhp}</span></span>${b.deTai ? `<span>${ic('tag', 14)} ${esc(b.deTai)}</span>` : '<span style="color:#B42318">Chưa đăng ký đề tài</span>'}</div>
+          <div class="meta">${has ? `<span>${ic('upload', 14)} ${esc(b.nguoiNop)} nộp lúc ${App.fmtDate(b.thoiGian)}</span>` : ''}<span>${ic('calendar', 14)} Hạn ${App.fmtDate(b.han)}</span>${b.nhom ? `<span>${ic('users', 14)} ${esc(b.nhom)}</span>` : ''}</div>
+        </div>
+        <div class="go">${has ? `<button class="btn" data-open="${b.id}">${ic('eye', 16)} Xem bài</button>` : `<span class="muted small">Chưa có bài nộp</span>`}</div>
+      </div>`; }).join('') : `<div class="empty">Không có bài nộp phù hợp.</div>`;
+  }
+  ['q', 'f-hk', 'f-tt'].forEach(id => $(id).addEventListener('input', list));
+
+  function open(b) {
+    let i = 0;
+    const n = b.loaiSP === 'THIET_KE' ? b.anh : 0, seed = b.id.charCodeAt(1);
+    const stage = b.loaiSP === 'THIET_KE'
+      ? `<div class="viewer" tabindex="0" id="vw" aria-label="Trình xem ảnh, dùng phím mũi tên để chuyển ảnh">
+          <div class="row between" style="padding:10px 14px;font-size:13px;background:#1B1D23"><span id="cnt"></span><span style="opacity:.7" class="mono" id="fn"></span><button class="btn btn-g btn-sm btn-ic" style="color:#fff" id="fs" aria-label="Toàn màn hình">${ic('max', 16)}</button></div>
+          <div class="viewer-stage"><img id="img" alt="" draggable="false" oncontextmenu="return false"><button class="viewer-nav" style="left:12px" id="pv" aria-label="Ảnh trước">${ic('left', 22)}</button><button class="viewer-nav" style="right:12px" id="nx" aria-label="Ảnh sau">${ic('right', 22)}</button></div>
+          <div class="viewer-thumbs" id="th">${Array.from({ length: n }, (_, k) => `<button data-k="${k}" aria-label="Ảnh ${k + 1}" style="background:url('${shot(seed, k, 144, 90)}') center/cover"></button>`).join('')}</div></div>`
+      : `<div class="viewer"><div class="viewer-stage" style="flex-direction:column;gap:14px;background:#0E0F12"><button class="viewer-nav" style="position:static;transform:none;width:72px;height:72px" id="play" aria-label="Phát video">${ic('play', 30)}</button><span class="mono small" style="opacity:.7">${esc(b.video)}</span></div>
+          <div class="row" style="gap:12px;padding:12px 14px;background:#1B1D23;font-size:13px">${ic('play', 16)}<div class="bar" style="flex:1;background:#2E323C"><span style="width:0%" id="prog"></span></div><span class="mono">00:00 / 03:12</span>${ic('max', 16)}</div></div>`;
+    const m = App.modal({ size: 'lg', title: b.baiTap, body: `<div class="vw">${stage}
+      <aside class="vw-info">
+        <div class="row wrap" style="gap:8px">${badge(ST[b.trangThai][0], ST[b.trangThai][1], 1)}${badge(b.hinhThuc === 'NHOM' ? 'Bài chung của nhóm' : 'Bài cá nhân', b.hinhThuc === 'NHOM' ? 'violet' : 'gray')}</div>
+        <div><span class="lbl" style="margin-bottom:2px">Đề tài</span>${esc(b.deTai)}</div>
+        <div class="row wrap" style="gap:6px">${b.tuKhoa.map(t => `<span class="chip">${esc(t)}</span>`).join('')}</div>
+        <dl class="kv" style="grid-template-columns:96px 1fr;font-size:13px"><dt>Môn</dt><dd>${esc(b.mon)}</dd>${b.nhom ? `<dt>Nhóm</dt><dd>${esc(b.nhom)}</dd>` : ''}<dt>Người nộp</dt><dd>${esc(b.nguoiNop)}</dd><dt>Thời gian</dt><dd>${App.fmtDate(b.thoiGian)}</dd><dt>Hạn nộp</dt><dd>${App.fmtDate(b.han)}</dd></dl>
+        ${b.figma ? `<a class="btn" href="${esc(b.figma)}" target="_blank" rel="noopener">${ic('link', 16)} Mở thiết kế trên Figma</a>` : ''}
+        ${b.git ? `<a class="btn" href="${esc(b.git)}" target="_blank" rel="noopener">${ic('code', 16)} Xem mã nguồn (GitHub)</a>` : ''}
+        <div class="card" style="padding:14px;background:${b.diem != null ? '#F4FBF6' : 'var(--soft)'}">${b.diem != null ? `<div class="row between"><b>Điểm</b><b style="font-size:22px">${b.diem.toFixed(1)}</b></div>${b.nhanXet ? `<p class="small" style="margin-top:8px;line-height:1.5"><b>Nhận xét của GV:</b> ${esc(b.nhanXet)}</p>` : ''}` : '<span class="muted small">Giảng viên chưa chấm bài này.</span>'}</div>
+        <p class="muted small row">${ic('shield', 14)} Chỉ xem — phụ huynh không tải xuống được bài nộp.</p>
+      </aside></div>`, foot: '<button class="btn" data-x>Đóng</button>' });
+    if (!n) { const p = m.$('#play'); if (p) p.onclick = () => App.toast('Bản demo: video thật được phát trực tiếp từ Google Drive của giảng viên.', 'info'); return; }
+    const show = () => {
+      m.$('#img').src = shot(seed, i); m.$('#img').alt = `Ảnh ${i + 1} trên ${n}`;
+      m.$('#cnt').textContent = `Ảnh ${i + 1}/${n}`; m.$('#fn').textContent = `anh_${String(i + 1).padStart(2, '0')}.png`;
+      m.$$('#th button').forEach((t, k) => t.classList.toggle('on', k === i));
+      const cur = m.$(`#th button[data-k="${i}"]`); cur && cur.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    };
+    const go = d => { i = (i + d + n) % n; show(); };
+    m.$('#pv').onclick = () => go(-1); m.$('#nx').onclick = () => go(1);
+    m.$('#th').onclick = e => { const t = e.target.closest('[data-k]'); if (t) { i = +t.dataset.k; show(); } };
+    m.$('#vw').addEventListener('keydown', e => { if (e.key === 'ArrowLeft') go(-1); if (e.key === 'ArrowRight') go(1); });
+    m.$('#fs').onclick = () => { const v = m.$('#vw'); document.fullscreenElement ? document.exitFullscreen() : v.requestFullscreen && v.requestFullscreen(); };
+    let sx = null; const st = m.$('.viewer-stage');
+    st.addEventListener('touchstart', e => sx = e.touches[0].clientX, { passive: true });
+    st.addEventListener('touchend', e => { if (sx == null) return; const dx = e.changedTouches[0].clientX - sx; if (Math.abs(dx) > 40) go(dx < 0 ? 1 : -1); sx = null; });
+    show(); setTimeout(() => m.$('#vw').focus(), 50);
+  }
+  $('list').onclick = e => { const b = e.target.closest('[data-open]'); if (b) open(mine.find(x => x.id === b.dataset.open)); };
+  tiles(); list();
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Chọn con cần xem · EduPortfolio</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/app.css">
+<style>
+  .kid{display:flex;flex-direction:column;gap:16px;padding:22px;text-align:left;cursor:pointer;font:inherit;color:inherit;transition:border-color .12s,box-shadow .12s}
+  .kid:hover{border-color:var(--red);box-shadow:0 6px 24px rgba(219,0,0,.08)}
+  .kid.cur{border-color:var(--red);box-shadow:0 0 0 1px var(--red)}
+  .kid .stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+  .kid .stats div{padding:10px 12px;border-radius:10px;background:var(--soft);display:flex;flex-direction:column;gap:2px}
+  .kid .stats b{font-size:18px;font-variant-numeric:tabular-nums}
+</style>
+<script src="../assets/data.js"></script>
+<script src="../assets/app.js"></script>
+</head>
+<body>
+<header class="top" style="position:static">
+  <a class="logo" href="../index.html" style="flex:1"><span class="logo-mark" id="logo-ic"></span><b>EduPortfolio</b></a>
+  <span class="small muted" id="who"></span>
+  <a class="btn btn-g btn-sm" href="dang-nhap.html" id="out"></a>
+</header>
+<main style="max-width:960px;margin:0 auto;padding:40px 16px;display:flex;flex-direction:column;gap:24px">
+  <div class="stack" style="gap:6px;text-align:center;align-items:center">
+    <h1 class="h1">Chọn con cần xem</h1>
+    <p class="muted" style="max-width:520px;line-height:1.6">Số điện thoại của bạn đang liên kết với nhiều sinh viên. Bạn có thể chuyển đổi giữa các con bất cứ lúc nào từ thanh bên trái.</p>
+  </div>
+  <div class="grid g2" id="kids"></div>
+  <p class="muted small" style="text-align:center">Không thấy con của bạn? Hãy nhờ con kiểm tra SĐT phụ huynh đã khai báo trong hồ sơ sinh viên.</p>
+</main>
+<script>
+document.addEventListener('app:ready', () => {
+  const { ic, esc, badge } = App, db = Store.db, $ = id => document.getElementById(id);
+  const { ph, kids, child } = App.phSession();
+  $('logo-ic').innerHTML = ic('book', 18, 2);
+  $('who').innerHTML = `Đăng nhập: <b class="mono">${ph.sdt}</b>`;
+  $('out').innerHTML = ic('logout', 16) + ' Đăng xuất';
+  $('out').onclick = () => { db.session = {}; Store.save(); };
+  const QH = { BO: 'Bố', ME: 'Mẹ', GIAM_HO: 'Người giám hộ' };
+  const fromLogin = document.referrer.includes('dang-nhap') || document.referrer.includes('doi-mat-khau');
+
+  $('kids').innerHTML = kids.map(k => {
+    const i = App.lopOf(k), g = App.gpa(k.id);
+    const warn = db.thongBao.filter(t => t.svId === k.id && !t.read && t.loai === 'CANH_BAO').length;
+    const unread = db.thongBao.filter(t => t.svId === k.id && !t.read).length;
+    return `<button class="card kid ${!fromLogin && k.id === child.id ? 'cur' : ''}" data-id="${k.id}">
+      <div class="row between" style="align-items:flex-start">
+        <div class="cell-user"><span class="av" style="width:52px;height:52px;font-size:18px">${esc(App.initials(k.hoTen))}</span><div><b style="font-size:17px">${esc(k.hoTen)}</b><span class="mono">${k.mssv}</span></div></div>
+        ${badge('Bạn là ' + QH[k.qh].toLowerCase(), 'gray')}
+      </div>
+      <div class="small muted" style="line-height:1.6">${esc(i.nganh)} · Lớp <span class="mono">${esc(i.lop)}</span> · Khóa ${esc(i.khoa)}</div>
+      <div class="stats">
+        <div><span class="small muted">CPA</span><b>${g.cpa != null ? g.cpa.toFixed(2) : '—'}</b></div>
+        <div><span class="small muted">Tín chỉ tích lũy</span><b>${g.tcTichLuy}</b></div>
+        <div><span class="small muted">Thông báo mới</span><b>${unread}</b></div>
+      </div>
+      ${warn ? `<div class="alert al-bad" style="padding:10px 12px">${ic('alert', 16)}<span class="small"><b>${warn} cảnh báo học tập</b> chưa xem</span></div>` : `<div class="alert al-ok" style="padding:10px 12px">${ic('check', 16)}<span class="small">Không có cảnh báo học tập</span></div>`}
+      <span class="btn btn-p" style="align-self:stretch">Xem kết quả của ${esc(k.hoTen.split(' ').slice(-2).join(' '))} ${ic('right', 16)}</span>
+    </button>`;
+  }).join('');
+  $('kids').onclick = e => { const b = e.target.closest('[data-id]'); if (!b) return; db.session.childId = b.dataset.id; Store.save(); location.href = 'ket-qua.html'; };
+});
+</script>
+</body>
+</html>

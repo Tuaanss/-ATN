@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tài khoản phụ huynh · EduPortfolio</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/app.css">
+<script src="../assets/data.js"></script>
+<script src="../assets/app.js"></script>
+</head>
+<body data-role="admin" data-active="phu-huynh" data-crumbs="Quản trị › <b>Tài khoản phụ huynh</b>">
+<div id="page" class="stack" style="gap:24px">
+  <div class="page-head">
+    <div class="t"><h1 class="h1">Tài khoản phụ huynh</h1><p class="sub-t">Tài khoản được sinh tự động từ SĐT bố / mẹ / người giám hộ do sinh viên khai báo (FR-02.4, BR-PH).</p></div>
+    <div class="actions"><button class="btn" id="btn-phone"></button></div>
+  </div>
+  <div class="grid g4" id="tiles"></div>
+  <section class="card">
+    <div class="toolbar">
+      <label class="search"><span id="ic-s"></span><input id="q" placeholder="Tìm theo SĐT, tên/MSSV của con…" aria-label="Tìm kiếm phụ huynh"></label>
+      <select class="inp" id="f-tt" aria-label="Lọc theo trạng thái"><option value="">Mọi trạng thái</option><option value="HOAT_DONG">Hoạt động</option><option value="CHUA_KICH_HOAT">Chưa đăng nhập lần đầu</option><option value="KHOA">Đã khóa</option><option value="VO_HIEU">Vô hiệu (không còn con)</option></select>
+      <select class="inp" id="f-n" aria-label="Lọc theo số con"><option value="">Số con: tất cả</option><option value="1">1 con</option><option value="2">Từ 2 con</option></select>
+    </div>
+    <div id="tbl"></div>
+  </section>
+</div>
+<script>
+document.addEventListener('app:ready', () => {
+  const { ic, esc, badge } = App, db = Store.db, $ = id => document.getElementById(id);
+  $('btn-phone').innerHTML = ic('swap', 18) + ' Xử lý đổi SĐT phụ huynh';
+  $('ic-s').innerHTML = ic('search', 16);
+  const qs = new URLSearchParams(location.search); if (qs.get('sv')) $('q').value = qs.get('sv');
+  const QH = { BO: 'Bố', ME: 'Mẹ', GIAM_HO: 'Giám hộ' };
+  const svOf = id => db.sv.find(s => s.id === id) || {};
+  const TT = { HOAT_DONG: ['Hoạt động', 'green'], CHUA_KICH_HOAT: ['Chưa đăng nhập lần đầu', 'gray'], KHOA: ['Đã khóa', 'red'], VO_HIEU: ['Vô hiệu', 'amber'] };
+
+  function tiles() {
+    const a = db.ph;
+    $('tiles').innerHTML = [['Tổng tài khoản', a.length, 'user'], ['Đã kích hoạt', a.filter(p => p.trangThai === 'HOAT_DONG').length, 'check'],
+      ['Chưa đăng nhập lần đầu', a.filter(p => p.trangThai === 'CHUA_KICH_HOAT').length, 'clock'], ['Liên kết từ 2 con', a.filter(p => p.links.length > 1).length, 'users']]
+      .map(([k, v, i]) => `<div class="tile"><span class="k">${ic(i, 16)} ${k}</span><span class="v">${v}</span></div>`).join('');
+  }
+
+  const t = App.table('#tbl', { pageSize: 12, columns: [
+    { h: 'Tài khoản (SĐT)', r: p => `<div class="cell-user"><span class="av">${ic('phone', 16)}</span><div><b class="mono">${p.sdt}</b><span>${esc(p.ten) || 'Chưa cập nhật tên'}</span></div></div>` },
+    { h: 'Con liên kết', r: p => p.links.length ? `<div class="row wrap" style="gap:6px">${p.links.map(l => { const s = svOf(l.svId); return `<span class="chip" title="${esc(s.hoTen)}">${esc(s.hoTen)} <span class="muted mono" style="font-size:11px">${s.mssv}</span> <span class="badge b-gray" style="height:18px;padding:0 6px;font-size:11px">${QH[l.qh]}</span></span>`; }).join('')}</div>` : '<span class="muted small">Không còn liên kết</span>' },
+    { h: 'Đăng nhập gần nhất', r: p => p.lastLogin ? `<span class="small">${App.fmtDate(p.lastLogin)}</span>` : '<span class="muted small">Chưa đăng nhập</span>' },
+    { h: 'Trạng thái', r: p => badge(TT[p.trangThai][0], TT[p.trangThai][1], 1) },
+    { h: '', cls: 'act', r: p => `<button class="btn btn-sm btn-g btn-ic" data-view="${p.id}" title="Chi tiết" aria-label="Chi tiết">${ic('eye', 16)}</button>
+      <button class="btn btn-sm btn-g btn-ic" data-reset="${p.id}" title="Đặt lại mật khẩu" aria-label="Đặt lại mật khẩu" ${p.trangThai === 'VO_HIEU' ? 'disabled' : ''}>${ic('key', 16)}</button>
+      <button class="btn btn-sm btn-g btn-ic" data-lock="${p.id}" title="${p.trangThai === 'KHOA' ? 'Mở khóa' : 'Khóa'}" aria-label="${p.trangThai === 'KHOA' ? 'Mở khóa' : 'Khóa'}" ${p.trangThai === 'VO_HIEU' ? 'disabled' : ''}>${ic(p.trangThai === 'KHOA' ? 'unlock' : 'lock', 16)}</button>` },
+  ] });
+
+  function refresh(keep) {
+    const q = App.norm($('q').value), tt = $('f-tt').value, n = $('f-n').value;
+    t.set(db.ph.filter(p => (!q || App.norm(p.sdt + ' ' + p.ten + ' ' + p.links.map(l => { const s = svOf(l.svId); return s.hoTen + ' ' + s.mssv; }).join(' ')).includes(q))
+      && (!tt || p.trangThai === tt) && (!n || (n === '1' ? p.links.length === 1 : p.links.length >= 2))), keep);
+    tiles();
+  }
+  ['q', 'f-tt', 'f-n'].forEach(id => $(id).addEventListener('input', () => refresh()));
+
+  function view(p) {
+    const logs = db.log.filter(l => l.target.includes(p.sdt) || l.user === p.sdt).slice(0, 5);
+    App.modal({ drawer: true, title: 'Chi tiết tài khoản phụ huynh', body: `
+      <dl class="kv"><dt>Tên đăng nhập</dt><dd class="mono">${p.sdt}</dd><dt>Họ tên</dt><dd>${esc(p.ten) || '<span class="muted">Chưa cập nhật</span>'}</dd>
+      <dt>Ngày tạo</dt><dd>${App.fmtDate(p.ngayTao)} <span class="muted small">(tự động từ hồ sơ SV)</span></dd>
+      <dt>Đổi MK lần đầu</dt><dd>${p.doiMk ? badge('Đã đổi', 'green') : badge('Chưa đổi', 'amber')}</dd>
+      <dt>Đăng nhập gần nhất</dt><dd>${p.lastLogin ? App.fmtDate(p.lastLogin) : '—'}</dd><dt>Trạng thái</dt><dd>${badge(TT[p.trangThai][0], TT[p.trangThai][1], 1)}</dd></dl>
+      <div class="divider"></div><h3 style="font-size:15px">Sinh viên liên kết (${p.links.length})</h3>
+      ${p.links.map(l => { const s = svOf(l.svId), i = App.lopOf(s); return `<div class="row between" style="padding:12px;border:1px solid var(--line);border-radius:10px"><div class="cell-user"><span class="av">${esc(App.initials(s.hoTen))}</span><div><b>${esc(s.hoTen)}</b><span class="mono">${s.mssv} · ${esc(i.lop)}</span></div></div>${badge(QH[l.qh], 'blue')}</div>`; }).join('') || '<p class="muted">Không còn sinh viên nào liên kết — tài khoản đã bị vô hiệu hóa (BR-PH-05).</p>'}
+      <div class="alert al-info">${ic('shield', 18)}<span>Phụ huynh chỉ được <b>xem</b> điểm và bài nộp của các con đã liên kết; không sửa, tải hay bình luận (BR-PH-04).</span></div>
+      ${logs.length ? `<div class="divider"></div><h3 style="font-size:15px">Hoạt động gần đây</h3>${logs.map(l => `<div class="row between small"><span>${esc(l.actionName)}</span><span class="muted">${App.fmtDate(l.time)}</span></div>`).join('')}` : ''}`,
+      foot: '<button class="btn" data-x>Đóng</button>' });
+  }
+
+  function phoneChange() {
+    const m = App.modal({ size: 'lg', title: 'Xử lý đổi SĐT phụ huynh', body: `
+      <div class="alert al-info">${ic('info', 18)}<span>Dùng khi phụ huynh đổi số điện thoại hoặc sinh viên khai báo nhầm. Hệ thống gỡ liên kết khỏi tài khoản cũ (vô hiệu hóa nếu không còn con nào), rồi tạo mới hoặc liên kết vào tài khoản của SĐT mới (BR-PH-05). Thao tác được ghi nhật ký.</span></div>
+      <form id="f" class="form-grid" novalidate>
+        <div class="full"><label class="lbl">Sinh viên <span class="req">*</span></label><input class="inp" name="sv" list="dl-sv" placeholder="Nhập MSSV hoặc họ tên…"><datalist id="dl-sv">${db.sv.filter(s => db.ph.some(p => p.links.some(l => l.svId === s.id))).map(s => `<option value="${s.mssv}">${esc(s.hoTen)}</option>`).join('')}</datalist></div>
+        <div class="full" id="cur"></div>
+        <div><label class="lbl">SĐT mới <span class="req">*</span></label><input class="inp mono" name="sdt" placeholder="0xxxxxxxxx"></div>
+        <div><label class="lbl">Ghi chú / căn cứ</label><input class="inp" name="note" placeholder="VD: Yêu cầu của SV ngày 03/10"></div>
+        <div class="full" id="plan"></div>
+      </form>`,
+      foot: '<button class="btn" data-x>Hủy</button><button class="btn btn-p" id="ok" disabled>Thực hiện</button>' });
+    const f = m.$('#f'); let s = null, link = null, oldP = null;
+    function upd() {
+      const v = App.form(f);
+      s = db.sv.find(x => x.mssv === v.sv);
+      const links = s ? db.ph.flatMap(p => p.links.filter(l => l.svId === s.id).map(l => ({ p, l }))) : [];
+      m.$('#cur').innerHTML = s ? `<label class="lbl">SĐT cần thay của ${esc(s.hoTen)}</label><div class="stack" style="gap:8px">${links.map(({ p, l }, i) => `<label class="row" style="padding:10px 12px;border:1px solid var(--line);border-radius:10px"><input type="radio" name="old" value="${p.id}|${l.qh}" ${i === 0 ? 'checked' : ''}><b class="mono">${p.sdt}</b><span class="muted">· ${QH[l.qh]}</span><span style="margin-left:auto" class="small muted">${p.links.length} con liên kết</span></label>`).join('')}</div>` : '';
+      const o = f.querySelector('[name=old]:checked');
+      oldP = o && db.ph.find(p => p.id === o.value.split('|')[0]); link = o && o.value.split('|')[1];
+      let err = '';
+      if (v.sdt && !App.phoneOk(v.sdt)) err = 'SĐT gồm 10 số, bắt đầu 03/05/07/08/09.';
+      else if (v.sdt && s && v.sdt === s.sdt) err = 'SĐT phụ huynh không được trùng SĐT của sinh viên (BR-HS-04).';
+      else if (oldP && v.sdt === oldP.sdt) err = 'SĐT mới trùng SĐT hiện tại.';
+      App.fieldErr(f, 'sdt', err);
+      const ready = s && oldP && v.sdt && !err;
+      m.$('#ok').disabled = !ready;
+      if (!ready) { m.$('#plan').innerHTML = ''; return; }
+      const exist = db.ph.find(p => p.sdt === v.sdt), left = oldP.links.length - 1;
+      m.$('#plan').innerHTML = `<label class="lbl">Hệ thống sẽ thực hiện</label><div class="stack" style="gap:8px;padding:14px;border-radius:10px;background:var(--soft);font-size:14px">
+        <div class="row">${ic('x', 16)} Gỡ liên kết <b class="mono">${oldP.sdt}</b> ↔ ${esc(s.hoTen)}</div>
+        <div class="row">${left ? ic('check', 16) + ` Tài khoản <b class="mono">${oldP.sdt}</b> vẫn hoạt động (còn ${left} con khác)` : ic('lock', 16) + ` Vô hiệu hóa tài khoản <b class="mono">${oldP.sdt}</b> (không còn con nào)`}</div>
+        <div class="row">${exist ? ic('link', 16) + ` Liên kết vào tài khoản đã có <b class="mono">${v.sdt}</b> (${exist.links.length} con)` : ic('plus', 16) + ` Tạo tài khoản mới <b class="mono">${v.sdt}</b>, mật khẩu tạm = SĐT, bắt buộc đổi lần đầu`}</div>
+        <div class="row">${ic('history', 16)} Cập nhật hồ sơ SV và ghi nhật ký hệ thống</div></div>`;
+    }
+    f.addEventListener('input', upd); f.addEventListener('change', upd);
+    m.$('#ok').onclick = () => {
+      const v = App.form(f);
+      oldP.links = oldP.links.filter(l => l.svId !== s.id);
+      if (!oldP.links.length) oldP.trangThai = 'VO_HIEU';
+      let np = db.ph.find(p => p.sdt === v.sdt);
+      if (np) { if (!np.links.some(l => l.svId === s.id)) np.links.push({ svId: s.id, qh: link }); if (np.trangThai === 'VO_HIEU') np.trangThai = np.doiMk ? 'HOAT_DONG' : 'CHUA_KICH_HOAT'; }
+      else db.ph.unshift({ id: Store.nextId('P', db.ph), sdt: v.sdt, ten: '', links: [{ svId: s.id, qh: link }], trangThai: 'CHUA_KICH_HOAT', doiMk: false, lastLogin: '', ngayTao: new Date().toISOString().slice(0, 10) });
+      Store.log('DOI_SDT_PH', 'Đổi SĐT phụ huynh', 'LienKet_PH_SV', 'SV ' + s.mssv, { ['sdt_' + link.toLowerCase()]: oldP.sdt }, { ['sdt_' + link.toLowerCase()]: v.sdt, ghi_chu: v.note || undefined });
+      App.save(); m.close(); refresh(true); App.toast('Đã cập nhật SĐT phụ huynh cho ' + s.hoTen);
+    };
+  }
+  $('btn-phone').onclick = phoneChange;
+
+  $('tbl').addEventListener('click', async e => {
+    const b = e.target.closest('button'); if (!b) return;
+    const p = db.ph.find(x => x.id === (b.dataset.view || b.dataset.reset || b.dataset.lock)); if (!p) return;
+    if (b.dataset.view) view(p);
+    if (b.dataset.reset) {
+      if (!await App.confirm({ title: 'Đặt lại mật khẩu phụ huynh', msg: `Đặt lại mật khẩu cho tài khoản <b class="mono">${p.sdt}</b>? Mật khẩu tạm sẽ là <b>SĐT</b> và phụ huynh phải đổi mật khẩu ở lần đăng nhập tiếp theo.`, ok: 'Đặt lại' })) return;
+      p.doiMk = false; if (p.trangThai === 'HOAT_DONG') p.trangThai = 'CHUA_KICH_HOAT';
+      Store.log('DAT_LAI_MK', 'Đặt lại mật khẩu', 'NguoiDung', 'PH ' + p.sdt, null, { bat_buoc_doi: true }); App.save(); refresh(true); App.toast('Đã đặt lại mật khẩu cho ' + p.sdt);
+    }
+    if (b.dataset.lock) {
+      const lock = p.trangThai !== 'KHOA';
+      const r = await App.confirm({ title: lock ? 'Khóa tài khoản phụ huynh' : 'Mở khóa', msg: lock ? `Khóa tài khoản <b class="mono">${p.sdt}</b>? Phụ huynh sẽ không xem được điểm và bài nộp của con.` : `Mở khóa tài khoản <b class="mono">${p.sdt}</b>?`, ok: lock ? 'Khóa' : 'Mở khóa', danger: lock, reason: lock ? 'Lý do khóa' : null });
+      if (!r) return;
+      p.trangThai = lock ? 'KHOA' : (p.doiMk ? 'HOAT_DONG' : 'CHUA_KICH_HOAT');
+      Store.log('KHOA_TK', lock ? 'Khóa tài khoản' : 'Mở khóa tài khoản', 'NguoiDung', 'PH ' + p.sdt, null, lock ? { ly_do: r } : null); App.save(); refresh(true); App.toast(lock ? 'Đã khóa tài khoản.' : 'Đã mở khóa.');
+    }
+  });
+  refresh();
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<title>Tìm kiếm sinh viên (FR-12.2–12.4)</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@500;600&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;font-family:'Be Vietnam Pro',system-ui,sans-serif;color:#1A1C21;background:#F5F5F5;-webkit-font-smoothing:antialiased}
+*{box-sizing:border-box}
+a{color:#DB0000;text-decoration:none}a:hover{color:#A30000}
+h1,h2,h3,p{margin:0}
+.card{background:#fff;border:1px solid #E3E1D9;border-radius:12px}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:40px;padding:0 16px;border-radius:8px;font:600 14px 'Be Vietnam Pro',sans-serif;border:1px solid #D6D3C8;background:#fff;color:#1A1C21;cursor:pointer;white-space:nowrap}
+.btn:hover{background:#F7F6F2;color:#1A1C21}
+.btn-p{background:#DB0000;border-color:#DB0000;color:#fff}.btn-p:hover{background:#A30000;color:#fff}
+.btn-d{background:#fff;border-color:#E9B8B3;color:#9B1C12}.btn-d:hover{background:#FCE8E6;color:#9B1C12}
+.btn-g{border-color:transparent;background:transparent}
+.btn-sm{height:32px;padding:0 12px;font-size:13px}
+.badge{display:inline-flex;align-items:center;gap:6px;height:24px;padding:0 10px;border-radius:999px;font-size:12px;font-weight:600;white-space:nowrap}
+.b-blue{background:#E6EFFD;color:#1847A8}.b-green{background:#E3F2E8;color:#14532D}.b-amber{background:#FDF0DE;color:#8A3B06}.b-red{background:#FCE8E6;color:#9B1C12}.b-gray{background:#EEEDE7;color:#474B53}.b-dark{background:#1A1C21;color:#fff}
+.dot{width:8px;height:8px;border-radius:50%;display:inline-block;flex-shrink:0}
+.chip{display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 10px;border-radius:6px;background:#F1F0EA;border:1px solid #E3E1D9;font-size:13px;color:#30343B;white-space:nowrap}
+.mono{font-family:'JetBrains Mono',ui-monospace,monospace}
+.muted{color:#62666F}
+.lbl{font-size:13px;font-weight:600;color:#30343B;display:block;margin-bottom:6px}
+.help{font-size:12px;color:#62666F;margin-top:6px}
+.err{font-size:12px;color:#B42318;margin-top:6px;font-weight:500}
+.inp{width:100%;height:42px;border:1px solid #D6D3C8;border-radius:8px;padding:0 12px;font:400 14px 'Be Vietnam Pro',sans-serif;background:#fff;color:#1A1C21}
+.inp:focus{outline:2px solid #DB0000;outline-offset:-1px}
+.inp-err{border-color:#D9534A;background:#FFFBFA}
+textarea.inp{height:auto;padding:10px 12px;line-height:1.5;resize:vertical}
+input[type=checkbox],input[type=radio]{accent-color:#DB0000;width:18px;height:18px;margin:0}
+table{border-collapse:collapse;width:100%}
+th{text-align:left;font-size:12px;font-weight:600;color:#62666F;text-transform:uppercase;letter-spacing:.04em;padding:10px 16px;border-bottom:1px solid #E3E1D9;background:#FAFAF7;white-space:nowrap}
+td{padding:12px 16px;border-bottom:1px solid #EFEDE6;font-size:14px;vertical-align:middle}
+tr:last-child td{border-bottom:0}
+.nav a{display:flex;align-items:center;gap:12px;height:40px;padding:0 12px;border-radius:8px;color:#30343B;font-size:14px;font-weight:500}
+.nav a:hover{background:#F2F2F2;color:#1A1C21}.nav a.on{background:#FDECEC;color:#DB0000;font-weight:600}
+.h1{font-size:26px;font-weight:700;letter-spacing:-.01em}
+.sec{font-size:16px;font-weight:700}
+.ph{background-image:repeating-linear-gradient(135deg,rgba(0,0,0,.035) 0 10px,transparent 10px 20px)}
+.tabs{display:flex;gap:4px;border-bottom:1px solid #E3E1D9}
+.tab{height:44px;padding:0 16px;display:inline-flex;align-items:center;gap:8px;font-size:14px;font-weight:600;color:#62666F;border-bottom:2px solid transparent;margin-bottom:-1px}
+.tab.on{color:#1A1C21;border-bottom-color:#DB0000}
+.seg{display:inline-flex;padding:3px;background:#ECEBE4;border-radius:9px;gap:2px}
+.seg span{height:32px;padding:0 14px;display:inline-flex;align-items:center;border-radius:7px;font-size:13px;font-weight:600;color:#4A4E57}
+.seg span.on{background:#fff;color:#1A1C21;box-shadow:0 1px 2px rgba(0,0,0,.08)}
+.sw{width:40px;height:24px;border-radius:12px;background:#DB0000;position:relative;flex-shrink:0}
+.sw::after{content:'';position:absolute;top:3px;left:19px;width:18px;height:18px;border-radius:50%;background:#fff}
+.sw.off{background:#C9C6BB}.sw.off::after{left:3px}
+.av{width:36px;height:36px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#A30000;background:#FBE3E3;flex-shrink:0}
+</style>
+</helmet>
+<div style="width:1440px;height:1160px;display:flex;background:#F5F5F5;overflow:hidden">
+<aside style="width:248px;flex-shrink:0;background:#fff;border-right:1px solid #E5E5E5;color:#1A1C21;display:flex;flex-direction:column;padding:20px 14px;gap:22px">
+<div style="padding:0 6px"><a href="Main.dc.html" style="display:flex;align-items:center;gap:10px;color:#1A1C21">
+<span style="width:32px;height:32px;border-radius:8px;background:#DB0000;display:inline-flex;align-items:center;justify-content:center;color:#fff"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4h11a4 4 0 0 1 4 4v12H8a4 4 0 0 1-4-4z"/><path d="M4 16a4 4 0 0 1 4-4h11"/></svg></span>
+<span style="font-size:17px;font-weight:700;letter-spacing:-.01em">EduPortfolio</span></a></div>
+<div style="padding:0 12px;font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:#8A8E97">Doanh nghiệp</div>
+<nav class="nav" aria-label="Điều hướng chính" style="display:flex;flex-direction:column;gap:2px;margin-top:-12px"><a href="DN_Search.dc.html" class=""><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg><span>Tìm kiếm sinh viên</span></a>
+<a href="DN_Profile.dc.html" class=""><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg><span>Hồ sơ sinh viên</span></a>
+<a href="DN_Dashboard.dc.html" class=""><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20V10"/><path d="M10 20V4"/><path d="M16 20v-7"/><path d="M22 20H2"/></svg><span>Yêu cầu & thống kê</span></a></nav>
+<div style="margin-top:auto;display:flex;align-items:center;gap:10px;padding:12px;border-radius:10px;background:#F5F5F5">
+<span class="av" style="width:36px;height:36px;background:#DB0000;color:#fff;font-size:13px">SV</span>
+<div style="display:flex;flex-direction:column;min-width:0;flex:1"><span style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Công ty CP Sao Việt</span><span style="font-size:12px;color:#62666F">Đã duyệt · CNTT</span></div>
+<a href="Auth_Login.dc.html" aria-label="Đăng xuất" style="color:#62666F"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 4h4v16h-4"/><path d="m10 8-4 4 4 4"/><path d="M6 12h10"/></svg></a></div>
+</aside>
+<main style="flex:1;display:flex;flex-direction:column;min-width:0">
+<header style="height:64px;flex-shrink:0;display:flex;align-items:center;gap:16px;padding:0 32px;background:#fff;border-bottom:1px solid #E3E1D9">
+<div style="font-size:13px;color:#62666F;flex:1">Doanh nghiệp / Tìm kiếm sinh viên</div>
+<label style="display:flex;align-items:center;gap:8px;width:300px;height:38px;border:1px solid #E3E1D9;border-radius:8px;padding:0 12px;color:#62666F;background:#FAFAF7"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg><input aria-label="Tìm kiếm" placeholder="MSSV (khớp chính xác)…" style="border:0;outline:0;background:transparent;font:400 14px 'Be Vietnam Pro',sans-serif;flex:1;min-width:0"></label>
+<button class="btn btn-g" aria-label="Thông báo, 1 chưa đọc" style="position:relative;width:40px;padding:0"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 16v-5a6 6 0 0 1 12 0v5l2 2H4z"/><path d="M10 21h4"/></svg><span style="position:absolute;top:4px;right:4px;min-width:18px;height:18px;border-radius:9px;background:#C2410C;color:#fff;font-size:11px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;padding:0 4px">1</span></button>
+<span class="av" style="width:36px;height:36px;background:#FBE3E3;color:#A30000;font-size:13px">SV</span>
+</header>
+<div style="padding:28px 32px;display:flex;flex-direction:column;gap:24px;flex:1;min-height:0">
+<div style="display:flex;align-items:flex-end;justify-content:space-between;gap:24px">
+<div style="display:flex;flex-direction:column;gap:6px"><h1 class="h1">Tìm kiếm sinh viên</h1><p style="font-size:14px;color:#62666F">Kết quả sắp xếp theo GPA giảm dần; bằng GPA thì theo số đề tài, rồi MSSV</p></div>
+<div style="display:flex;gap:10px;align-items:center"></div></div>
+<div class="card" style="padding:20px;display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:14px;align-items:end">
+<div><label class="lbl">MSSV</label><input class="inp mono" type="text"  placeholder="Khớp chính xác"></div><div><label class="lbl">Khóa</label><select class="inp"><option>K66, K67</option></select></div><div><label class="lbl">Ngành</label><select class="inp"><option>Thiết kế đồ họa</option></select></div><div><label class="lbl">Lớp</label><select class="inp"><option>Tất cả</option></select></div>
+<div><label class="lbl">GPA từ</label><div style="display:flex;gap:6px;align-items:center"><input class="inp mono" defaultValue="3.2" aria-label="GPA tối thiểu"><span class="muted">–</span><input class="inp mono" defaultValue="4.0" aria-label="GPA tối đa"></div></div>
+<button class="btn btn-p" style="height:42px"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>Tìm kiếm</button>
+<div style="grid-column:span 3"><div><label class="lbl">Chủ đề đề tài</label><div class="inp" style="display:flex;gap:6px;align-items:center;padding:0 8px"><span class="chip" style="background:#FDECEC;border-color:#F5C2C2;color:#A30000">UI Mobile App <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></span><span class="chip" style="background:#FDECEC;border-color:#F5C2C2;color:#A30000">Thương mại điện tử <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></span></div></div></div>
+<div style="grid-column:span 3"><div><label class="lbl">Kỹ năng</label><div class="inp" style="display:flex;gap:6px;align-items:center;padding:0 8px"><span class="chip" style="background:#FDECEC;border-color:#F5C2C2;color:#A30000">Figma <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></span><span class="muted" style="font-size:13px">Thêm…</span></div></div></div></div>
+<div class="card" style="padding:12px 16px;display:flex;align-items:center;gap:14px;background:#1A1C21;border-color:#1A1C21;color:#fff"><input type="checkbox" defaultChecked="{{true}}" aria-label="Đã chọn"><span style="font-size:14px;font-weight:600">Đã chọn 2 sinh viên</span><span style="font-size:13px;color:#B9BDC8">Gửi một yêu cầu xem bài cho nhiều sinh viên cùng lúc</span><a class="btn btn-sm btn-p" href="DN_Profile.dc.html" style="margin-left:auto"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 2 11 13"/><path d="m22 2-7 20-4-9-9-4z"/></svg>Gửi yêu cầu xem bài</a></div>
+<section class="card" style="overflow:hidden"><table><thead><tr><th style="width:40px"></th><th>Sinh viên</th><th>Khóa · Ngành</th><th>GPA ↓</th><th>Đề tài đã thực hiện</th><th>Quyền xem</th><th></th></tr></thead><tbody>
+<tr style=""><td><input type="checkbox"  aria-label="Chọn Đặng Quốc Bảo"></td><td><a href="DN_Profile.dc.html" style="font-weight:700;color:#1A1C21">Đặng Quốc Bảo</a><div class="mono muted" style="font-size:12px">22511102</div></td><td style="font-size:13px">K67 · Thiết kế đồ họa</td><td class="mono" style="font-size:18px;font-weight:700">3.86</td>
+<td style="max-width:420px"><div style="display:flex;flex-direction:column;gap:6px"><div style="display:flex;gap:8px;align-items:center;font-size:13px"><span>Website bán giày SneakerZ</span><span class="chip" style="height:22px;font-size:11px">Thương mại điện tử</span></div><div style="display:flex;gap:8px;align-items:center;font-size:13px"><span>App thiền MindRest</span><span class="chip" style="height:22px;font-size:11px">UI Mobile App</span></div><span class="muted" style="font-size:12px">+ 3 đề tài khác</span></div></td>
+<td><span class="badge b-green">Còn 9 ngày</span></td><td style="white-space:nowrap"><button class="btn btn-sm btn-g" aria-label="Lưu vào danh sách quan tâm"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h12v18l-6-4-6 4z"/></svg></button><a class="btn btn-sm" href="DN_Profile.dc.html">Hồ sơ</a></td></tr><tr style=""><td><input type="checkbox"  aria-label="Chọn Nguyễn Thu Hà"></td><td><a href="DN_Profile.dc.html" style="font-weight:700;color:#1A1C21">Nguyễn Thu Hà</a><div class="mono muted" style="font-size:12px">22511203</div></td><td style="font-size:13px">K67 · Thiết kế đồ họa</td><td class="mono" style="font-size:18px;font-weight:700">3.42</td>
+<td style="max-width:420px"><div style="display:flex;flex-direction:column;gap:6px"><div style="display:flex;gap:8px;align-items:center;font-size:13px"><span>Ứng dụng đặt lịch cắt tóc BarberGo</span><span class="chip" style="height:22px;font-size:11px">UI Mobile App</span></div><div style="display:flex;gap:8px;align-items:center;font-size:13px"><span>Wireframe ví điện tử</span><span class="chip" style="height:22px;font-size:11px">Fintech</span></div><span class="muted" style="font-size:12px">+ 2 đề tài khác</span></div></td>
+<td><span class="badge b-amber">Chờ duyệt</span></td><td style="white-space:nowrap"><button class="btn btn-sm btn-g" aria-label="Lưu vào danh sách quan tâm"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h12v18l-6-4-6 4z"/></svg></button><a class="btn btn-sm" href="DN_Profile.dc.html">Hồ sơ</a></td></tr><tr style="background:#FFF7F7"><td><input type="checkbox" defaultChecked="{{true}}" aria-label="Chọn Võ Thị Mai"></td><td><a href="DN_Profile.dc.html" style="font-weight:700;color:#1A1C21">Võ Thị Mai</a><div class="mono muted" style="font-size:12px">22511230</div></td><td style="font-size:13px">K67 · Thiết kế đồ họa</td><td class="mono" style="font-size:18px;font-weight:700">3.42</td>
+<td style="max-width:420px"><div style="display:flex;flex-direction:column;gap:6px"><div style="display:flex;gap:8px;align-items:center;font-size:13px"><span>Hệ thống bán sách trực tuyến</span><span class="chip" style="height:22px;font-size:11px">Thương mại điện tử</span></div><span class="muted" style="font-size:12px">+ 1 đề tài khác</span></div></td>
+<td><span class="muted" style="font-size:13px">Chưa có</span></td><td style="white-space:nowrap"><button class="btn btn-sm btn-g" aria-label="Lưu vào danh sách quan tâm"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h12v18l-6-4-6 4z"/></svg></button><a class="btn btn-sm" href="DN_Profile.dc.html">Hồ sơ</a></td></tr><tr style="background:#FFF7F7"><td><input type="checkbox" defaultChecked="{{true}}" aria-label="Chọn Lý Gia Huy"></td><td><a href="DN_Profile.dc.html" style="font-weight:700;color:#1A1C21">Lý Gia Huy</a><div class="mono muted" style="font-size:12px">21511044</div></td><td style="font-size:13px">K66 · Thiết kế đồ họa</td><td class="mono" style="font-size:18px;font-weight:700">3.38</td>
+<td style="max-width:420px"><div style="display:flex;flex-direction:column;gap:6px"><div style="display:flex;gap:8px;align-items:center;font-size:13px"><span>App mua sắm ReWear</span><span class="chip" style="height:22px;font-size:11px">Thương mại điện tử</span></div><div style="display:flex;gap:8px;align-items:center;font-size:13px"><span>Landing page quán cà phê</span><span class="chip" style="height:22px;font-size:11px">Web</span></div><span class="muted" style="font-size:12px">+ 4 đề tài khác</span></div></td>
+<td><span class="muted" style="font-size:13px">Chưa có</span></td><td style="white-space:nowrap"><button class="btn btn-sm btn-g" aria-label="Lưu vào danh sách quan tâm"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h12v18l-6-4-6 4z"/></svg></button><a class="btn btn-sm" href="DN_Profile.dc.html">Hồ sơ</a></td></tr><tr style=""><td><input type="checkbox"  aria-label="Chọn Trịnh Khánh Linh"></td><td><a href="DN_Profile.dc.html" style="font-weight:700;color:#1A1C21">Trịnh Khánh Linh</a><div class="mono muted" style="font-size:12px">22511087</div></td><td style="font-size:13px">K67 · Thiết kế đồ họa</td><td class="mono" style="font-size:18px;font-weight:700">3.25</td>
+<td style="max-width:420px"><div style="display:flex;flex-direction:column;gap:6px"><div style="display:flex;gap:8px;align-items:center;font-size:13px"><span>App quản lý chi tiêu MoneyNote</span><span class="chip" style="height:22px;font-size:11px">UI Mobile App</span></div><span class="muted" style="font-size:12px">+ 2 đề tài khác</span></div></td>
+<td><span class="badge b-gray">Hết hạn</span></td><td style="white-space:nowrap"><button class="btn btn-sm btn-g" aria-label="Lưu vào danh sách quan tâm"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h12v18l-6-4-6 4z"/></svg></button><a class="btn btn-sm" href="DN_Profile.dc.html">Hồ sơ</a></td></tr>
+</tbody></table>
+<div style="padding:12px 16px;display:flex;justify-content:space-between;align-items:center;border-top:1px solid #EFEDE6"><span class="muted" style="font-size:13px">1–20 trong 342 sinh viên · Sinh viên chọn ẩn khỏi tìm kiếm không xuất hiện</span>
+<div style="display:flex;gap:4px"><button class="btn btn-sm" aria-label="Trang ‹" style="width:34px;padding:0;">‹</button><button class="btn btn-sm" aria-label="Trang 1" style="width:34px;padding:0;background:#1A1C21;color:#fff;border-color:#1A1C21">1</button><button class="btn btn-sm" aria-label="Trang 2" style="width:34px;padding:0;">2</button><button class="btn btn-sm" aria-label="Trang 3" style="width:34px;padding:0;">3</button><button class="btn btn-sm" aria-label="Trang …" style="width:34px;padding:0;">…</button><button class="btn btn-sm" aria-label="Trang 18" style="width:34px;padding:0;">18</button><button class="btn btn-sm" aria-label="Trang ›" style="width:34px;padding:0;">›</button></div></div></section>
+</div></main></div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1160}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {};
+  }
+}
+</script>
+</body>
+</html>

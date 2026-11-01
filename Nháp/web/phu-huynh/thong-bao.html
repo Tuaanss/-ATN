@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Thông báo & cảnh báo · EduPortfolio</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/app.css">
+<style>
+  .nt{display:flex;gap:14px;padding:16px 20px;border-top:1px solid var(--line2);cursor:pointer;position:relative}
+  .nt:first-child{border-top:0}
+  .nt:hover{background:#FCFCFA}
+  .nt.unread{background:#FFFAFA}
+  .nt.unread::before{content:'';position:absolute;left:8px;top:50%;width:6px;height:6px;margin-top:-3px;border-radius:50%;background:var(--red)}
+  .nt .ico{width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+  .nt b{font-weight:600}
+  .nt.unread b{font-weight:700}
+</style>
+<script src="../assets/data.js"></script>
+<script src="../assets/app.js"></script>
+</head>
+<body data-role="ph" data-active="thong-bao" data-crumbs="Phụ huynh › <b>Thông báo & cảnh báo</b>">
+<div id="page" class="stack" style="gap:24px">
+  <div class="page-head">
+    <div class="t"><h1 class="h1" id="title"></h1><p class="sub-t">Cảnh báo khi con quá hạn nộp bài, điểm dưới ngưỡng, GPA giảm; thông báo điểm mới và bài nộp (FR-11.4).</p></div>
+    <div class="actions"><button class="btn" id="btn-all"></button></div>
+  </div>
+  <div id="banner"></div>
+  <section class="card">
+    <div class="tabs" id="tabs" role="tablist" style="padding:0 12px"></div>
+    <div class="toolbar"><label class="row small"><input type="checkbox" id="only-unread"> Chỉ hiện chưa đọc</label></div>
+    <div id="list"></div>
+  </section>
+  <div class="card card-b row wrap" style="gap:12px">
+    <span id="ic-mail" class="muted"></span>
+    <span class="small muted" style="flex:1;min-width:240px">Cảnh báo học tập cũng được gửi qua email/SMS (nếu nhà trường bật). Ngưỡng cảnh báo do nhà trường cấu hình: điểm dưới <b id="th"></b>, GPA giảm từ <b id="gd"></b> điểm.</span>
+  </div>
+</div>
+<script>
+document.addEventListener('app:ready', () => {
+  const { ic, esc, badge } = App, db = Store.db, $ = id => document.getElementById(id);
+  const { child } = App.phSession();
+  $('title').textContent = 'Thông báo · ' + child.hoTen;
+  $('btn-all').innerHTML = ic('check', 16) + ' Đánh dấu tất cả đã đọc';
+  $('ic-mail').innerHTML = ic('mail', 20);
+  $('th').textContent = db.config.canhBaoDiem.toFixed(1); $('gd').textContent = db.config.canhBaoGpaGiam.toFixed(1);
+  const TYPES = [['', 'Tất cả'], ['CANH_BAO', 'Cảnh báo học tập'], ['DIEM', 'Điểm'], ['BAI_TAP', 'Bài nộp'], ['HAN_NOP', 'Hạn nộp'], ['HE_THONG', 'Hệ thống']];
+  const STY = { CANH_BAO: ['alert', '#FCE8E6', '#B42318'], DIEM: ['chart', '#E3F2E8', '#15803D'], BAI_TAP: ['upload', '#E6EFFD', '#1847A8'], HAN_NOP: ['clock', '#FDF0DE', '#B45309'], HE_THONG: ['info', '#EEEDE7', '#474B53'] };
+  let type = '';
+  const mine = () => db.thongBao.filter(t => t.svId === child.id).sort((a, b) => b.time.localeCompare(a.time));
+
+  function render() {
+    const all = mine();
+    $('tabs').innerHTML = TYPES.map(([k, l]) => { const n = all.filter(t => (!k || t.loai === k) && !t.read).length;
+      return `<button class="tab ${k === type ? 'on' : ''}" role="tab" aria-selected="${k === type}" data-t="${k}">${l}${n ? `<span class="n">${n}</span>` : ''}</button>`; }).join('');
+    const warn = all.filter(t => t.loai === 'CANH_BAO' && !t.read);
+    $('banner').innerHTML = warn.length ? `<div class="alert al-bad">${ic('alert', 20)}<div><b>${warn.length} cảnh báo học tập chưa xem</b><div class="small" style="margin-top:2px">${warn.map(w => esc(w.title)).join(' · ')}</div></div></div>` : '';
+    const rows = all.filter(t => (!type || t.loai === type) && (!$('only-unread').checked || !t.read));
+    $('list').innerHTML = rows.length ? rows.map(t => { const [i, bg, fg] = STY[t.loai];
+      return `<div class="nt ${t.read ? '' : 'unread'}" data-id="${t.id}" role="button" tabindex="0">
+        <span class="ico" style="background:${bg};color:${fg}">${ic(i, 20)}</span>
+        <div class="stack" style="gap:4px;flex:1;min-width:0">
+          <div class="row between wrap" style="gap:8px"><b>${esc(t.title)}</b><span class="muted small">${App.fmtDate(t.time)}</span></div>
+          <span class="small" style="color:var(--ink2);line-height:1.5">${esc(t.body)}</span>
+          <div class="row" style="gap:8px;margin-top:4px">${t.loai === 'CANH_BAO' ? badge(t.muc === 'cao' ? 'Mức cao' : 'Cần chú ý', t.muc === 'cao' ? 'red' : 'amber') : ''}${t.link ? `<a class="small" href="${t.link}" data-go>${t.link.includes('ket-qua') ? 'Xem bảng điểm' : 'Xem bài nộp'} →</a>` : ''}</div>
+        </div>
+        ${t.read ? '' : `<button class="btn btn-g btn-sm" data-read="${t.id}" title="Đánh dấu đã đọc" aria-label="Đánh dấu đã đọc">${ic('check', 16)}</button>`}
+      </div>`; }).join('') : `<div class="empty">${ic('bell', 28)}<p style="margin-top:8px">Không có thông báo nào.</p></div>`;
+    $('btn-all').disabled = !all.some(t => !t.read);
+    // cập nhật số trên thanh điều hướng
+    const navA = document.querySelector('.nav a[href="thong-bao.html"] .badge'), n = all.filter(t => !t.read).length;
+    if (navA) { navA.textContent = n; navA.classList.toggle('hidden', !n); }
+  }
+  const mark = id => { const t = db.thongBao.find(x => x.id === id); if (t && !t.read) { t.read = true; Store.save(); } };
+  $('tabs').onclick = e => { const b = e.target.closest('[data-t]'); if (b) { type = b.dataset.t; render(); } };
+  $('only-unread').onchange = render;
+  $('list').addEventListener('click', e => {
+    const r = e.target.closest('[data-read]'); if (r) { e.stopPropagation(); mark(r.dataset.read); render(); return; }
+    const row = e.target.closest('.nt'); if (!row) return;
+    mark(row.dataset.id);
+    if (!e.target.closest('[data-go]')) render();
+  });
+  $('list').addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.classList.contains('nt')) { mark(e.target.dataset.id); render(); } });
+  $('btn-all').onclick = () => { mine().forEach(t => t.read = true); Store.save(); render(); App.toast('Đã đánh dấu tất cả là đã đọc.'); };
+  render();
+});
+</script>
+</body>
+</html>
