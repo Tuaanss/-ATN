@@ -1,7 +1,8 @@
 # EduPortfolio – Luồng xử lý giữa các module (Module Flows)
 
-> Phiên bản 2.0 · 07/10/2026
-> Mô tả luồng xử lý giữa các module cho những nghiệp vụ chính. Quy tắc chi tiết nằm ở [Specification](Specification.md), tên module theo [ModulesStructure](ModulesStructure.md).
+> Phiên bản 3.0 · 11/10/2026 · mọi tiến trình chạy trên Node.js 22 LTS
+> **v3.0:** bỏ luồng SV lập nhóm/mời, chốt nhóm, duyệt đề tài, chấm bài, phúc khảo; thêm luồng liên kết Drive OAuth, tải danh sách nhóm và tải điểm bằng Excel.
+> Quy tắc chi tiết nằm ở [Specification](Specification.md), tên module theo [ModulesStructure](ModulesStructure.md).
 
 ---
 
@@ -77,81 +78,105 @@ sequenceDiagram
   P-->>S: 200 hồ sơ
 ```
 
-## 3. Liên kết Drive & tạo bài tập (UC04.1–UC04.4)
+## 3. Liên kết Google Drive bằng OAuth (UC04.1)
+
+```mermaid
+sequenceDiagram
+  autonumber
+  actor L as Giảng viên
+  participant W as Web
+  participant DL as drive-link
+  participant D as DriveService
+  participant GA as Google OAuth
+  participant G as Google Drive
+  participant DB as PostgreSQL
+
+  L->>W: Bấm "Liên kết tài khoản Google"
+  W->>DL: GET /lecturer/drive/oauth/start
+  DL->>DL: state ngẫu nhiên (gắn lecturerId, hạn 10')
+  DL-->>W: URL đồng ý (scope drive.file + email, access_type=offline)
+  W->>GA: Chuyển trang; GV chọn tài khoản, đồng ý
+  GA-->>DL: GET /lecturer/drive/oauth/callback?code&state (cookie phiên của GV)
+  DL->>DL: Kiểm tra state khớp GV, còn hạn
+  DL->>GA: Đổi code → refresh token; userinfo.email
+  DL->>DB: UPSERT lecturer_drive_links(OAUTH, google_email, refresh_token_enc = AES-256-GCM)
+  opt Lần đầu liên kết
+    DL->>D: createFolder("EduPortfolio_<MãGV>", 'root', owner=GV)
+    D->>G: files.create(folder) bằng OAuth client của GV
+    DL->>DB: root_folder_id, root_folder_name
+  end
+  DL-->>W: 302 /lecturer/drive?linked=1
+```
+
+`DriveService` chọn client theo **chủ bài tập** (`assignments.created_by`): GV có `refresh_token_enc` → `OAuth2Client` của GV (tự làm mới access token, lưu đệm theo GV); không có → Service Account (nếu cấu hình); không có cả hai → `DRIVE_NOT_LINKED`. Hủy liên kết: thu hồi token với Google, xóa liên kết, bỏ client lưu đệm.
+
+## 4. Giao bài tập (UC04.2–UC04.4, UC04.8)
 
 ```mermaid
 sequenceDiagram
   autonumber
   actor L as Giảng viên
   participant AS as assignments
-  participant DL as drive-link
   participant D as DriveService
   participant G as Google Drive
   participant DB as PostgreSQL
-  participant Q as Queue notify
+  participant N as notifications
 
-  L->>AS: POST /sections/:id/assignments {..., folderUrl?}
-  AS->>AS: Kiểm tra L dạy LHP, BR-04 (ngày, min/max)
-  AS->>DL: parentFolderId = folderUrl ?? lecturer_drive_links.root_folder_id
-  AS->>D: verifyWritable(parentFolderId)  «include UC04.4»
-  D->>G: files.get(fields=mimeType,trashed,capabilities,driveId)
-  D->>G: files.create(.eduportfolio_check.txt) → files.delete
+  L->>AS: POST /lecturer/sections/:id/assignments {common, schedule} (hoặc /assignments/batch)
+  AS->>AS: Kiểm tra L dạy LHP, BR-04 (ngày), work_mode ∈ {INDIVIDUAL, GROUP}
+  AS->>AS: parentFolderId = folderUrl ?? lecturer_drive_links.root_folder_id
+  AS->>D: verifyWritable(parentFolderId, owner=L)  «include UC04.4»
+  D->>G: files.get(mimeType, trashed, capabilities) + ghi thử .eduportfolio_check.txt
   alt Lỗi
-    D-->>AS: DriveError(code)
-    AS-->>L: 422 DRIVE_* + hướng dẫn
+    D-->>AS: AppException DRIVE_*
+    AS-->>L: 422 + hướng dẫn
   else OK
-    AS->>D: createFolder("<MaLHP>_<TenBaiTap>", parent)  «include UC04.3»
-    D->>G: files.create(folder)
-    AS->>DB: INSERT assignments(drive_folder_id, status)
+    AS->>D: createFolder("<MaLHP>_<TenBaiTap>", parent, owner=L)  «include UC04.3»
+    AS->>DB: INSERT assignments(drive_folder_id, status, auto_open, batch_id?)
     alt Ghi DB lỗi
-      AS->>G: files.update(trashed=true) (bù trừ)
+      AS->>G: trash thư mục vừa tạo (bù trừ)
     end
     opt status = OPEN
-      AS->>Q: notify.fanout(ASSIGNMENT_OPENED, SV trong LHP) (afterCommit)
+      AS->>N: ASSIGNMENT_OPENED → SV trong LHP (sau commit)
     end
-    AS-->>L: 201 bài tập
+    opt Có tệp đề bài
+      AS->>D: uploadFile(De_bai_<tên>, drive_folder_id, owner=L) (nền)
+    end
+    AS-->>L: 201 bài tập (GROUP: nhắc tải danh sách nhóm)
   end
 ```
 
-Bài tập lưu ở `DRAFT` (ngày mở trong tương lai) sẽ được job `assignments.open-due` (mỗi phút) chuyển sang `OPEN` và gửi thông báo.
+Bài `DRAFT` có `auto_open = true` được job `assignments.open-due` (mỗi phút) chuyển sang `OPEN` khi tới `open_at`. Giao nhiều LHP: lặp từng LHP, mỗi LHP một transaction và một thư mục, chung `batch_id`; trả kết quả từng LHP.
 
-## 4. Nhóm: tạo, mời, tham gia (UC05.1–UC05.3)
+## 4a. Tải lên danh sách nhóm (UC05.1–UC05.3)
 
 ```mermaid
 sequenceDiagram
   autonumber
-  actor S1 as SV (trưởng nhóm)
-  actor S2 as SV được mời
+  actor L as Giảng viên
   participant GR as groups
+  participant X as ExcelService
   participant DB as PostgreSQL
-  participant QD as Queue drive
   participant N as notifications
-  participant RT as realtime
 
-  S1->>GR: POST /assignments/:id/groups {name}
-  GR->>DB: BEGIN; kiểm tra S1 thuộc LHP, chưa có nhóm/individual_works
-  GR->>DB: INSERT groups(seq, invite_code), group_members(LEADER); COMMIT
-  GR->>QD: ensure-folder(group) (afterCommit)
-
-  S1->>GR: POST /groups/:id/invitations {studentCode}
-  GR->>DB: Kiểm tra cùng LHP, S2 chưa có nhóm, số TV + lời mời chờ < max
-  GR->>DB: INSERT group_invitations(PENDING, expires_at)
-  GR->>N: notify(S2, GROUP_INVITED, email)
-
-  S2->>GR: POST /invitations/:id/accept
-  GR->>DB: BEGIN; SELECT groups FOR UPDATE
-  GR->>DB: Kiểm tra lại: nhóm OPEN, chưa đủ, S2 chưa có nhóm
-  GR->>DB: INSERT group_members; invitation=ACCEPTED; CANCEL lời mời khác của S2 trong bài tập
-  opt Nhóm đủ max
-    GR->>DB: CANCEL mọi lời mời PENDING của nhóm
-  end
-  GR->>DB: COMMIT
-  GR->>QD: ensure-folder(member personal)
-  GR->>N: notify(trưởng nhóm, GROUP_INVITE_RESPONDED)
-  GR->>RT: emit group:<id> group:updated
+  L->>GR: GET /lecturer/assignments/:id/groups/template
+  GR->>DB: SV của LHP + nhóm hiện có
+  GR->>X: Sinh .xlsx (MSSV, Họ tên, Mã nhóm, Tên nhóm, Trưởng nhóm)
+  GR-->>L: Tệp mẫu
+  L->>GR: POST .../groups/import/preview (multipart .xlsx)
+  GR->>X: Đọc sheet, chuẩn hóa ô
+  GR->>DB: Đối chiếu MSSV ∈ LHP, nhóm hiện có, nhóm đã có bài chung/đề tài
+  GR->>DB: INSERT import_jobs(ASSIGNMENT_GROUPS, PREVIEW, preview, errors)
+  GR-->>L: Xem trước: nhóm Mới/Sửa/Giữ/Xóa, SV chuyển nhóm, SV chưa có nhóm, lỗi theo dòng
+  L->>GR: POST .../groups/import/:jobId/commit
+  GR->>DB: BEGIN; khóa bài tập (advisory lock)
+  GR->>DB: UPSERT groups theo code; thay group_members; DELETE nhóm bị bỏ (chưa có bài chung/đề tài)
+  GR->>DB: assignments.groups_imported_at = now; import_jobs = COMPLETED; audit; COMMIT
+  GR->>N: GROUP_ASSIGNED / GROUP_REMOVED cho SV thay đổi (sau commit)
+  GR-->>L: Danh sách nhóm mới
 ```
 
-Tham gia bằng mã (`POST /groups/join`) đi theo nhánh "accept" nhưng không có lời mời.
+Thư mục Drive của nhóm không tạo khi tải danh sách mà tạo lười ở lần nộp đầu tiên (§5), nên tải lại danh sách nhiều lần không sinh thư mục rác. SV báo nhóm chưa đúng: `POST /student/assignments/:id/group-report` → `group_reports(OPEN)` → `GROUP_REPORTED` cho GV; GV `POST /lecturer/group-reports/:id/resolve` → `GROUP_REPORT_RESOLVED` cho SV.
 
 ## 5. Nộp bài & ghi lên Drive (UC06.1–UC06.4)
 
@@ -177,44 +202,43 @@ sequenceDiagram
   UP->>DB: uploads(status=COMPLETED, user_id)
   S->>W: Bấm "Nộp bài" (xác nhận nếu nộp lại)
   W->>SB: POST /assignments/:id/submissions {kind, uploadIds, figmaUrl, gitUrl, note, order}
-  SB->>SB: Policy: thành viên/chủ bài, đề tài có, hạn nộp, chưa GRADED
+  SB->>SB: Policy: thành viên nhóm/chủ bài, có nhóm (GROUP), có đề tài, trong hạn cuối
   SB->>FS: Đọc magic bytes từng tệp (file-type) + kiểm tra size/số lượng
   SB->>DB: BEGIN
-  SB->>DB: SELECT submission FOR UPDATE (nếu có)
+  SB->>DB: pg_advisory_xact_lock(chủ bài); SELECT submission (nếu có)
   alt Nộp lần đầu
     SB->>DB: INSERT submissions(version=1)
   else Nộp lại «extend UC06.4»
-    SB->>DB: UPDATE submission_files SET deleted_at=now (bản cũ); version++
+    SB->>DB: deleted_at=now cho tệp cũ CÙNG LOẠI với tệp mới (loại khác giữ nguyên); version++
   end
   SB->>FS: move uploads → /data/pending/<submissionId>/
   SB->>DB: INSERT submission_files(PENDING); uploads=CONSUMED
   SB->>DB: submitted_at=now, is_late, status, sync_status=PENDING
   SB->>DB: INSERT submission_events(SUBMIT|RESUBMIT)
   SB->>DB: COMMIT
-  SB->>QD: upload-file × n, trash-file × (tệp cũ có drive_file_id)  (afterCommit)
+  SB->>QD: upload-file × n, trash-file × (tệp bị thay có drive_file_id)  (afterCommit)
   SB->>RT: emit group:<id> submission:updated
   SB-->>W: 201 "Nộp thành công – đang đồng bộ"
 
   QD->>WK: upload-file(fileId)
   WK->>DB: sync_status=UPLOADING
-  WK->>WK: ensure-folder (khóa Redis) → folderId đích
+  WK->>WK: ensure-folder (khóa theo khóa thư mục) → folderId đích, client Drive của GV tạo bài
   WK->>G: resumable upload (chunk 8MB)
   alt Thành công
     WK->>DB: drive_file_id, drive_md5, SYNCED; local_path → /data/cache
     opt Mọi tệp của bài SYNCED
-      WK->>G: tạo/ghi đè thong_tin_bai_nop.txt
       WK->>DB: submissions.sync_status=SYNCED
     end
     WK->>RT: emit file:sync-status
   else Lỗi tạm thời
-    WK-->>QD: throw → BullMQ thử lại (backoff mũ, tối đa 8)
+    WK-->>QD: thử lại (backoff tăng dần)
   else Lỗi vĩnh viễn / hết lần thử
     WK->>DB: FAILED, last_error, next_retry_at; submissions.sync_status=ERROR
     WK->>DB: notify GV SUBMISSION_SYNC_FAILED / DRIVE_FOLDER_PROBLEM (gộp theo giờ)
   end
 ```
 
-**Đường đi của tệp:** `uploads/tus` → `pending/<submissionId>` → (sau khi SYNCED) `cache/<fileId>` giữ 7 ngày → xóa. Tệp `FAILED` ở lại `pending` đến khi đồng bộ được.
+**Đường đi của tệp:** `uploads` → `pending/<submissionId>` → (sau khi SYNCED) giữ bản cục bộ một thời gian để xem nhanh → xóa. Tệp `FAILED` ở lại `pending` đến khi đồng bộ được.
 
 ## 6. Xem bài & stream tệp (UC06.7, UC09.5–UC09.6)
 
@@ -240,14 +264,14 @@ sequenceDiagram
     opt user là DN
       F->>QA: log VIEW_SUBMISSION
     end
-    F-->>W: metadata (đề tài, tệp, link, điểm nếu được phép)
+    F-->>W: metadata (đề tài, tệp, link, điểm nếu đã công bố và được phép)
   end
   W->>F: <img src=/files/:id/thumbnail?w=400>, <video src=/files/:id/content>
   F->>POL: canViewSubmission (cache 60s theo user+submission)
   alt Có bản cục bộ (pending/cache)
     F->>FS: createReadStream(start,end)
   else
-    F->>G: files.get(alt=media, Range)
+    F->>G: files.get(alt=media, Range) bằng client Drive của GV tạo bài
   end
   F-->>W: 206 Partial Content (video) / 200 (ảnh)
   opt user là DN
@@ -297,39 +321,48 @@ sequenceDiagram
 
 | Job | Lịch (cron) | Use case | Việc làm |
 |---|---|---|---|
-| `assignments.open-due` | `* * * * *` | UC04.2 | `DRAFT` có `open_at ≤ now` → `OPEN` + `ASSIGNMENT_OPENED` |
-| `groups.lock-at-deadline` | `* * * * *` | UC05.10 | Bài tập quá hạn cuối, `deadline_processed_at IS NULL` → khóa nhóm, hủy lời mời, vô hiệu mã, cảnh báo nhóm thiếu người, `OVERDUE_SUBMISSION` cho PH |
-| `invitations.expire` | `*/15 * * * *` | UC05.3 | `PENDING` quá `expires_at` → `EXPIRED` |
-| `reminders.deadline` | `*/15 * * * *` | UC06.10 | Nhắc 24h / 2h cho SV chưa nộp (dedupe) |
+| `assignments.open-due` | `* * * * *` | UC04.2 | `DRAFT` có `auto_open` và `open_at ≤ now` → `OPEN` + `ASSIGNMENT_OPENED` |
+| `assignments.close-due` | `*/5 * * * *` | UC04.5 | Quá hạn cuối, `deadline_processed_at IS NULL` → ghi `deadline_processed_at` (không nhận bài nữa; không gửi cảnh báo) |
+| `reminders.deadline` | `*/15 * * * *` | UC06.10 | Nhắc SV chưa nộp trước `reminder.hoursBefore` giờ (dedupe) |
 | `drive.retry-failed` | `*/10 * * * *` | UC06.9 | Đưa lại tệp `FAILED` đến hạn thử |
 | `drive.verify-files` | `0 3 * * *` | UC06.9 | Kiểm tra tệp còn trên Drive → `MISSING` |
-| `drive.health-check` | `0 6 * * *` | UC04.4 | Kiểm tra thư mục bài tập đang mở còn quyền ghi → `DRIVE_FOLDER_PROBLEM` |
+| `drive.health-check` | `0 6 * * *` | UC04.4 | Kiểm tra thư mục bài tập đang mở còn quyền ghi / liên kết còn hiệu lực → `DRIVE_FOLDER_PROBLEM` |
+| `imports.expire` | `0 * * * *` | UC05.2, UC07.2 | `import_jobs` `PREVIEW` quá 24 giờ → `CANCELLED`, xóa tệp tạm |
 | `view-requests.expire` | `*/5 * * * *` | UC09.10 | `APPROVED` quá hạn → `EXPIRED` |
 | `view-requests.expiring` | `0 8 * * *` | UC09.10 | Báo DN còn ≤ 48h |
-| `maintenance.cleanup-uploads` | `0 * * * *` | – | Xóa `uploads` hết hạn chưa dùng + tệp tus mồ côi |
-| `maintenance.cleanup-cache` | `30 3 * * *` | – | Xóa cache > 7 ngày, thumbnail > 30 ngày, báo cáo > 24h |
+| `maintenance.cleanup-uploads` | `0 * * * *` | – | Xóa `uploads` hết hạn chưa dùng |
+| `maintenance.cleanup-cache` | `30 3 * * *` | – | Xóa cache tệp, thumbnail, báo cáo cũ |
 | `maintenance.purge-logs` | `0 4 1 * *` | – | Dọn log/thông báo/token cũ (DatabaseDesign §8) |
 | `stats.warmup` | `0 5 * * *` | UC10 | Tính sẵn dashboard Admin vào cache |
+| `stats.topic-trends` | `30 1 * * *` | UC10.7–10.8 | Tính lại `topic_trend_snapshots` cho kỳ hiện tại và kỳ trước |
+| `notifications.digest` | `*/15 * * * *` | UC11.4 | Gửi bản tin tổng hợp cho người dùng bật bản tin, đúng khung giờ |
 
-## 9. Chấm điểm → công bố → GPA → cảnh báo (UC07, UC08.4)
+Đã bỏ ở v3.0: `groups.lock-due`, `groups.lock-reminder`, `groups.lock-at-deadline`, `invitations.expire` (không còn chốt nhóm/lời mời); cảnh báo PH "quá hạn chưa nộp".
+
+## 9. Tải điểm → công bố → GPA → cảnh báo (UC07)
 
 ```mermaid
 flowchart TD
-  A[GV chấm bài nộp<br/>PUT /submissions/:id/grade] --> B{Bài chung nhóm?}
-  B -- Có --> C[assignment_grades cho mọi thành viên<br/>trừ dòng is_override]
-  B -- Không --> D[assignment_grades cho chủ bài]
-  C --> E[Thông báo SUBMISSION_GRADED]
-  D --> E
-  E --> F[GV nhập điểm học phần<br/>'Tính từ bài tập' = Σ điểm×trọng số / Σ trọng số]
-  F --> G[computeTotal / toLetter / toGpa4<br/>packages/shared/grading.ts]
-  G --> H[GV công bố<br/>POST /sections/:id/grades/publish]
-  H --> I[course_sections.grades_published_at = now<br/>section_grades.status = PUBLISHED]
-  I --> J[[Queue grading: recompute-gpa]]
-  J --> K[student_term_results GPA kỳ, CPA<br/>students.cpa, credits_earned]
-  K --> L[[academic-warning-check]]
-  L --> M{Điểm < 4 / GPA < 2 / GPA giảm ≥ 0,5?}
-  M -- Có --> N[academic_warnings + ACADEMIC_WARNING<br/>cho PH và SV]
-  I --> O[GRADES_PUBLISHED cho SV + PH]
+  A[GV chấm bài ngoài hệ thống] --> B[Tải file mẫu điểm bài tập<br/>GET /lecturer/assignments/:id/grades/template]
+  B --> C[Điền Điểm, Nhận xét theo từng SV<br/>bài nhóm: tự điền cùng điểm cho cả nhóm]
+  C --> D[POST .../grades/import/preview<br/>kiểm tra mẫu, MSSV ∈ LHP, 0–10, trùng]
+  D --> E{Có lỗi dòng?}
+  E -- Có --> D2[GV sửa file / áp dụng phần hợp lệ]
+  D2 --> D
+  E -- Không --> F[POST .../grades/import/:jobId/commit<br/>UPSERT assignment_grades + import_job_id]
+  F --> G[GV công bố điểm bài tập<br/>grades_published_at = now<br/>ASSIGNMENT_GRADES_PUBLISHED]
+  F -. đã công bố mà điểm đổi .-> G2[ASSIGNMENT_GRADE_UPDATED cho SV liên quan]
+  G --> H[Tải file mẫu điểm học phần<br/>cột Bài tập = Σ điểm × trọng số / Σ trọng số]
+  H --> I[POST /lecturer/sections/:id/grades/import/preview → commit<br/>section_grades: CC, BT, GK, CK]
+  I --> J[computeTotal / toLetter / toGpa4]
+  J --> K[GV công bố<br/>POST /lecturer/sections/:id/grades/publish]
+  K --> L[course_sections.grades_published_at = now<br/>section_grades.status = PUBLISHED]
+  L --> M[[recompute-gpa]]
+  M --> N[student_term_results, students.cpa, credits_earned]
+  N --> O[[academic-warning-check]]
+  O --> P{Điểm < 4 / GPA < 2 / GPA giảm ≥ 0,5?}
+  P -- Có --> Q[academic_warnings + ACADEMIC_WARNING<br/>cho PH và SV]
+  L --> R[GRADES_PUBLISHED cho SV + PH]
 ```
 
 ## 10. Yêu cầu sửa điểm sau khi khóa (UC07.7–UC07.8)
@@ -360,38 +393,43 @@ sequenceDiagram
 
 ```mermaid
 flowchart TD
-  A[GV dán link thư mục mới] --> B[verifyWritable]
+  A[GV dán link thư mục mới] --> B[verifyWritable owner=GV]
   B -- lỗi --> X[Báo lỗi + hướng dẫn]
   B -- OK --> C{Đã có bài nộp?}
-  C -- Không --> D[Tạo thư mục bài tập mới<br/>trash thư mục cũ<br/>cập nhật id]
-  C -- Có --> E[Xác nhận sao chép]
-  E --> F[Tạo thư mục bài tập mới<br/>drive_migration_status = RUNNING<br/>xóa folder_id nhóm/cá nhân trong DB]
-  F --> G[[Job migrate-assignment]]
-  G --> H[Với mỗi tệp SYNCED: ensure-folder mới → files.copy → cập nhật drive_file_id]
-  H --> I{Mọi tệp xong?}
-  I -- Có --> J[Trash thư mục cũ<br/>DONE + thông báo GV]
-  I -- Lỗi --> K[FAILED + thông báo GV<br/>tệp chưa chép vẫn đọc được từ id cũ]
+  C -- Không --> D[Di chuyển thư mục bài tập sang thư mục mới]
+  C -- Có --> E{GV chọn}
+  E -- Di chuyển toàn bộ (khuyến nghị) --> F[files.update addParents/removeParents<br/>thư mục bài tập kèm mọi thư mục nhóm/cá nhân và tệp]
+  E -- Chỉ bài mới --> G[Tạo thư mục bài tập mới<br/>xóa folder_id nhóm/cá nhân trong DB<br/>bài nộp mới tạo lại thư mục trong cây mới]
+  F --> H[Cập nhật drive_parent_folder_id + audit]
+  G --> H
 ```
-
-Trong lúc migrate, SV nộp bài mới thì `ensure-folder` tạo thư mục trong cây mới, vì `folder_id` cũ đã bị xóa khỏi DB.
 
 ## 12. Luồng sự kiện nội bộ → thông báo
 
 ```mermaid
 flowchart LR
   subgraph Domain events
-    E1[assignment.opened]
-    E2[group.invited / member.changed / locked]
-    E3[submission.created / updated / files.deleted]
-    E4[submission.graded / returned]
-    E5[grades.published]
-    E6[view-request.created / processed / expired]
-    E7[enterprise.registered / reviewed]
-    E8[drive.sync-failed]
+    E1[assignment.opened / updated]
+    E2[groups.imported / group.reported / report.resolved]
+    E3[topic.updated]
+    E4[submission.created / updated / files.deleted]
+    E5[assignment-grades.published / updated]
+    E6[section-grades.published]
+    E7[view-request.created / processed / expired]
+    E8[enterprise.registered / reviewed]
+    E9[drive.sync-failed / folder-problem]
   end
-  E1 & E2 & E3 & E4 & E5 & E6 & E7 & E8 --> L[NotificationListener]
-  L --> NS[NotificationService.notify<br/>insert notifications ON CONFLICT dedupe DO NOTHING]
-  NS --> RT[Realtime emit user:&lt;id&gt; notification:new]
-  NS --> M[[Queue mail.send nếu type có email]]
-  E3 --> RT2[Realtime emit group:&lt;id&gt; submission:updated]
+  E1 & E2 & E3 & E4 & E5 & E6 & E7 & E8 & E9 --> L[NotificationService.notify]
+  L --> PF{users.notification_prefs<br/>kênh Ứng dụng bật?}
+  PF -- Có --> NS[insert notifications ON CONFLICT dedupe DO NOTHING]
+  NS --> RT[Đẩy chuông / làm mới số chưa đọc]
+  NS --> ST{Email bật? bản tin?}
+  ST -- khẩn hoặc không bật bản tin --> M[[mail.send]]
+  ST -- bật bản tin --> DG[(chờ notifications.digest)]
+  PF -- Không --> SKIP[Bỏ qua]
 ```
+
+## 13. Phân tích đề tài & bản tin thông báo
+
+- `stats.topic-trends` (01:30): với kỳ hiện tại và kỳ trước, chạy truy vấn [DatabaseDesign §6.6](DatabaseDesign.md#66-phân-tích-cung--cầu-đề-tài-uc107) theo từng ngành → `INSERT ... ON CONFLICT DO UPDATE` vào `topic_trend_snapshots`. Đề tài chỉ gồm tên + từ khóa nên mọi số liệu tính theo từ khóa đã gộp.
+- `notifications.digest` (mỗi 15'): lấy người dùng bật bản tin và giờ gửi trong khung → gom thông báo chưa gửi email → 1 email `NOTIFICATION_DIGEST` (nhóm theo loại, có link).

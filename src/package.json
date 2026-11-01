@@ -1,0 +1,21 @@
+{
+  "name": "eduportfolio",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Hệ thống quản lý kết quả học tập đa phương tiện của sinh viên (EduPortfolio)",
+  "workspaces": [
+    "backend",
+    "frontend"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "db:start": "npm run db:start -w backend",
+    "db:setup": "npm run db:setup -w backend",
+    "dev:api": "npm run dev -w backend",
+    "dev:web": "npm run dev -w frontend",
+    "build": "npm run build -w backend && npm run build -w frontend",
+    "typecheck": "npm run typecheck -w backend && npm run typecheck -w frontend"
+  }
+}

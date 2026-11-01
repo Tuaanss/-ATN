@@ -1,7 +1,8 @@
 # EduPortfolio – Đặc tả chức năng (Specification)
 
-> Phiên bản 2.0 · 07/10/2026
-> Đặc tả từng use case trong [Requirement.md](Requirement.md). Tên bảng/cột theo [DatabaseDesign.md](DatabaseDesign.md), endpoint theo [ModulesStructure.md](ModulesStructure.md).
+> Phiên bản 3.0 · 11/10/2026 · Backend Node.js 22 + NestJS 11 (TypeScript)
+> **v3.0:** hệ thống chỉ lưu trữ kết quả học tập — GV lập nhóm và tải điểm bằng Excel, SV nhận bài/xem nhóm/nhập đề tài/nộp bài; không chấm trên web, không theo dõi tiến độ. Viết lại UC04–UC07 và các phần liên quan (xem [Requirement §10](Requirement.md#10-nhật-ký-thay-đổi-v30)).
+> Danh sách use case trong [Requirement.md](Requirement.md). Tên bảng/cột theo [DatabaseDesign.md](DatabaseDesign.md), endpoint theo [ModulesStructure.md](ModulesStructure.md).
 
 ---
 
@@ -31,16 +32,16 @@
 |---|---|---|---|---|---|
 | Quản lý người dùng, danh mục, đào tạo | ✔ | – | – | – | – |
 | Khai báo / sửa hồ sơ SV | ◐ sửa hộ | – | ◐ của mình | – | – |
-| Liên kết Drive, tạo / sửa / xóa bài tập | – | ◐ LHP mình dạy | – | – | – |
-| Tạo nhóm, mời, phản hồi, rời nhóm | – | – | ✔ | – | – |
-| Điều chỉnh thành viên, khóa nhóm | – | ◐ LHP mình dạy | – | – | – |
-| Đăng ký / sửa đề tài | – | ◐ sau hạn | ◐ nhóm mình, trước hạn | – | – |
-| Nộp / nộp lại / xóa tệp | – | – | ◐ trước hạn, chưa chấm | – | – |
+| Liên kết Drive, giao / sửa / đóng / xóa bài tập | – | ◐ LHP mình dạy | – | – | – |
+| Tải file nhóm (Excel), xem danh sách nhóm | – | ◐ LHP mình dạy | – | – | – |
+| Xem nhóm của mình, báo nhóm chưa đúng | – | – | ◐ bài của LHP mình học | – | – |
+| Nhập / sửa đề tài | – | ◐ sau hạn | ◐ nhóm mình, trước hạn cuối | – | – |
+| Nộp / nộp lại / xóa tệp | – | – | ◐ trước hạn cuối, đã có nhóm + đề tài | – | – |
 | Xem bài chung nhóm | ✔ | ◐ LHP mình dạy | ◐ thành viên | ◐ của con | ◐ quyền còn hạn |
 | Xem bài cá nhân | ✔ | ◐ LHP mình dạy | ◐ của mình | ◐ của con | ◐ quyền còn hạn |
 | Tải tệp gốc | ✔ | ◐ LHP mình dạy | ◐ bài của mình/nhóm mình | – | – |
-| Tìm kiếm bài nộp | ✔ | ◐ theo `lecturer_search_scope` | – | – | ◐ SV đang có quyền |
-| Chấm, nhập, công bố điểm | – | ◐ LHP mình dạy | – | – | – |
+| Tìm kiếm bài nộp | ✔ | ◐ theo `lecturer.searchScope` | – | – | ◐ SV đang có quyền |
+| Tải lên điểm (Excel), công bố điểm | – | ◐ LHP mình dạy | – | – | – |
 | Yêu cầu sửa điểm sau khóa | – | ◐ LHP mình dạy | – | – | – |
 | Xử lý yêu cầu sửa điểm | ✔ | – | – | – | – |
 | Xem điểm chi tiết | ✔ | ◐ LHP mình dạy | ◐ của mình, đã công bố | ◐ của con, đã công bố | – (chỉ CPA) |
@@ -49,6 +50,8 @@
 | Xem DN đã xem mình | – | – | ✔ | – | – |
 | Nhật ký hệ thống, cấu hình | ✔ | – | – | – | – |
 | Dashboard, thống kê DN, xuất báo cáo | ✔ | – | – | – | – |
+| Phân tích đề tài – nhu cầu DN | ✔ | ◐ LHP mình dạy | – | – | – |
+| Bản đồ năng lực (ẩn danh) | ✔ | – | – | – | ✔ |
 | Thống kê LHP | ✔ | ◐ LHP mình dạy | – | – | – |
 | Thống kê cá nhân / của DN mình | – | – | ✔ | – | ✔ |
 
@@ -82,37 +85,41 @@ Chỉ DN đi qua `PENDING`/`REJECTED`. Khóa tạm do sai mật khẩu dùng `lo
 ### 4.2. Bài tập `assignments.status`
 
 ```
-DRAFT ──công bố / tới open_at──► OPEN ──GV đóng / Bộ hẹn giờ quá hạn cuối──► CLOSED
-                                  ▲                                        │
-                                  └──────────── GV mở lại (gia hạn) ───────┘
+DRAFT ──GV giao ngay / tới open_at (auto_open)──► OPEN ──GV đóng / quá hạn cuối──► CLOSED
+                                                    ▲                              │
+                                                    └──── GV mở lại (gia hạn) ─────┘
 ```
-Hạn cuối = `late_due_at` nếu `allow_late`, ngược lại là `due_at`. Bài tập lưu ở `DRAFT` chưa hiện với SV; chọn "Giao ngay" thì `open_at = now`.
+Hạn cuối = `late_due_at` nếu `allow_late`, ngược lại là `due_at`. Bài `DRAFT` chưa hiện với SV; *Lưu nháp* đặt `auto_open = false`, *hẹn giờ* đặt `auto_open = true`.
+
+Trên trang bài tập của GV **không có** các trạng thái theo dõi tiến độ (lập nhóm, duyệt đề tài, đang chấm…). Trang gồm các tab cố định: *Thông tin* · *Nhóm* (bài `GROUP`) · *Bài đã nộp* · *Điểm*.
 
 ### 4.3. Bài nộp `submissions.status`
 
 ```
 (không có bản ghi) = CHƯA NỘP
-        │ nộp
+        │ nộp (trước due_at → SUBMITTED, sau due_at trong hạn muộn → LATE)
         ▼
-   SUBMITTED / LATE ──chấm──► GRADED ──yêu cầu làm lại──► RETURNED ──nộp lại──► SUBMITTED/LATE
+   SUBMITTED / LATE ──nộp lại (đến hạn cuối)──► SUBMITTED / LATE
         │ xóa hết tệp và không còn link
         ▼
      (xóa bản ghi → CHƯA NỘP)
 ```
-`sync_status` của bài nộp tổng hợp từ các tệp: `PENDING` (còn tệp chưa lên Drive) · `SYNCED` · `ERROR` (có tệp `FAILED`/`MISSING`).
+Không có trạng thái chấm (`GRADED`, `RETURNED`). `sync_status` của bài nộp tổng hợp từ các tệp: `PENDING` (còn tệp chưa lên Drive) · `SYNCED` · `ERROR` (có tệp `FAILED`/`MISSING`).
 
 ### 4.4. Tệp `submission_files.sync_status`
 
 ```
-PENDING ──worker nhận──► UPLOADING ──ok──► SYNCED ──phát hiện mất──► MISSING
-                            │lỗi
-                            ▼
-                         FAILED ──Bộ hẹn giờ/GV thử lại──► PENDING
+PENDING ──hàng đợi nhận──► UPLOADING ──ok──► SYNCED ──phát hiện mất──► MISSING
+                               │lỗi
+                               ▼
+                            FAILED ──Bộ hẹn giờ/GV thử lại──► PENDING
 ```
 
-### 4.5. Lời mời `group_invitations.status`
+### 4.5. Lần tải lên Excel `import_jobs.status`
 
-`PENDING → ACCEPTED | DECLINED | CANCELLED (trưởng nhóm hủy/nhóm đủ người) | EXPIRED (72h hoặc quá hạn nộp)`
+`PREVIEW (đã kiểm tra, chờ GV áp dụng) → COMPLETED | CANCELLED (GV hủy / tải file khác) | FAILED (lỗi file)`. Dùng chung cho danh sách nhóm, điểm bài tập, điểm học phần, import SV.
+
+Phản hồi nhóm `group_reports.status`: `OPEN → RESOLVED`.
 
 ### 4.6. Yêu cầu xem bài `view_requests.status`
 
@@ -129,29 +136,34 @@ PENDING ──Admin duyệt──► APPROVED ──hết hạn──► EXPIRED
 
 ## 5. Danh mục thông báo
 
-| Mã `type` | Sự kiện | Người nhận | Email |
-|---|---|---|---|
-| `ASSIGNMENT_OPENED` | Bài tập được mở | SV trong LHP | ✔ |
-| `DEADLINE_REMINDER` | Còn 24h / 2h, chưa nộp | SV / thành viên nhóm chưa nộp | ✔ (24h) |
-| `GROUP_INVITED` | Được mời vào nhóm | SV được mời | ✔ |
-| `GROUP_INVITE_RESPONDED` | Lời mời được chấp nhận/từ chối | Trưởng nhóm | – |
-| `GROUP_MEMBER_CHANGED` | Thêm/xóa/rời/chuyển trưởng nhóm | Thành viên nhóm | – |
-| `GROUP_LOCKED` | Nhóm bị khóa | Thành viên nhóm | – |
-| `SUBMISSION_UPDATED` | Thành viên nộp/nộp lại/xóa tệp bài chung | Thành viên khác | – |
-| `SUBMISSION_SYNC_FAILED` | Tệp lỗi sau khi hết số lần thử | GV phụ trách (+ SV nộp) | ✔ (GV) |
-| `SUBMISSION_GRADED` | Bài được chấm | Chủ bài / thành viên | ✔ |
-| `SUBMISSION_RETURNED` | Yêu cầu làm lại | Chủ bài / thành viên | ✔ |
-| `GRADES_PUBLISHED` | Công bố điểm học phần | SV trong LHP + PH | ✔ |
-| `GRADE_CHANGE_REQUESTED` | GV gửi yêu cầu sửa điểm | Admin | – |
-| `GRADE_CHANGE_PROCESSED` | Admin duyệt/từ chối | GV (+ SV nếu duyệt) | ✔ |
-| `ACADEMIC_WARNING` | Quá hạn chưa nộp / điểm < 4 / GPA thấp | PH của SV (+ SV) | ✔ |
-| `ENTERPRISE_REGISTERED` | DN mới đăng ký | Admin | – |
-| `ENTERPRISE_REVIEWED` | DN được duyệt/từ chối | DN | ✔ |
-| `VIEW_REQUEST_CREATED` | DN gửi yêu cầu | Admin | – |
-| `VIEW_REQUEST_PROCESSED` | Duyệt/từ chối/thu hồi | DN; SV (khi duyệt) | ✔ |
-| `VIEW_REQUEST_EXPIRING` | Còn 2 ngày | DN | ✔ |
-| `VIEW_REQUEST_EXPIRED` | Hết hạn | DN | – |
-| `DRIVE_FOLDER_PROBLEM` | Mất quyền/thư mục bị xóa/hết dung lượng | GV | ✔ |
+Cột **Khẩn**: ✔ = luôn gửi email ngay, kể cả khi người nhận bật bản tin tổng hợp; các loại còn lại được gộp vào bản tin (mặc định 20:00) nếu bật.
+
+| Mã `type` | Sự kiện | Người nhận | Email | Khẩn |
+|---|---|---|---|---|
+| `ASSIGNMENT_OPENED` | Bài tập được mở | SV trong LHP | ✔ | – |
+| `ASSIGNMENT_UPDATED` | GV gia hạn / sửa đề bài | SV trong LHP | ✔ | – |
+| `DEADLINE_REMINDER` | Sắp hết hạn, chưa nộp | SV / thành viên nhóm chưa nộp | ✔ | – |
+| `GROUP_ASSIGNED` | Được xếp vào nhóm / đổi nhóm (GV tải danh sách) | SV liên quan | ✔ | – |
+| `GROUP_REMOVED` | Bị gỡ khỏi nhóm khi GV tải lại danh sách | SV liên quan | ✔ | – |
+| `GROUP_REPORTED` | SV báo nhóm chưa đúng | GV phụ trách | – | – |
+| `GROUP_REPORT_RESOLVED` | GV đã xử lý phản hồi nhóm | SV gửi phản hồi | – | – |
+| `TOPIC_UPDATED` | Thành viên nhập/sửa đề tài | Thành viên khác của nhóm | – | – |
+| `SUBMISSION_UPDATED` | Thành viên nộp/nộp lại/xóa tệp bài chung | Thành viên khác | – | – |
+| `SUBMISSION_SYNC_FAILED` | Tệp lỗi sau khi hết số lần thử | GV phụ trách (+ SV nộp) | ✔ (GV) | – |
+| `DRIVE_FOLDER_PROBLEM` | Mất quyền / chưa liên kết / thư mục bị xóa / hết dung lượng | GV | ✔ | ✔ |
+| `ASSIGNMENT_GRADES_PUBLISHED` | GV công bố điểm bài tập | SV của bài tập (+ PH) | ✔ | – |
+| `ASSIGNMENT_GRADE_UPDATED` | Điểm bài tập đã công bố bị thay đổi | SV liên quan | ✔ | – |
+| `GRADES_PUBLISHED` | Công bố điểm học phần | SV trong LHP + PH | ✔ | – |
+| `GRADE_CHANGE_REQUESTED` | GV gửi yêu cầu sửa điểm | Admin | – | – |
+| `GRADE_CHANGE_PROCESSED` | Admin duyệt/từ chối | GV (+ SV nếu duyệt) | ✔ | – |
+| `ACADEMIC_WARNING` | Điểm < 4 / GPA thấp / GPA giảm | PH của SV (+ SV) | ✔ | – |
+| `ENTERPRISE_REGISTERED` | DN mới đăng ký | Admin | – | – |
+| `ENTERPRISE_REVIEWED` | DN được duyệt/từ chối | DN | ✔ | ✔ |
+| `VIEW_REQUEST_CREATED` | DN gửi yêu cầu | Admin | – | – |
+| `VIEW_REQUEST_PROCESSED` | Duyệt/từ chối/thu hồi | DN; SV (khi duyệt) | ✔ | ✔ |
+| `VIEW_REQUEST_EXPIRING` | Còn 2 ngày | DN | ✔ | – |
+| `VIEW_REQUEST_EXPIRED` | Hết hạn | DN | – | – |
+| `NOTIFICATION_DIGEST` | Bản tin tổng hợp hằng ngày | Người bật bản tin | ✔ | – |
 
 ## 6. Đặc tả use case
 
@@ -269,11 +281,12 @@ PENDING ──Admin duyệt──► APPROVED ──hết hạn──► EXPIRED
 | `upload.image.maxSizeMB` / `maxCount` / `mimeTypes` | 10 / 30 / jpg, png, webp |
 | `upload.video.maxSizeMB` / `mimeTypes` | 500 / mp4, webm, mov |
 | `upload.source.maxSizeMB` / `mimeTypes` | 100 / zip, rar, 7z |
+| `upload.report.maxSizeMB` / `maxCount` / `mimeTypes` | 20 / 3 / pdf, doc, docx |
+| `import.maxRows` / `maxSizeMB` | 2000 / 5 |
 | `viewRequest.minDays` / `maxDays` | 14 / 28 |
 | `warning.lowScore` / `lowGpa` / `gpaDrop` | 4.0 / 2.0 / 0.5 |
 | `lecturer.searchScope` | `OWN_SECTIONS` |
-| `invitation.ttlHours` | 72 |
-| `reminder.hoursBefore` | [24, 2] |
+| `reminder.hoursBefore` | 24 |
 
 - Thay đổi ghi log; cache Redis bị xóa khi lưu.
 
@@ -308,119 +321,143 @@ PENDING ──Admin duyệt──► APPROVED ──hết hạn──► EXPIRED
 
 ### UC04 – Quản lý bài tập
 
-#### UC04.1 Liên kết tài khoản Google Drive (Service Account)
-- **Tác nhân:** GV, Google Drive.
-- **Luồng:**
-  1. Trang hiển thị email Service Account (có nút sao chép) và hướng dẫn 3 bước: (a) tạo/chọn một thư mục trong **Shared Drive** của trường; (b) thêm email SA làm thành viên *Content manager*; (c) dán link thư mục.
-  2. GV dán link → hệ thống tách `folderId` từ URL dạng `drive.google.com/drive/folders/<id>` (hoặc `?id=`).
-  3. **Include UC04.4.**
-  4. Đạt: lưu `lecturer_drive_links(root_folder_id, url, name, shared_drive_id, status=OK, checked_at)`.
-- **Ngoại lệ:** xem bảng lỗi ở UC04.4.
-- GV có thể liên kết lại (đổi thư mục gốc) bất kỳ lúc nào; bài tập đã tạo không bị ảnh hưởng.
+#### UC04.1 Liên kết tài khoản Google Drive
+- **Tác nhân:** GV, Google Drive. Trang *Kết nối Google Drive* (mẫu `GV_GoogleLink`).
+- **Cách 1 – OAuth của GV (mặc định):**
+  1. GV bấm **Liên kết tài khoản Google** → `GET /lecturer/drive/oauth/start` trả URL đồng ý của Google (scope `https://www.googleapis.com/auth/drive.file` + `userinfo.email`, `access_type=offline`, `prompt=consent`, `state` ngẫu nhiên hạn 10 phút).
+  2. GV chọn tài khoản Google, đồng ý → Google chuyển về `GET /lecturer/drive/oauth/callback?code&state`.
+  3. Hệ thống kiểm tra `state`, đổi `code` lấy refresh token, lấy email tài khoản, mã hóa token (AES-256-GCM) và lưu `lecturer_drive_links(auth_mode=OAUTH, google_email, refresh_token_enc, linked_at)`.
+  4. Lần đầu liên kết: tạo thư mục gốc `EduPortfolio_<MãGV>` trong My Drive của GV, lưu `root_folder_id`. Liên kết lại cùng tài khoản thì giữ thư mục cũ.
+  5. Quay về trang, hiện email, trạng thái *Đang hoạt động*, dung lượng Drive (`about.get storageQuota`), bảng *Thư mục nhận bài của các bài tập*.
+- **Kiểm tra lại:** ghi thử vào thư mục gốc (UC04.4) → cập nhật `status`.
+- **Hủy liên kết:** thu hồi token với Google, xóa liên kết; bài tập đang mở không ghi được Drive cho tới khi liên kết lại (tệp vẫn giữ tạm trên server, NFR-13).
+- **Cách 2 – Service Account (khi có Shared Drive):** trang hiển thị email SA + hướng dẫn: tạo thư mục trong Shared Drive → thêm SA quyền *Người chỉnh sửa* → dán link thư mục khi giao bài. GV chưa liên kết OAuth thì mọi thao tác Drive dùng SA.
+- **Ngoại lệ:** GV từ chối quyền → `?error=Bạn đã từ chối cấp quyền`; máy chủ chưa cấu hình OAuth → nút bị khóa kèm hướng dẫn; Google không trả refresh token → yêu cầu liên kết lại.
+- **Lưu ý `drive.file`:** ứng dụng chỉ thấy thư mục/tệp do chính nó tạo, nên ở chế độ OAuth thư mục nhận bài phải là thư mục do EduPortfolio tạo (mặc định là thư mục gốc).
 
-#### UC04.2 Tạo bài tập
-- **TĐK:** GV phụ trách LHP; LHP thuộc học kỳ chưa kết thúc; GV đã liên kết Drive (hoặc nhập link thư mục riêng cho bài).
+#### UC04.2 Giao bài tập
+- **TĐK:** GV phụ trách LHP; LHP thuộc học kỳ chưa kết thúc; GV đã liên kết Drive (hoặc có Service Account).
 - **Luồng:**
-  1. GV nhập: tiêu đề*, mô tả (rich text), ngày mở*, hạn nộp*, hình thức*, min–max thành viên (nếu có nhóm), loại sản phẩm (gợi ý theo loại môn), nộp muộn (bật/tắt, hạn muộn, % trừ), trọng số trong cột bài tập, thư mục nhận bài (mặc định thư mục gốc đã liên kết).
+  1. GV nhập: tiêu đề*, mô tả, tệp đề bài (tùy chọn, ≤ 20 MB), ngày mở*, hạn nộp*, **hình thức*** (`INDIVIDUAL` / `GROUP`), *có phần cá nhân* (chỉ khi `GROUP`), loại sản phẩm (gợi ý theo loại môn), nộp muộn (bật/tắt, số ngày), trọng số trong cột điểm bài tập (%), đề tài gợi ý (tùy chọn), thư mục nhận bài (mặc định thư mục gốc đã liên kết).
   2. Kiểm tra BR-04.
   3. **Include UC04.4** trên thư mục cha.
   4. **Include UC04.3**: tạo thư mục `<MaLHP>_<TenBaiTap>`, lưu `drive_folder_id`.
-  5. Lưu `assignments` (`OPEN` nếu `open_at ≤ now`, ngược lại `DRAFT`).
+  5. Lưu `assignments` (`OPEN` nếu `open_at ≤ now`, ngược lại `DRAFT` + `auto_open`); *Lưu nháp* thì `DRAFT` không tự mở.
   6. Khi chuyển sang `OPEN`: thông báo `ASSIGNMENT_OPENED` cho SV trong LHP.
-- **Ngoại lệ:** Drive lỗi → không lưu, hiện hướng dẫn; tạo thư mục thành công nhưng ghi CSDL lỗi → xóa thư mục vừa tạo (bù trừ).
+  7. Tệp đề bài (nếu có) lưu trên server và chép một bản vào thư mục bài tập trên Drive (chạy nền).
+- **Sau khi giao bài `GROUP`:** trang bài tập nhắc GV tải danh sách nhóm (UC05.2); SV chỉ thấy "Chưa được xếp nhóm" cho tới khi GV tải lên.
+- **Ngoại lệ:** Drive lỗi → không lưu, hiện hướng dẫn; tạo thư mục thành công nhưng ghi CSDL lỗi → đưa thư mục vừa tạo vào thùng rác (bù trừ).
+- **Hai lối vào:** (a) từ trang một LHP (*Lớp học phần → Môn → Tạo bài tập*): LHP cố định; (b) từ menu *Tạo bài tập*: chạy **UC04.8**.
+
+#### UC04.8 Giao bài tập cho nhiều lớp học phần
+- **Extend** UC04.2. **TĐK:** GV dạy ít nhất một LHP trong kỳ chưa kết thúc.
+- **Luồng:** GV chọn một hoặc nhiều LHP mình dạy (tìm theo mã/tên môn, *Chọn tất cả lớp cùng môn*) → nhập thông tin chung → bảng *Hạn nộp riêng* cho từng LHP (mặc định giống nhau) → `POST /lecturer/assignments/batch` → với mỗi LHP: kiểm tra BR-04, BR-24 → include UC04.4, UC04.3 → tạo `assignments` cùng `batch_id`.
+- Lỗi ở một LHP không làm hỏng LHP khác; trả kết quả từng LHP. Mỗi bài tập sau đó độc lập (danh sách nhóm và điểm tải riêng cho từng LHP).
 
 #### UC04.3 Tạo thư mục trên Drive
-- `files.create(mimeType=folder, parents=[parentId], supportsAllDrives=true)`, tên đã được làm sạch (bỏ `/\:*?"<>|`, rút gọn ≤ 100 ký tự, thay khoảng trắng bằng `_`).
+- `files.create(mimeType=folder, parents=[parentId], supportsAllDrives=true)`, tên đã làm sạch (bỏ `/\:*?"<>|`, ≤ 100 ký tự, khoảng trắng → `_`).
 - Cấu trúc tạo dần:
 ```
-<Thư mục nhận bài>/
+<Thư mục nhận bài>/                         (mặc định EduPortfolio_<MãGV>)
 └── <MaLHP>_<TenBaiTap>/                    ← UC04.2
-    ├── Nhom01_<TenNhom>/                   ← khi nhóm được tạo (job)
+    ├── De_bai_<tên tệp>                    ← tệp đề bài (nếu có)
+    ├── Nhom01_<TenNhom>/                   ← khi nhóm có bài nộp đầu tiên
     │   ├── Bai_chung/
-    │   └── <MSSV>_<HoTen>/                 ← khi thành viên tham gia (job)
-    └── CaNhan_<MSSV>_<HoTen>/              ← khi SV chọn làm cá nhân / lần nộp đầu
+    │   └── <MSSV>_<HoTen>/                 ← phần cá nhân trong nhóm
+    └── CaNhan_<MSSV>_<HoTen>/              ← bài cá nhân, lần nộp đầu
 ```
-- Thư mục nhóm/cá nhân được tạo **lười** bằng job `drive.ensure-folder` (idempotent: kiểm tra `folder_id` trong CSDL trước).
+- Thư mục nhóm/cá nhân tạo **lười** khi có tệp đầu tiên cần ghi (idempotent: kiểm tra `folder_id` trong CSDL, khóa theo khóa thư mục để hai tệp không tạo trùng).
 
 #### UC04.4 Kiểm tra quyền ghi thư mục trên Drive
-1. `files.get(folderId, fields=id,name,mimeType,driveId,trashed,capabilities, supportsAllDrives=true)`.
+1. `files.get(folderId, fields=id,name,mimeType,driveId,trashed,capabilities, supportsAllDrives=true)` bằng client của GV (OAuth) hoặc SA.
 2. Kiểm tra: tồn tại, không ở thùng rác, `mimeType = folder`, `capabilities.canAddChildren = true`.
-3. **Ghi thử**: tạo tệp `.eduportfolio_check.txt` (1 byte) rồi xóa vĩnh viễn ngay.
+3. **Ghi thử**: tạo tệp `.eduportfolio_check.txt` (1 byte) rồi xóa ngay.
 
 | Lỗi Google | Mã lỗi hệ thống | Hướng dẫn hiển thị |
 |---|---|---|
-| 404 / không thấy | `DRIVE_FOLDER_NOT_FOUND` | Link sai hoặc chưa chia sẻ cho SA |
+| Chưa liên kết / token bị thu hồi | `DRIVE_NOT_LINKED` | Vào *Kết nối Google Drive* để liên kết |
+| 404 / không thấy | `DRIVE_FOLDER_NOT_FOUND` | Link sai, chưa chia sẻ cho SA, hoặc (OAuth) thư mục không do EduPortfolio tạo |
 | `mimeType` không phải folder | `DRIVE_NOT_A_FOLDER` | Hãy dán link thư mục, không phải tệp |
-| `canAddChildren=false` / 403 | `DRIVE_NO_WRITE_PERMISSION` | Thêm SA với quyền Content manager |
-| `storageQuotaExceeded` khi ghi thử | `DRIVE_NOT_SHARED_DRIVE` | Thư mục đang ở My Drive; chuyển sang Shared Drive |
-| Shared Drive hết dung lượng | `DRIVE_QUOTA_EXCEEDED` | Liên hệ quản trị Workspace |
+| `canAddChildren=false` / 403 | `DRIVE_NO_WRITE_PERMISSION` | Thêm quyền *Người chỉnh sửa* / liên kết lại |
+| `storageQuotaExceeded` (SA ghi vào My Drive) | `DRIVE_NOT_SHARED_DRIVE` | Chuyển thư mục sang Shared Drive hoặc dùng OAuth |
+| Hết dung lượng | `DRIVE_QUOTA_EXCEEDED` | Giải phóng dung lượng Drive |
 
 #### UC04.5 Sửa / Đóng bài tập
-- Sửa: tiêu đề, mô tả, hạn nộp (gia hạn hay rút ngắn đều phải ≥ now), nộp muộn, loại sản phẩm (không bỏ được loại đã có tệp nộp), trọng số.
-- Đổi tiêu đề → job đổi tên thư mục Drive (không bắt buộc thành công).
-- **Đóng**: `status = CLOSED`, khóa mọi nhóm, không nhận bài. **Mở lại**: phải đặt hạn nộp mới > now.
-- Gia hạn thì mở khóa các nhóm đã bị Bộ hẹn giờ khóa (nhóm do GV khóa tay thì giữ nguyên).
-- Extend: UC04.6, UC04.7. Ghi log.
+- Sửa: tiêu đề, mô tả, tệp đề bài, hạn nộp (gia hạn hay rút ngắn đều phải ≥ now), nộp muộn, loại sản phẩm (không bỏ được loại đã có tệp nộp), trọng số, đề tài gợi ý, có phần cá nhân (không tắt được khi đã có bài cá nhân). Không đổi được hình thức khi đã có nhóm hoặc bài nộp.
+- **Đóng**: `status = CLOSED`, không nhận bài. **Mở lại**: đặt hạn nộp mới > now.
+- **Giao ngay** bài đang `DRAFT`/hẹn giờ: `status = OPEN`, `open_at = now`.
+- **Hủy giao bài**: khi chưa có nhóm và bài nộp → xóa (UC04.7); đã có dữ liệu thì chỉ *Đóng* được.
+- Extend: UC04.6. Ghi log và lịch sử thay đổi (hiển thị ở khối *Lịch sử thay đổi*).
 
 #### UC04.6 Đổi thư mục nhận bài
 - GV dán link thư mục cha mới → **include UC04.4**.
-  - Chưa có bài nộp: tạo thư mục bài tập mới trong thư mục mới, chuyển thư mục cũ (trống) vào thùng rác, cập nhật id.
-  - Đã có bài nộp: xác nhận "Toàn bộ tệp sẽ được sao chép sang thư mục mới" → tạo cấu trúc mới, đánh dấu `assignments.drive_migration_status = RUNNING`, đưa job `drive.migrate-assignment` vào hàng đợi (dùng `files.copy` cho từng tệp, cập nhật `drive_file_id`, xong thì đưa thư mục cũ vào thùng rác). Trong lúc chạy, SV vẫn nộp được (tệp mới ghi vào thư mục mới).
+  - Chưa có bài nộp: chuyển thư mục bài tập (trống) sang thư mục mới.
+  - Đã có bài nộp: GV chọn *Di chuyển toàn bộ thư mục nhóm/cá nhân sang thư mục mới* (khuyến nghị, `files.update addParents/removeParents`) hoặc *Chỉ lưu bài nộp mới vào thư mục mới* (tạo thư mục bài tập mới, xóa `folder_id` nhóm/cá nhân trong CSDL để tạo lại).
 - Báo GV khi xong hoặc lỗi.
 
-#### UC04.7 Điều chỉnh thành viên nhóm
-- **Sửa min/max:** đảm bảo `1 ≤ min ≤ max`. Giảm `max` dưới sĩ số một số nhóm → cảnh báo, liệt kê nhóm; các nhóm đó giữ người hiện có, không nhận thêm.
-- **Điều chỉnh người:** GV xem danh sách SV chưa có nhóm; thêm SV vào nhóm, chuyển SV giữa nhóm, xóa SV khỏi nhóm, chỉ định trưởng nhóm. GV được làm kể cả khi nhóm khóa hoặc đã nộp (quyền ghi đè), nhưng vẫn không vượt `max` trừ khi tick "Vượt giới hạn" (ghi log).
-- Thay đổi → job tạo/dọn thư mục cá nhân, thông báo `GROUP_MEMBER_CHANGED`.
+#### UC04.7 Xóa bài tập
+- **TĐK:** chưa có bài nộp và chưa có nhóm. Xác nhận → xóa mềm (`deleted_at`); thư mục Drive đưa vào thùng rác. Có dữ liệu → `ASSIGNMENT_HAS_SUBMISSIONS`, gợi ý "Đóng bài tập".
 
-#### UC04.8 Xóa bài tập
-- **TĐK:** chưa có bài nộp nào. Xác nhận → xóa mềm (`deleted_at`), xóa nhóm, đề tài, lời mời liên quan; job đưa thư mục Drive vào thùng rác. Có bài nộp → `ASSIGNMENT_HAS_SUBMISSIONS`, gợi ý "Đóng bài tập".
-
-#### UC04.9 Xem LHP & bài tập được giao (SV)
-- Danh sách LHP kỳ hiện tại (đổi kỳ được): mã, môn, GV, lịch học.
-- Chi tiết LHP: bài tập `OPEN`/`CLOSED` gồm tiêu đề, hạn (đếm ngược), hình thức, trạng thái của SV (*Chưa chọn hình thức / Chưa có đề tài / Chưa nộp / Đã nộp / Nộp muộn / Đã chấm (điểm) / Bị trả lại*).
+#### UC04.9 Nhận bài tập (SV)
+- **Trang *Bài tập của tôi*:** danh sách LHP kỳ hiện tại (mã, môn, GV, lịch học, số bài đã nộp) và bảng mọi bài tập: tiêu đề, LHP, hình thức (cá nhân / tên nhóm), hạn nộp (đếm ngược), trạng thái của SV (*Chưa xếp nhóm / Chưa nhập đề tài / Chưa nộp / Đã nộp / Nộp muộn / Quá hạn – chưa nộp / Có điểm*), điểm nếu đã công bố. Lọc: tất cả / đang mở / sắp hạn / đã nộp / quá hạn.
+- **Trang bài tập** (4 bước):
+  1. **Đề bài & nhóm** — mô tả, tệp đề bài (tải), sản phẩm cần nộp, hạn nộp, đề tài gợi ý; khối *Nhóm của tôi* (UC05.5).
+  2. **Đề tài** — UC05.7.
+  3. **Nộp bài** — UC06.1/06.2, lịch sử nộp.
+  4. **Kết quả** — điểm + nhận xét khi GV đã công bố điểm bài tập.
+- Trang môn học của SV (*SV_Course*): bài tập của môn, nhóm của tôi trong môn, thông tin môn, cơ cấu điểm, tài liệu (tệp đề bài).
 
 ---
 
 ### UC05 – Quản lý nhóm & đề tài
 
-Điều kiện chung cho mọi thao tác SV: bài tập `OPEN`, chưa quá hạn cuối, SV thuộc LHP, hồ sơ đã hoàn thiện, nhóm chưa khóa.
+#### UC05.1 Tải file mẫu danh sách nhóm
+- **TĐK:** bài tập `GROUP`, GV phụ trách.
+- `GET /lecturer/assignments/:id/groups/template` → `.xlsx` (ExcelJS) gồm sheet *Nhom*: cột **MSSV**, **Họ tên** (điền sẵn mọi SV của LHP, sắp theo MSSV, khóa không sửa), **Mã nhóm**, **Tên nhóm**, **Trưởng nhóm** (đánh `x`). Đã có nhóm thì điền sẵn nhóm hiện tại để GV sửa. Sheet *HuongDan* mô tả quy tắc.
 
-#### UC05.1 Tạo nhóm
-- **TĐK:** hình thức `GROUP` hoặc `CHOICE`; SV chưa thuộc nhóm nào của bài tập; chưa nộp bài cá nhân dạng làm cá nhân (với `CHOICE`).
-- **Luồng:** nhập tên nhóm (3–50 ký tự, duy nhất trong bài tập) → tạo `groups` (số thứ tự `seq` tăng dần, `invite_code` 8 ký tự `A-Z2-9` bỏ ký tự dễ nhầm), thêm `group_members(role=LEADER)` → job tạo thư mục `NhomNN_<Ten>/Bai_chung` và thư mục cá nhân.
-- **Chọn làm cá nhân (`CHOICE`)**: tạo `individual_works(assignment, student)`; đổi sang nhóm khi chưa nộp thì xóa bản ghi này.
+#### UC05.2 Tải lên danh sách nhóm
+1. GV chọn file → `POST /lecturer/assignments/:id/groups/import/preview` (multipart) → **include UC05.3** → lưu `import_jobs(type=ASSIGNMENT_GROUPS, status=PREVIEW)`.
+2. Màn hình xem trước: tổng số nhóm, số SV có nhóm / chưa có nhóm; bảng từng nhóm (mã, tên, trưởng nhóm, thành viên) với nhãn *Mới / Sửa / Giữ nguyên / Xóa*; danh sách SV bị chuyển nhóm; lỗi theo dòng (ô bị lỗi tô đỏ).
+3. GV bấm **Áp dụng** → `POST .../groups/import/:jobId/commit` → transaction:
+   - tạo nhóm mới (`seq` tăng dần, `code`, `name`), sửa tên/trưởng nhóm nhóm cũ (khớp theo `code`);
+   - thay `group_members` theo file; SV không có mã nhóm → không thuộc nhóm nào;
+   - xóa nhóm không còn trong file (chỉ khi nhóm đó chưa có bài chung và đề tài);
+   - `import_jobs.status = COMPLETED`, ghi log.
+4. Sau commit: thông báo `GROUP_ASSIGNED` cho SV được xếp vào nhóm hoặc đổi nhóm; SV bị gỡ khỏi nhóm nhận `GROUP_REMOVED`.
+- **Ngoại lệ:** file sai mẫu → `IMPORT_INVALID_FILE`; có lỗi dòng → chỉ cho *Áp dụng phần hợp lệ* hoặc tải file khác; nhóm đã có bài chung bị bỏ khỏi file → lỗi dòng `GROUP_HAS_SUBMISSION`.
 
-#### UC05.2 Mời thành viên
-- **Tác nhân:** Trưởng nhóm.
-- **Cách 1 – MSSV:** nhập MSSV → kiểm tra BR-07 (cùng LHP, chưa có nhóm, chưa làm cá nhân đã nộp, nhóm chưa đủ tính cả lời mời đang chờ) → tạo `group_invitations(PENDING, expires_at = min(now+72h, hạn nộp))` → thông báo `GROUP_INVITED`.
-- **Cách 2 – Mã mời:** hiển thị mã + nút sao chép link `/join/<code>`; "Làm mới mã" sinh mã mới, mã cũ hết hiệu lực.
-- Trưởng nhóm hủy được lời mời đang chờ.
+#### UC05.3 Kiểm tra & xem trước danh sách nhóm
+| Kiểm tra | Mức |
+|---|---|
+| Đủ các cột bắt buộc; ≤ 2.000 dòng; ≤ 5 MB | Lỗi file |
+| MSSV tồn tại và thuộc LHP | Lỗi dòng |
+| MSSV không lặp trong file | Lỗi dòng |
+| Có *Tên nhóm* thì phải có *Mã nhóm* (≤ 20 ký tự); các dòng cùng mã nhóm phải cùng tên | Lỗi dòng |
+| Mỗi nhóm tối đa 1 trưởng nhóm | Lỗi nhóm |
+| Nhóm đã có bài chung / đề tài thì không được xóa | Lỗi nhóm |
+| SV chuyển khỏi nhóm đã nộp bài chung (bài chung ở lại nhóm cũ, phần cá nhân đi theo SV) | Cảnh báo |
+| SV của LHP không có trong file / để trống mã nhóm | Cảnh báo (*Chưa có nhóm*) |
 
-#### UC05.3 Phản hồi lời mời tham gia nhóm
-- **Chấp nhận:** kiểm tra lại BR-07 trong transaction (khóa dòng nhóm `FOR UPDATE`) → thêm thành viên → hủy mọi lời mời đang chờ khác của SV trong bài tập này → thông báo trưởng nhóm → job tạo thư mục cá nhân. Nhóm đủ `max` thì hủy các lời mời còn lại.
-- **Từ chối:** `DECLINED`, thông báo trưởng nhóm.
-- **Nhập mã:** như chấp nhận, không cần lời mời. Mã sai → `GROUP_INVALID_CODE` (rate limit 10 lần/phút).
+#### UC05.4 Xem danh sách nhóm & đề tài (GV)
+- Tab *Nhóm* trên trang bài tập: mã/tên nhóm, trưởng nhóm, thành viên, đề tài, từ khóa, bài chung (đã nộp lúc …/chưa), nút *Mở trên Google Drive*. Danh sách SV chưa có nhóm. Nút *Tải file mẫu*, *Tải lên danh sách nhóm*, *Xuất Excel*, lịch sử các lần tải lên.
+- Khối *Phản hồi nhóm chưa đúng* (UC05.6): SV, nội dung, thời gian, nút *Đã xử lý* (kèm ghi chú).
+- Bài `INDIVIDUAL`: tab *Đề tài* liệt kê SV – đề tài – từ khóa.
 
-#### UC05.4 Xóa thành viên
-- **TĐK:** trưởng nhóm; nhóm chưa có bài chung; chưa khóa; không xóa chính mình.
-- Xóa `group_members`; job xóa thư mục cá nhân **nếu trống**; thông báo SV bị xóa.
+#### UC05.5 Xem nhóm của mình (SV)
+- Khối *Nhóm của tôi* trên trang bài tập: mã/tên nhóm, trưởng nhóm, thành viên (họ tên, MSSV), đề tài hiện tại. Bài `GROUP` chưa được xếp nhóm → "Bạn chưa được xếp nhóm. Liên hệ giảng viên" + nút *Báo nhóm chưa đúng*; các bước Đề tài và Nộp bài bị khóa (`GROUP_NOT_ASSIGNED`).
+- Trang môn học có bảng *Nhóm của tôi trong môn* (mỗi bài tập nhóm một dòng).
 
-#### UC05.5 Chuyển quyền trưởng nhóm
-- Chọn thành viên → đổi `groups.leader_id` và vai trò → thông báo cả nhóm. Không cần nhóm chưa khóa.
+#### UC05.6 Báo nhóm chưa đúng
+- **Extend** UC05.5. SV nhập nội dung (10–500 ký tự, VD "Em ở nhóm 03 chứ không phải nhóm 02") → `group_reports(OPEN)` → thông báo `GROUP_REPORTED` cho GV. Mỗi SV có tối đa 1 phản hồi `OPEN` cho 1 bài tập.
+- GV đánh dấu *Đã xử lý* (ghi chú tùy chọn) → `RESOLVED`, thông báo `GROUP_REPORT_RESOLVED` cho SV.
 
-#### UC05.6 Rời nhóm
-- **TĐK:** nhóm chưa có bài chung, chưa khóa.
-- Trưởng nhóm còn thành viên khác → `GROUP_LEADER_MUST_TRANSFER`. Nhóm còn 1 người → giải tán: xóa nhóm, đề tài, lời mời; job dọn thư mục nếu trống.
-- Nhóm đã có bài chung → `GROUP_HAS_SUBMISSION`: "Liên hệ GV để được điều chỉnh" (UC04.7).
-
-#### UC05.7 Đăng ký đề tài
-- **Tác nhân:** bất kỳ thành viên nhóm / SV làm cá nhân.
+#### UC05.7 Nhập đề tài
+- **Tác nhân:** bất kỳ thành viên nhóm / SV làm cá nhân. **TĐK:** bài `OPEN`, chưa quá hạn cuối, SV thuộc LHP, (bài `GROUP`) đã có nhóm.
 - **Luồng:**
-  1. Nhập tên (5–200), mô tả (≤ 1000), công nghệ/công cụ (≤ 200).
-  2. Gõ tên → gọi `GET /topics/similar?assignmentId&title` → hiển thị cảnh báo nếu `similarity(normalize(title)) ≥ 0.6` với đề tài khác trong cùng LHP.
+  1. Nhập **tên đề tài** (5–200 ký tự); có thể bấm chọn một *đề tài gợi ý* của GV.
+  2. Gõ tên → `GET /topics/similar?assignmentId&title` → cảnh báo nếu `similarity(normalize(title)) ≥ 0.6` với đề tài khác trong cùng LHP (không chặn).
   3. **Include UC05.8.**
-  4. Lưu `topics` (tạo hoặc sửa), ghi `topic_histories` (dữ liệu cũ/mới, người sửa); thông báo thành viên nhóm.
+  4. Lưu `topics` (tạo hoặc sửa), ghi `topic_histories` (cũ/mới, người sửa); thông báo `TOPIC_UPDATED` cho các thành viên khác của nhóm.
 - Sau hạn cuối: SV không sửa được; GV sửa được.
 
 #### UC05.8 Gắn từ khóa đề tài
@@ -428,121 +465,122 @@ PENDING ──Admin duyệt──► APPROVED ──hết hạn──► EXPIRED
 - Chuẩn hóa: trim, gộp khoảng trắng, `normalized = lower(unaccent(name))`. Trùng `normalized` thì dùng tag có sẵn; chưa có thì tạo mới.
 - 1–5 tag, mỗi tag ≤ 50 ký tự.
 
-#### UC05.9 Xem danh sách nhóm & đề tài (GV)
-- Bảng theo bài tập: STT nhóm, tên nhóm, trưởng nhóm, thành viên, đề tài, từ khóa, trạng thái nhóm, trạng thái nộp, thời điểm nộp, điểm. Tab "SV làm cá nhân" và "SV chưa có nhóm/chưa chọn".
-- Nút "Mở trên Google Drive" (link thư mục bài tập/nhóm). Xuất Excel.
-
-#### UC05.10 Khóa nhóm
-- **GV:** khóa/mở khóa từng nhóm hoặc tất cả (`locked_by = GV`).
-- **Bộ hẹn giờ (mỗi phút):** bài tập có hạn cuối ≤ now và chưa xử lý → khóa mọi nhóm (`locked_by = null`, `lock_reason = DEADLINE`), hủy lời mời đang chờ, vô hiệu mã mời; nhóm có số thành viên < min → thông báo GV; đặt `assignments.deadline_processed_at`.
-- Nhóm khóa: không thêm/bớt/rời, không sửa đề tài. Việc nộp bài do hạn nộp quyết định, không do khóa nhóm.
-
 ---
 
 ### UC06 – Nộp bài, xem & tìm kiếm bài nộp
 
 #### UC06.1 Nộp bài nhóm / UC06.2 Nộp bài cá nhân
-- **TĐK:** SV thuộc nhóm (UC06.1) hoặc thuộc LHP (UC06.2); đã có đề tài; bài tập `OPEN`; `now ≤ due_at` (hoặc `≤ late_due_at` nếu cho nộp muộn); bài chưa ở `GRADED` (trừ `RETURNED`).
+- **TĐK:** (bài `GROUP`) SV thuộc nhóm hoặc (bài `INDIVIDUAL`) SV thuộc LHP; đã có đề tài; hồ sơ đã hoàn thiện; bài tập `OPEN`; `now ≤ due_at` (hoặc `≤ late_due_at` nếu cho nộp muộn).
 - **Luồng:**
-  1. Màn hình nộp: tab **Bài chung** / **Bài cá nhân** (bài tập nhóm), hoặc chỉ một khu vực (làm cá nhân). Hiển thị các ô theo loại sản phẩm đã cấu hình.
-  2. SV kéo thả tệp → client kiểm tra sơ bộ (đuôi, dung lượng, số lượng) → upload từng tệp qua giao thức **tus** (chunk 5 MB, tải tiếp được, có tiến trình và nút hủy) vào `/api/v1/uploads`.
-  3. SV nhập link Figma/Git, ghi chú, sắp xếp thứ tự ảnh (kéo thả) → bấm **Nộp bài**.
-  4. Server `POST /submissions` với `{assignmentId, kind, uploadIds[], figmaUrl, gitUrl, note}`:
+  1. Màn hình nộp: tab **Bài chung của nhóm** / **Bài cá nhân** (bài nhóm có `has_individual_part`; không bật thì chỉ có Bài chung), hoặc chỉ một khu vực (bài cá nhân). Hiển thị các ô theo loại sản phẩm đã cấu hình (ảnh, video, mã nguồn ZIP hoặc link Git, báo cáo, link Figma, ghi chú; phần cá nhân có thêm *mức đóng góp tự đánh giá %*).
+  2. SV kéo thả tệp → client kiểm tra sơ bộ (đuôi, dung lượng, số lượng) → upload có tiến trình, hủy được.
+  3. SV bấm **Nộp bài**.
+  4. Server:
      - kiểm tra quyền và TĐK; kiểm tra magic bytes, dung lượng, số lượng (BR-13); kiểm tra domain link;
-     - transaction: `SELECT ... FOR UPDATE` bài nộp hiện có; chưa có thì tạo, có rồi thì **UC06.4**; chuyển tệp tạm vào `storage/pending/<submissionId>/`; tạo `submission_files(sync_status=PENDING)`; `submitted_at = now`, `is_late = now > due_at`; trạng thái `SUBMITTED`/`LATE`; ghi `submission_events(SUBMIT)`;
-     - sau commit: đẩy job `drive.upload-file` cho từng tệp (**include UC06.3**); phát socket `submission:updated` tới phòng `group:<id>`; thông báo `SUBMISSION_UPDATED`.
+     - transaction có khóa theo chủ bài (`pg_advisory_xact_lock`): chưa có bài thì tạo, có rồi thì **UC06.4**; chuyển tệp tạm vào `pending/<submissionId>/`; tạo `submission_files(sync_status=PENDING)`; `submitted_at = now`, `is_late = now > due_at`; trạng thái `SUBMITTED`/`LATE`; ghi `submission_events(SUBMIT|RESUBMIT)`;
+     - sau commit: đưa tệp vào hàng đợi ghi Drive (**include UC06.3**); thông báo `SUBMISSION_UPDATED` cho thành viên khác (bài chung).
   5. Trả "Nộp bài thành công – đang đồng bộ lên Drive"; giao diện hiện trạng thái đồng bộ từng tệp.
-- **Ngoại lệ:** quá hạn → `SUBMISSION_DEADLINE_PASSED`; sai định dạng thực → `FILE_INVALID_TYPE` (kèm tên tệp); vượt dung lượng/số lượng → `FILE_TOO_LARGE`/`FILE_TOO_MANY`; chưa có đề tài → `TOPIC_REQUIRED`; đã chấm → `SUBMISSION_ALREADY_GRADED`.
-- Nộp muộn trừ điểm: lúc chấm, điểm hiệu lực = điểm × (1 − `late_penalty_percent`/100); hiển thị cả hai.
+- **Ngoại lệ:** quá hạn → `SUBMISSION_DEADLINE_PASSED`; chưa có nhóm → `GROUP_NOT_ASSIGNED`; chưa có đề tài → `TOPIC_REQUIRED`; sai định dạng thực → `FILE_INVALID_TYPE` (kèm tên tệp); vượt dung lượng/số lượng → `FILE_TOO_LARGE`/`FILE_TOO_MANY`; bài yêu cầu báo cáo mà bài chung / bài cá nhân chính không có tệp PDF/DOC/DOCX (kể cả tệp đang giữ lại) → `REPORT_REQUIRED`; gửi phần cá nhân khi bài không bật → `PERSONAL_PART_DISABLED`.
 
 #### UC06.3 Ghi tệp lên Drive
-- **Worker `drive.upload-file(fileId)`** (đồng thời tối đa 4, giới hạn 8 request/giây toàn hệ thống):
-  1. Đặt `UPLOADING`. Bảo đảm thư mục đích tồn tại (job `ensure-folder` chạy nội tuyến): bài chung → `Nhom/Bai_chung`; bài cá nhân trong nhóm → `Nhom/<MSSV>_<HoTen>`; làm cá nhân → `CaNhan_<MSSV>_<HoTen>`.
-  2. Upload **resumable** (`uploadType=resumable`, chunk 8 MB) với tên `NN_<tên gốc đã làm sạch>`; lấy `id`, `thumbnailLink`, `md5Checksum`; so md5 với tệp cục bộ.
-  3. `SYNCED`, lưu `drive_file_id`; đặt `local_path` sang thư mục cache (giữ 7 ngày để xem nhanh, rồi dọn).
-  4. Khi mọi tệp của bài đã `SYNCED`: ghi/ghi đè `thong_tin_bai_nop.txt` (đề tài, từ khóa, link Figma/Git, người nộp, thời gian) và đặt `submissions.sync_status = SYNCED`.
-- **Lỗi:** lỗi tạm thời (429, 5xx, mạng) → BullMQ thử lại với backoff mũ (30 s, 1', 2', 4'… tối đa 8 lần). Lỗi vĩnh viễn (403 mất quyền, 404 thư mục bị xóa, quota) → `FAILED`, `last_error`, thông báo `SUBMISSION_SYNC_FAILED` + `DRIVE_FOLDER_PROBLEM` cho GV (gộp tối đa 1 email/bài tập/giờ). Tệp tạm vẫn giữ.
+- **Hàng đợi ghi Drive** (đồng thời có giới hạn):
+  1. Đặt `UPLOADING`. Bảo đảm thư mục đích (UC04.3): bài chung → `Nhom/Bai_chung`; phần cá nhân trong nhóm → `Nhom/<MSSV>_<HoTen>`; bài cá nhân → `CaNhan_<MSSV>_<HoTen>`. Dùng client Drive của **GV tạo bài tập**.
+  2. Upload dạng stream (resumable với tệp lớn) tên `NN_<tên gốc đã làm sạch>`; lưu `drive_file_id`, `md5`.
+  3. `SYNCED`; giữ bản cục bộ một thời gian để xem nhanh rồi dọn.
+- **Lỗi:** tạm thời (429, 5xx, mạng) → thử lại với backoff tăng dần. Vĩnh viễn (403 mất quyền, 404 thư mục bị xóa, chưa liên kết, hết dung lượng) → `FAILED`, `last_error`, thông báo `SUBMISSION_SYNC_FAILED` + `DRIVE_FOLDER_PROBLEM` cho GV (gộp tối đa 1 email/bài tập/giờ). Tệp tạm vẫn giữ.
 
 #### UC06.4 Nộp lại bài
-- **Extend** UC06.1/06.2 khi đã có bài nộp. Client hiện hộp thoại "Bản nộp trước sẽ bị xóa vĩnh viễn. Tiếp tục?".
-- Server trong transaction: tăng `version`, đánh dấu mọi tệp cũ `deleted_at = now` (ẩn ngay), tạo tệp mới, cập nhật link/ghi chú/`submitted_at`, nếu đang `RETURNED` thì về `SUBMITTED`/`LATE`; ghi `submission_events(RESUBMIT, {removed:[tên], added:[tên]})`.
-- Sau commit: job `drive.trash-file` cho từng tệp cũ đã có `drive_file_id`; xóa tệp cục bộ.
-- Hai thành viên nộp cùng lúc: khóa dòng làm cho các yêu cầu chạy tuần tự; yêu cầu sau ghi đè yêu cầu trước (BR-12); cả hai nhận `SUBMISSION_UPDATED`.
+- **Extend** UC06.1/06.2 khi đã có bài nộp, được làm đến hạn cuối.
+- **Quy tắc thay thế:** với mỗi loại tệp (ảnh, video, mã nguồn, báo cáo), **nếu lần nộp này có tệp mới của loại đó thì toàn bộ tệp cũ cùng loại bị thay**; loại không có tệp mới **được giữ nguyên**. Link Figma/Git, ghi chú lấy theo lần nộp mới.
+- Client: chỉ khi có tệp cũ bị thay mới hiện hộp xác nhận (mẫu `SV_ConfirmResubmit`): "Các tệp <danh sách> sẽ bị xóa vĩnh viễn, kể cả trên Drive · Bản mới: … · Giữ nguyên: …". Chỉ sửa link/ghi chú thì nộp luôn.
+- Server trong transaction: tăng `version`, đánh dấu tệp cũ bị thay `deleted_at = now`, tạo tệp mới (số thứ tự nối tiếp tệp được giữ), cập nhật link/ghi chú/`submitted_at`/`is_late`; ghi `submission_events(RESUBMIT, {removed:[tên], added:[tên]})`.
+- Sau commit: đưa tệp cũ đã có `drive_file_id` vào thùng rác Drive; xóa tệp cục bộ.
+- Hai thành viên nộp cùng lúc: khóa theo chủ bài làm các yêu cầu chạy tuần tự (BR-12); cả hai nhận `SUBMISSION_UPDATED`.
 
 #### UC06.5 Xóa nhiều ảnh/tệp
-- **TĐK:** như nộp bài (trước hạn cuối, chưa chấm).
-- **Luồng:** ở chế độ "Chọn", SV tick nhiều tệp (có "Chọn tất cả") → "Xóa (n)" → xác nhận → `DELETE /submissions/:id/files` với `{fileIds[]}` → đánh dấu xóa, ghi `submission_events(DELETE_FILES)`, job đưa vào thùng rác Drive, đánh lại `sort_order`.
-- Xóa hết tệp và không còn link → xóa bài nộp (trạng thái *Chưa nộp*); sự kiện vẫn được giữ (gắn `assignment_id` + chủ bài).
+- **TĐK:** như nộp bài (trước hạn cuối).
+- **Luồng:** chọn nhiều tệp (có "Chọn tất cả") → "Xóa (n)" → xác nhận → `DELETE /student/submissions/:id/files {fileIds[]}` → đánh dấu xóa, ghi `submission_events(DELETE_FILES)`, đưa vào thùng rác Drive, đánh lại `sort_order`.
+- Xóa hết tệp và không còn link → xóa bài nộp (trạng thái *Chưa nộp*); sự kiện vẫn được giữ.
 
 #### UC06.6 Xem lịch sử nộp bài
-- Dòng thời gian từ `submission_events` của bài chung (mọi thành viên thấy) và bài cá nhân (chỉ chủ bài): thời gian, người thao tác, hành động, danh sách tệp thêm/xóa, phiên bản. GV xem được mọi lịch sử trong LHP.
+- Dòng thời gian từ `submission_events` của bài chung (mọi thành viên thấy) và bài cá nhân (chỉ chủ bài): thời gian, người thao tác, hành động, tệp thêm/xóa, phiên bản. GV xem được mọi lịch sử trong LHP.
 
 #### UC06.7 Xem bài nộp
 - **Kiểm tra:** `canViewSubmission` (§3.1). Với DN: **include UC09.6**.
-- **Hiển thị:** đề tài + từ khóa, người nộp, thời gian, phiên bản, trạng thái, điểm/nhận xét (nếu người xem được xem điểm).
-  - Ảnh: lưới thumbnail → bấm mở trình chiếu (Next/Prev, "3/12", dải thumbnail, phím ←/→/Esc, vuốt, zoom, toàn màn hình).
-  - Video: thẻ `<video>` nguồn `/api/v1/files/:id/content`, hỗ trợ `Range` để tua.
-  - Figma: nhúng `https://www.figma.com/embed?embed_host=eduportfolio&url=<url>` + nút mở tab.
+- **GV:** tab *Bài đã nộp* của bài tập: danh sách nhóm/SV đã nộp (đề tài, người nộp, thời điểm, nộp muộn, sản phẩm, phần cá nhân, trạng thái Drive), tìm theo nhóm/đề tài/SV, xuất danh sách, nút *Xem* mở trình xem, *Mở trên Google Drive*. Danh sách chỉ phục vụ xem/lưu trữ, không có trạng thái chấm.
+- **Trình xem** (mẫu `Media_Viewer`, nền tối): đề tài + từ khóa, người nộp, thời gian, phiên bản, đồng bộ Drive, điểm/nhận xét (nếu đã công bố và người xem được xem).
+  - Ảnh: trình chiếu (Next/Prev, "3/12", dải thumbnail, phím ←/→/Esc, vuốt, zoom, toàn màn hình).
+  - Video: `<video>` nguồn `/api/v1/files/:id/content`, hỗ trợ `Range` để tua.
+  - Figma: nhúng `https://www.figma.com/embed?embed_host=share&url=<url>` + nút mở tab.
   - Mã nguồn: tên, dung lượng, nút tải (nếu `canDownload`); link Git mở tab mới.
+  - Báo cáo: PDF xem trực tiếp; DOC/DOCX tải về.
 - **Tệp đang đồng bộ:** phục vụ từ bản cục bộ. **Tệp `MISSING`:** nhãn "Tệp không còn trên Drive".
-- **Truy cập tệp:** `GET /files/:id/content` (stream, `Range`), `GET /files/:id/thumbnail?w=400` (sinh bằng sharp từ bản gốc, cache đĩa), `GET /files/:id/download` (header `Content-Disposition: attachment`, chỉ khi `canDownload`). Ảnh/video đặt `Cache-Control: private, max-age=3600`.
 
 #### UC06.8 Tìm kiếm bài nộp
 - **Tác nhân:** GV, DN, Admin.
-- **Đầu vào:** từ khóa `q` (khớp tên đề tài, mô tả, tên tag, tên/MSSV SV), bộ lọc (học kỳ, môn, LHP, bài tập, loại môn, tag, khoảng điểm, trạng thái, nộp muộn), sắp xếp (độ liên quan, mới nhất, điểm).
-- **Xử lý:** `unaccent(lower(q))` so với cột `search_text` đã chuẩn hóa của `topics` bằng `pg_trgm` (`%` và `word_similarity`) + `ILIKE` → giới hạn phạm vi theo vai trò (FR-06.13) → phân trang 20.
-- **Kết quả:** thẻ bài: ảnh đại diện (thumbnail ảnh đầu), đề tài, tag, SV/nhóm, LHP, thời gian, điểm (không hiện với DN). Bấm → UC06.7. DN tìm thì ghi `enterprise_search_logs(scope=SUBMISSION)`.
+- **Đầu vào:** từ khóa `q` (khớp tên đề tài, tên tag, tên/MSSV SV), bộ lọc (học kỳ, môn, LHP, bài tập, khóa, loại môn, tag, khoảng điểm, nộp muộn), sắp xếp (độ liên quan, mới nhất, điểm). Giao diện GV: ô tìm chung + chọn *Tìm theo* (Đề tài / Tên SV / MSSV / Khóa).
+- **Xử lý:** `unaccent(lower(q))` so với `search_text` của `topics` bằng `pg_trgm` + `ILIKE` → giới hạn phạm vi theo vai trò (FR-06.13) → phân trang 20.
+- **Kết quả:** thẻ bài: thumbnail ảnh đầu, đề tài, tag, SV/nhóm, LHP, thời gian, điểm (không hiện với DN). DN tìm thì ghi `enterprise_search_logs(scope=SUBMISSION)`.
 
 #### UC06.9 Đồng bộ lại tệp lỗi
-- **Bộ hẹn giờ (mỗi 10 phút):** chọn tệp `FAILED` có `retry_count < 20` và `next_retry_at ≤ now`; kiểm tra nhanh thư mục bài tập (UC04.4 không ghi thử); vẫn lỗi → `next_retry_at` tăng dần (10', 30', 1h, 3h, 6h…); hết lỗi → đưa lại `drive.upload-file`.
-- **Kiểm tra định kỳ (03:00 hằng ngày):** với tệp `SYNCED` trong các bài tập còn mở hoặc đóng < 30 ngày, gọi `files.get` theo lô; tệp bị xóa/ở thùng rác → `MISSING`, báo GV.
-- **GV thủ công:** trang "Tình trạng đồng bộ" của bài tập liệt kê tệp lỗi kèm nguyên nhân, nút "Thử lại tất cả".
+- **Bộ hẹn giờ:** chọn tệp `FAILED` đến hạn thử (`next_retry_at ≤ now`), giãn dần (10', 30', 1h, 3h, 6h…); hết lỗi → đưa lại hàng đợi.
+- **Kiểm tra định kỳ (03:00):** tệp `SYNCED` của bài tập còn mở hoặc đóng < 30 ngày; tệp bị xóa/ở thùng rác → `MISSING`, báo GV.
+- **GV thủ công:** trang *Kết nối Google Drive* liệt kê bài tập có tệp lỗi; nút "Thử lại".
 
 #### UC06.10 Gửi nhắc hạn nộp bài
-- **Bộ hẹn giờ (mỗi 15 phút):** với mỗi bài tập `OPEN` có `due_at - now ∈ (0, 24h]` (và `(0, 2h]`): tìm SV chưa nộp (làm cá nhân không có bài; nhóm không có bài chung → mọi thành viên; SV chưa chọn hình thức/chưa vào nhóm) → tạo `DEADLINE_REMINDER` với `dedupe_key = reminder:<assignmentId>:<studentId>:<24|2>`.
-- **Khi qua hạn:** SV chưa nộp → `ACADEMIC_WARNING` cho PH (`dedupe_key = overdue:<assignmentId>:<studentId>`).
+- **Bộ hẹn giờ (mỗi 15 phút):** bài tập `OPEN` có `due_at - now ∈ (0, reminder.hoursBefore]`: SV chưa nộp (bài cá nhân chưa có bài; bài nhóm chưa có bài chung → mọi thành viên) → `DEADLINE_REMINDER` với `dedupe_key = reminder:<assignmentId>:<studentId>`.
+- Chỉ nhắc SV; không tạo báo cáo, cảnh báo hay thông báo đôn đốc cho GV/PH.
 
 ---
 
 ### UC07 – Quản lý & xem điểm
 
-#### UC07.1 Chấm điểm bài tập
-- **TĐK:** GV phụ trách; bài ở `SUBMITTED`/`LATE`/`GRADED`; bảng điểm học phần chưa công bố.
-- **Luồng:** màn hình chấm 2 cột (trái: trình xem bài; phải: form) → nhập điểm 0–10 (bước 0,1), nhận xét → lưu: `submissions.score/feedback/graded_*`, `status = GRADED`; điểm hiệu lực sau trừ muộn; tạo/cập nhật `assignment_grades` cho **mỗi thành viên** (bài chung) hoặc chủ bài (bài cá nhân, làm cá nhân), trừ dòng đã ghi đè; thông báo `SUBMISSION_GRADED`.
-- Nút "Bài tiếp theo" để chấm liên tục; chấm lại được (ghi log).
-- Bài cá nhân trong bài tập nhóm: GV xem để tham khảo; nếu chấm thì điểm đó dùng làm điểm ghi đè cho SV (UC07.3).
+> GV chấm bài **ngoài hệ thống**. Hệ thống chỉ nhận điểm qua file Excel, lưu, tính tổng kết/GPA/CPA và công bố.
 
-#### UC07.2 Yêu cầu làm lại
-- **Extend** UC07.1: nhập lý do* và hạn nộp lại* (> now) → `status = RETURNED`, `resubmit_due_at`; SV nộp lại được đến hạn này (bỏ qua hạn chung); thông báo `SUBMISSION_RETURNED`. Nhóm bị khóa vẫn giữ khóa (chỉ mở quyền nộp).
+#### UC07.1 Tải file mẫu bảng điểm
+- **Mẫu điểm bài tập** — `GET /lecturer/assignments/:id/grades/template`: cột **MSSV**, **Họ tên**, **Nhóm** (bài `GROUP`, để GV điền cùng điểm cho cả nhóm cho nhanh), **Đề tài**, **Điểm**, **Nhận xét**. Đã có điểm thì điền sẵn.
+- **Mẫu điểm học phần** — `GET /lecturer/sections/:id/grades/template`: cột **MSSV**, **Họ tên**, **Chuyên cần**, **Bài tập**, **Giữa kỳ**, **Cuối kỳ**. Cột *Bài tập* điền sẵn = Σ(điểm bài tập × trọng số bài)/Σ trọng số của các bài đã có điểm; GV sửa được.
 
-#### UC07.3 Cho điểm riêng từng thành viên
-- **Extend** UC07.1 với bài chung: bảng thành viên, mỗi dòng có điểm mặc định = điểm nhóm, GV sửa điểm + ghi chú → `assignment_grades.is_override = true`. Có nút "Đặt lại theo điểm nhóm".
+#### UC07.2 Tải lên điểm bài tập
+1. GV chọn file trên tab *Điểm* của bài tập → `POST /lecturer/assignments/:id/grades/import/preview` → **include UC07.4**.
+2. Xem trước: số SV có điểm / để trống, điểm cũ → mới, lỗi theo dòng.
+3. **Áp dụng** → ghi `assignment_grades(score, note, import_job_id, updated_by)` cho từng SV (ghi đè điểm cũ); `import_jobs = COMPLETED`; ghi log.
+4. Bài tập đã công bố điểm (`grades_published_at`) mà điểm thay đổi → thông báo `ASSIGNMENT_GRADE_UPDATED` cho SV bị đổi điểm.
 
-#### UC07.4 Nhập điểm học phần
-- Bảng: MSSV, họ tên, chuyên cần, bài tập, giữa kỳ, cuối kỳ, tổng kết, điểm chữ, hệ 4 (3 cột cuối tự tính).
-- **Cột bài tập:** nút "Tính từ bài tập" = Σ(điểm hiệu lực × trọng số bài tập)/Σ trọng số, chỉ tính bài đã chấm; SV không nộp bài nào tính 0. GV vẫn sửa tay được.
-- Tổng kết = Σ(điểm thành phần × trọng số môn)/100, làm tròn 1 chữ số (BR-14); quy đổi theo BR-15. Thiếu thành phần thì để trống tổng kết.
-- Lưu nháp tự động (debounce 1 s, `PATCH` theo ô). Import Excel (mẫu xuất từ chính bảng) có xem trước lỗi. Chặn khi đã công bố.
+#### UC07.3 Tải lên điểm học phần
+- **TĐK:** bảng điểm học phần chưa công bố (`course_sections.grades_published_at IS NULL`), nếu đã công bố → `GRADES_LOCKED` (dùng UC07.7).
+- Như UC07.2 trên trang *Bảng điểm* của LHP: ghi `section_grades(attendance, assignment, midterm, final)`, tính `total` = Σ(thành phần × trọng số môn)/100 làm tròn 1 chữ số (BR-14), `letter`, `gpa4` (BR-15); thiếu thành phần thì để trống tổng kết.
+
+#### UC07.4 Kiểm tra & xem trước tệp điểm
+| Kiểm tra | Mức |
+|---|---|
+| Đúng mẫu (tên cột), ≤ 2.000 dòng, ≤ 5 MB | Lỗi file (`IMPORT_INVALID_FILE`) |
+| MSSV thuộc LHP, không lặp | Lỗi dòng |
+| Điểm là số 0–10 (dấu phẩy hoặc chấm), làm tròn 1 chữ số; ô trống = chưa có điểm | Lỗi dòng |
+| Nhận xét ≤ 1000 ký tự | Lỗi dòng |
+| SV của LHP không có trong file | Cảnh báo (giữ điểm cũ) |
+| Điểm thay đổi so với lần trước | Hiển thị cũ → mới |
 
 #### UC07.5 Xem bảng điểm lớp học phần
-- Như UC07.4 ở chế độ chỉ đọc + điểm từng bài tập; lọc, sắp xếp, tô đỏ < 4,0; xuất Excel. Hiện nhãn "Đã công bố lúc …" nếu đã khóa.
+- Trang đầu *Bảng điểm* (mẫu `GV_GradebookHome`): danh sách LHP GV phụ trách theo năm học (mã LHP, môn, sĩ số, trạng thái: chưa có điểm / đã tải / đã công bố). Chọn LHP → bảng điểm (mẫu `GV_Gradebook`; LHP chưa có điểm → `GV_GradebookEmpty`).
+- Bảng: MSSV, họ tên, điểm từng bài tập, 4 thành phần, tổng kết, chữ, hệ 4; trọng số; biểu đồ phân bố; lọc, sắp xếp, tô đỏ < 4,0; nút *Tải file mẫu*, *Tải lên điểm*, *Xuất Excel*, *Công bố*; nhãn "Đã công bố lúc …" khi đã khóa.
 
 #### UC07.6 Công bố điểm
-- **TĐK:** mọi SV có đủ 4 thành phần (hoặc GV tick "Công bố cả SV thiếu điểm" → tổng kết thiếu thì để trống, không tính GPA).
-- Xác nhận → `course_sections.grades_published_at = now`; `section_grades.status = PUBLISHED`; job `grades.recompute` tính lại `student_term_results` và `students.cpa` cho các SV liên quan; job `academic-warning.check`; thông báo `GRADES_PUBLISHED` cho SV và PH. Ghi log.
+- **Điểm bài tập:** nút *Công bố điểm* trên tab *Điểm* của bài tập → `assignments.grades_published_at = now` → SV (và PH) thấy điểm + nhận xét; thông báo `ASSIGNMENT_GRADES_PUBLISHED`. Sau công bố vẫn tải lên lại được (UC07.2).
+- **Điểm học phần:** **TĐK:** mọi SV có đủ 4 thành phần (hoặc GV tick "Công bố cả SV thiếu điểm" → tổng kết để trống, không tính GPA). Xác nhận → `course_sections.grades_published_at = now`; `section_grades.status = PUBLISHED`; tính lại `student_term_results` và `students.cpa`; kiểm tra cảnh báo học tập; thông báo `GRADES_PUBLISHED` cho SV và PH. Ghi log.
 
 #### UC07.7 Yêu cầu sửa điểm sau khi khóa
-- GV chọn SV trong bảng đã công bố → form: thành phần muốn sửa, giá trị mới, lý do* (≥ 10 ký tự), minh chứng (tùy chọn, tệp ≤ 5 MB, lưu cục bộ) → `grade_change_requests(PENDING, old_values, new_values)` → thông báo Admin.
+- GV chọn SV trong bảng đã công bố → form: thành phần muốn sửa, giá trị mới, lý do* (≥ 10 ký tự), minh chứng (tùy chọn, tệp ≤ 5 MB) → `grade_change_requests(PENDING, old_values, new_values)` → thông báo Admin.
 - Mỗi SV/LHP chỉ có 1 yêu cầu `PENDING`; GV hủy được khi còn chờ.
 
 #### UC07.8 Xử lý yêu cầu sửa điểm của GV
 - Admin xem danh sách chờ: GV, LHP, SV, điểm cũ → mới (tổng kết dự kiến), lý do, minh chứng.
-- **Duyệt:** transaction áp dụng giá trị mới vào `section_grades`, tính lại tổng kết, ghi `audit_logs(GRADE_CHANGED)` với dữ liệu cũ/mới, `status = APPROVED` → job `grades.recompute` cho SV → thông báo GV và SV.
+- **Duyệt:** transaction kiểm tra `old_values` vẫn khớp, áp dụng giá trị mới vào `section_grades`, tính lại tổng kết, ghi `audit_logs(GRADE_CHANGED)`, `status = APPROVED` → tính lại GPA/CPA → thông báo GV và SV.
 - **Từ chối:** lý do bắt buộc → thông báo GV.
 
 #### UC07.9 Xem điểm của bản thân (SV)
 - Tab "Theo học kỳ": từng học phần đã công bố (thành phần, tổng kết, chữ, hệ 4, tín chỉ), GPA kỳ, tín chỉ kỳ.
-- Tab "Bài tập": điểm và nhận xét từng bài đã chấm (kể cả khi học phần chưa công bố).
+- Tab "Bài tập": điểm + nhận xét từng bài tập đã công bố (kể cả khi học phần chưa công bố).
 - Thẻ tổng: CPA, tổng tín chỉ tích lũy, xếp loại (Xuất sắc ≥ 3,6 · Giỏi ≥ 3,2 · Khá ≥ 2,5 · TB ≥ 2,0 · Yếu < 2,0).
 
 ---
@@ -555,19 +593,18 @@ Mọi API của PH đi qua `ParentChildGuard`: lấy `selectedStudentId` từ to
 - Giống UC01.3; hiển thị ở header mọi trang.
 
 #### UC08.2 Xem điểm, GPA, CPA của con
-- Giống UC07.9 nhưng chỉ đọc; thêm biểu đồ đường GPA theo kỳ và cột tín chỉ. Không thấy điểm chưa công bố, nhưng thấy điểm bài tập đã chấm.
+- Giống UC07.9 nhưng chỉ đọc; thêm biểu đồ đường GPA theo kỳ và cột tín chỉ. Chỉ thấy điểm đã công bố (điểm bài tập và điểm học phần).
 
 #### UC08.3 Xem bài nộp của con
-- Danh sách theo kỳ → LHP → bài tập: trạng thái, thời gian nộp, đề tài, điểm. Bấm vào thì mở UC06.7 (chế độ PH: không tải). Bài cá nhân của con và bài chung của nhóm con tham gia.
+- Danh sách theo kỳ → LHP → bài tập: thời gian nộp, đề tài, điểm (nếu đã công bố). Bấm vào thì mở UC06.7 (chế độ PH: không tải). Bài cá nhân của con và bài chung của nhóm con tham gia.
 
 #### UC08.4 Xem thông báo, cảnh báo học tập của con
 - Tab "Cảnh báo": danh sách `academic_warnings` của con (loại, nội dung, thời gian, đối tượng liên quan), lọc theo loại.
 - Tab "Thông báo": thông báo gửi tới tài khoản PH.
-- **Sinh cảnh báo** (job `academic-warning.check`, chạy sau khi công bố điểm và khi qua hạn nộp):
+- **Sinh cảnh báo** (chạy sau khi công bố điểm học phần):
 
 | Loại | Điều kiện |
 |---|---|
-| `OVERDUE_SUBMISSION` | Qua hạn cuối mà SV chưa có bài |
 | `LOW_COURSE_SCORE` | Điểm tổng kết học phần < `warning.lowScore` |
 | `LOW_GPA` | GPA kỳ < `warning.lowGpa` |
 | `GPA_DROP` | GPA kỳ giảm ≥ `warning.gpaDrop` so với kỳ trước |
@@ -632,7 +669,7 @@ Mỗi cảnh báo tạo 1 dòng `academic_warnings` (duy nhất theo `dedupe_key
 Số liệu tính bằng truy vấn tổng hợp, cache Redis 5 phút (khóa theo vai trò + bộ lọc). Biểu đồ dùng Recharts.
 
 #### UC10.1 Xem Dashboard tổng quan (Admin)
-- Thẻ: tổng SV/GV/PH/DN (active), LHP kỳ này, bài tập đang mở, bài nộp tuần này, tệp chờ/lỗi đồng bộ, DN chờ duyệt, yêu cầu xem bài chờ, yêu cầu sửa điểm chờ (bấm để đi tới trang xử lý).
+- Thẻ: tổng SV/GV/PH/DN (active), LHP kỳ này, bài tập kỳ này, bài nộp được lưu tuần này, tệp chờ/lỗi đồng bộ, DN chờ duyệt, yêu cầu xem bài chờ, yêu cầu sửa điểm chờ (bấm để đi tới trang xử lý).
 - Biểu đồ: bài nộp theo ngày (30 ngày), người dùng đăng nhập theo ngày, phân bố CPA toàn trường.
 
 #### UC10.2 Xem thống kê doanh nghiệp (Admin)
@@ -640,11 +677,11 @@ Số liệu tính bằng truy vấn tổng hợp, cache Redis 5 phút (khóa the
 - Chỉ số: DN theo trạng thái; DN mới theo tháng; DN theo lĩnh vực (tròn); DN hoạt động 30 ngày; yêu cầu theo trạng thái; tỉ lệ duyệt; thời gian xử lý trung bình (`approved_at - created_at`); quyền còn hiệu lực; yêu cầu theo tháng; lượt tìm kiếm theo ngày; tiêu chí lọc dùng nhiều; tag được tìm nhiều; top 10 SV được yêu cầu/xem; phân bố ngành/khóa/CPA của SV được yêu cầu; top 10 DN hoạt động.
 
 #### UC10.3 Xem thống kê lớp học phần (Admin, GV)
-- Chọn học kỳ → LHP. Chỉ số: sĩ số; mỗi bài tập: % đúng hạn / muộn / chưa nộp (cột chồng), danh sách SV chưa nộp; điểm TB từng bài; phổ điểm tổng kết (histogram bước 1,0); phân bố điểm chữ; top tag đề tài; số SV được DN quan tâm.
+- Chọn học kỳ → LHP. Chỉ số **về kết quả** (không theo dõi tiến độ): sĩ số; số bài tập; số bài nộp được lưu trữ; điểm TB từng bài tập (theo điểm đã tải lên); phổ điểm tổng kết (histogram bước 1,0); phân bố điểm chữ; top tag đề tài; số SV được DN quan tâm.
 - Admin xem được mọi LHP và so sánh giữa các LHP cùng môn.
 
 #### UC10.4 Xem thống kê cá nhân sinh viên
-- GPA theo kỳ (đường), CPA, tín chỉ tích lũy, tiến độ nộp bài kỳ hiện tại (đã nộp/tổng, đúng hạn/muộn), điểm TB bài tập theo môn, số DN đã xem, số lượt xem.
+- GPA theo kỳ (đường), CPA, tín chỉ tích lũy, số bài nộp đã lưu, điểm TB bài tập theo môn, số DN đã xem, số lượt xem.
 
 #### UC10.5 Xem thống kê của doanh nghiệp mình
 - Yêu cầu theo trạng thái; quyền còn hạn kèm số ngày còn lại; số SV đã xem bài; số lượt xem theo ngày; 20 lần tìm kiếm gần nhất (tiêu chí, số kết quả, bấm để tìm lại).
@@ -653,6 +690,16 @@ Số liệu tính bằng truy vấn tổng hợp, cache Redis 5 phút (khóa the
 - **Extend** UC10.1/10.2/10.3: nút "Xuất Excel" / "Xuất PDF" với bộ lọc đang chọn.
 - Excel (ExcelJS): mỗi chỉ số một sheet, có tiêu đề, bộ lọc, ngày xuất. PDF (pdfmake, font Roboto hỗ trợ tiếng Việt): bảng + biểu đồ (ảnh PNG chụp từ client gửi lên kèm yêu cầu).
 - Báo cáo lớn (> 5.000 dòng) chạy job nền; xong thì thông báo kèm link tải (hết hạn sau 24h).
+
+#### UC10.7 Phân tích đề tài – nhu cầu DN
+- **Tác nhân:** Admin (toàn trường), GV (LHP mình dạy, chỉ phần SV). Bộ lọc: học kỳ (một hoặc khoảng), ngành, khóa.
+- **Xu hướng đề tài SV:** top từ khóa theo số đề tài đã nộp; đường số đề tài theo từ khóa qua các kỳ; nhãn *mới nổi* (lần đầu hoặc tăng > 50%), *ổn định*, *giảm dần*; phân bố theo ngành.
+- **DN quan tâm:** từ khóa trong `enterprise_search_logs` và đề tài của bài DN đã xem (`enterprise_access_logs`); theo lĩnh vực DN; từ khóa tăng nhanh.
+- **Cung – cầu:** bảng từ khóa với số đề tài, lượt DN quan tâm, `demand_index` (DatabaseDesign §6.6); tô *thiếu hụt* (> 1,2) và *dư thừa* (< 0,8).
+- Số liệu lấy từ `topic_trend_snapshots` (job `stats.topic-trends` 01:30 hằng ngày) và truy vấn trực tiếp cho kỳ hiện tại; chỉ tính đề tài có bài đã nộp, từ khóa sau gộp. Xuất được (UC10.6).
+
+#### UC10.8 Xem bản đồ năng lực SV (DN)
+- Ma trận chủ đề × ngành/khóa/khoảng CPA: số SV đã làm đề tài về chủ đề đó; bấm một ô → chuyển sang UC09.1 với bộ lọc tương ứng. Chỉ tính SV `discoverable`; không hiển thị tên/MSSV; ô < 3 SV hiển thị "< 3".
 
 ---
 
@@ -670,12 +717,17 @@ Số liệu tính bằng truy vấn tổng hợp, cache Redis 5 phút (khóa the
 - `NotificationService.notify(recipients[], type, payload, {email?, dedupeKey?})` → insert `notifications` (bỏ qua nếu trùng `dedupe_key`) → emit socket → (tùy chọn) đưa job email.
 - Danh sách job định kỳ ở [ModuleFlows §8](ModuleFlows.md#8-lịch-tác-vụ-nền-bộ-hẹn-giờ).
 
+#### UC11.4 Cài đặt nhận thông báo
+- Mỗi vai trò có trang *Thông báo* riêng, lọc theo nhóm (GV: Bài nộp, Nhóm, Điểm, Drive; SV: Bài tập, Nhóm, Điểm, DN, Hệ thống; …) và hành động nhanh trên từng thông báo (VD: *Xem bài nộp*, *Xem phản hồi nhóm*).
+- Khối *Cài đặt nhận thông báo*: bảng loại × kênh (*Ứng dụng*, *Email*); thông báo bảo mật và quyền xem của DN luôn bật; bật *bản tin tổng hợp* (mặc định 20:00) → lưu `users.notification_prefs`. Tắt kênh *Ứng dụng* của một loại thì không tạo thông báo loại đó cho người dùng.
+- Job `notifications.digest` (mỗi 15 phút) gom thông báo chưa gửi email của người dùng có `digest_time` rơi vào khung hiện tại → 1 email `NOTIFICATION_DIGEST`.
+
 ## 7. Mã lỗi chuẩn
 
 Định dạng phản hồi lỗi:
 
 ```json
-{ "statusCode": 409, "code": "GROUP_FULL", "message": "Nhóm đã đủ 5 thành viên", "details": { "max": 5 } }
+{ "statusCode": 409, "code": "GROUP_NOT_ASSIGNED", "message": "Bạn chưa được xếp nhóm cho bài tập này" }
 ```
 
 | Nhóm | Mã |
@@ -684,10 +736,11 @@ Số liệu tính bằng truy vấn tổng hợp, cache Redis 5 phút (khóa the
 | Auth | `AUTH_INVALID_CREDENTIALS`, `AUTH_TEMP_LOCKED`, `AUTH_ACCOUNT_LOCKED`, `AUTH_PENDING_APPROVAL`, `AUTH_REJECTED`, `AUTH_MUST_CHANGE_PASSWORD`, `AUTH_PROFILE_INCOMPLETE`, `AUTH_TOKEN_INVALID`, `PARENT_NO_CHILD` |
 | Admin | `CATALOG_IN_USE`, `SCHEDULE_CONFLICT`, `SECTION_FULL`, `IMPORT_INVALID_FILE`, `ENTERPRISE_DUPLICATE` |
 | Drive | `DRIVE_FOLDER_NOT_FOUND`, `DRIVE_NOT_A_FOLDER`, `DRIVE_NO_WRITE_PERMISSION`, `DRIVE_NOT_SHARED_DRIVE`, `DRIVE_QUOTA_EXCEEDED`, `DRIVE_NOT_LINKED` |
-| Bài tập | `ASSIGNMENT_INVALID_DATES`, `ASSIGNMENT_HAS_SUBMISSIONS`, `ASSIGNMENT_CLOSED` |
-| Nhóm | `GROUP_FULL`, `GROUP_LOCKED`, `GROUP_ALREADY_MEMBER`, `GROUP_NOT_SAME_SECTION`, `GROUP_INVALID_CODE`, `GROUP_LEADER_MUST_TRANSFER`, `GROUP_HAS_SUBMISSION`, `INVITATION_EXPIRED` |
+| Bài tập | `ASSIGNMENT_INVALID_DATES`, `ASSIGNMENT_HAS_SUBMISSIONS`, `ASSIGNMENT_CLOSED`, `ASSIGNMENT_SECTION_NOT_OWNED`, `WORK_MODE_LOCKED` |
+| Nhóm | `GROUP_NOT_ASSIGNED`, `GROUP_HAS_SUBMISSION`, `GROUP_REPORT_PENDING_EXISTS` |
+| Excel | `IMPORT_INVALID_FILE`, `IMPORT_TOO_LARGE`, `IMPORT_JOB_EXPIRED` (lỗi theo dòng trả trong `details.rows[]`) |
 | Đề tài | `TOPIC_REQUIRED`, `TOPIC_TAG_LIMIT`, `TOPIC_EDIT_CLOSED` |
-| Nộp bài | `SUBMISSION_DEADLINE_PASSED`, `SUBMISSION_ALREADY_GRADED`, `FILE_INVALID_TYPE`, `FILE_TOO_LARGE`, `FILE_TOO_MANY`, `LINK_INVALID_DOMAIN`, `UPLOAD_NOT_FOUND` |
+| Nộp bài | `REPORT_REQUIRED`, `SUBMISSION_DEADLINE_PASSED`, `SUBMISSION_EMPTY`, `FILE_INVALID_TYPE`, `FILE_TOO_LARGE`, `FILE_TOO_MANY`, `LINK_INVALID_DOMAIN`, `PERSONAL_PART_DISABLED` |
 | Điểm | `GRADES_LOCKED`, `GRADE_WEIGHTS_INVALID`, `GRADE_REQUEST_PENDING_EXISTS` |
 | DN | `VIEW_REQUEST_DUPLICATE`, `VIEW_ACCESS_EXPIRED`, `VIEW_DAYS_OUT_OF_RANGE` |
 
@@ -695,9 +748,21 @@ Số liệu tính bằng truy vấn tổng hợp, cache Redis 5 phút (khóa the
 
 | Vai trò | Màn hình |
 |---|---|
-| Chung | Đăng nhập (2 tab), Quên/Đặt lại mật khẩu, Đổi mật khẩu (lần đầu và thường), Đăng ký DN, Thông báo, 403/404 |
-| Admin | Dashboard; GV; SV (+ import); PH (+ đổi SĐT); DN (duyệt); Danh mục (khoa, ngành, khóa, lớp, phòng, lĩnh vực, từ khóa); Học kỳ; Môn học; LHP (+ lịch, xếp SV); Yêu cầu xem bài; Quyền đang hiệu lực; Yêu cầu sửa điểm; Tìm bài nộp; Thống kê DN; Thống kê LHP; Nhật ký; Cấu hình |
-| GV | LHP của tôi; Chi tiết LHP (SV, bài tập, bảng điểm, thống kê); Tạo/Sửa bài tập; Chi tiết bài tập (nhóm & đề tài, bài nộp, tình trạng đồng bộ); Chấm bài; Bảng điểm học phần; Yêu cầu sửa điểm của tôi; Tìm bài nộp; Liên kết Google Drive; Hồ sơ cá nhân |
-| SV | Khai báo hồ sơ; LHP của tôi; Chi tiết bài tập (hình thức, nhóm, đề tài, nộp bài, lịch sử); Lời mời của tôi; Tham gia bằng mã; Điểm của tôi; Thống kê cá nhân; DN đã xem tôi; Hồ sơ & quyền riêng tư |
+| Chung | Đăng nhập (tab Sinh viên / Giảng viên / Quản trị / Phụ huynh / Doanh nghiệp), Quên/Đặt lại mật khẩu, Đổi mật khẩu (lần đầu và thường), Đăng ký DN, Thông báo, Tài khoản, Trình xem bài nộp, 403/404, Quyền xem hết hạn, Tệp không còn trên Drive, Hết phiên |
+| Admin | Dashboard; Người dùng (GV/SV/PH, import); DN (duyệt); Đào tạo (học kỳ, môn, LHP + lịch, xếp SV); Từ khóa; Yêu cầu xem bài & quyền đang hiệu lực; Yêu cầu sửa điểm; Tình trạng đồng bộ Drive; Thống kê DN; Phân tích đề tài; Nhật ký; Cấu hình |
+| GV | Tổng quan; Lớp học phần → Môn → danh sách bài tập & SV; Tạo bài tập (nhiều LHP) / Tạo bài tập cho một LHP / Sửa bài tập; **Trang bài tập** (tab Thông tin · Nhóm: tải file mẫu, tải lên, xem trước, phản hồi nhóm · Bài đã nộp · Điểm: tải file mẫu, tải lên, xem trước, công bố); Bảng điểm (danh sách LHP theo năm → bảng điểm LHP / trống, tải lên điểm học phần, công bố, yêu cầu sửa điểm); Tìm bài nộp; Thống kê (kèm phân tích đề tài); Thông báo; Kết nối Google Drive (OAuth / Service Account) |
+| SV | Khai báo hồ sơ; Tổng quan; Bài tập của tôi → Môn → **trang bài tập 4 bước**: Đề bài & nhóm → Đề tài → Nộp bài (bài chung / bài cá nhân / mã nguồn, xác nhận nộp lại) → Kết quả; Điểm của tôi; Quyền riêng tư & DN đã xem tôi |
 | PH | Chọn con; Tổng quan; Điểm; Bài nộp; Cảnh báo & thông báo |
-| DN | Tìm SV; Hồ sơ SV; Yêu cầu của tôi; Bài nộp của SV; Tìm bài nộp; Thống kê; Hồ sơ DN |
+| DN | Tổng quan; Tìm SV; Hồ sơ SV; Bài nộp của SV; Bản đồ năng lực; Hồ sơ DN |
+
+**Đối chiếu với bộ giao diện `project/` (v3.0):**
+
+| Mẫu | Dùng trong v3.0 |
+|---|---|
+| `GV_Dashboard`, `GV_Classes`, `GV_CreateAssignment`, `GV_CreateAssignmentClass`, `GV_EditAssignment`, `GV_GoogleLink`, `GV_GradebookHome`, `GV_Gradebook`, `GV_GradebookEmpty`, `GV_Notifications` | Dùng, bỏ các khối liên quan đến chốt nhóm, duyệt đề tài, rubric, phúc khảo |
+| `GV_AssignNew`, `GV_AssignmentDetail` | Gộp thành trang bài tập 4 tab (Thông tin · Nhóm · Bài đã nộp · Điểm); bỏ thanh 5 bước theo dõi tiến độ |
+| `GV_AssignForming`, `GV_AssignTopics`, `GV_AssignGrading`, `GV_AssignGraded`, `GV_Grading`, `GV_GradeList`, `GV_GradeResult`, `GV_GroupManage`, `GV_GroupsForming` | **Không dùng** (thuộc phạm vi đã bỏ); tab *Nhóm* thay bằng khối tải file nhóm, tab *Điểm* thay bằng khối tải file điểm |
+| `SV_Dashboard`, `SV_Assignments`, `SV_Course`, `SV_Submit`, `SV_SubmitPersonal`, `SV_SubmitCode`, `SV_ConfirmResubmit`, `SV_StepSubmit`, `SV_AssignmentDone`, `Media_Viewer`, `Shared_Notifications`, `Shared_ErrorForbidden` | Dùng; cột *Tiến độ* đổi thành 4 bước, bỏ trạng thái *Chờ duyệt đề tài / Chờ chấm / Bị trả lại* |
+| `SV_AssignmentNew`, `SV_StepGroup`, `SV_StepTopic` | Dùng một phần: bỏ chọn hình thức, tạo/tham gia nhóm, mời thành viên, duyệt đề tài; thay bằng khối *Nhóm của tôi* (chỉ xem + *Báo nhóm chưa đúng*) và form *Tên đề tài + từ khóa* |
+| `SV_StepGrading` | Không dùng (không có bước chấm trên web) |
+| `phu-huynh/`, `doanh-nghiep/`, `admin/` | Dùng như cũ |

@@ -1,6 +1,7 @@
 # EduPortfolio – Thiết kế cơ sở dữ liệu (Database Design)
 
-> Phiên bản 2.0 · 07/10/2026 · PostgreSQL 16 · ORM Prisma 6
+> Phiên bản 3.0 · 11/10/2026 · PostgreSQL 16 · ORM Prisma 6 (chạy trên **Node.js 22 LTS** cùng backend NestJS)
+> **v3.0:** theo phạm vi "chỉ lưu trữ kết quả học tập": bỏ bảng lời mời nhóm, lịch sử đổi thành viên, rubric, phúc khảo, cài đặt thông báo riêng; bỏ cột chốt nhóm, mã mời, duyệt đề tài, chấm bài; thêm `group_reports` (SV báo nhóm chưa đúng), dùng `import_jobs` cho file nhóm/điểm. Tổng cộng **47 bảng**.
 > Tài liệu liên quan: [Specification](Specification.md) · [Architecture](Architecture.md)
 
 ---
@@ -56,11 +57,11 @@ erDiagram
   course_sections ||--o{ section_students : enrolls
   students ||--o{ section_students : enrolls
   course_sections ||--o{ assignments : has
-  assignments ||--o{ groups : has
+  assignments ||--o{ groups : "nhóm (từ file Excel)"
   groups ||--o{ group_members : has
-  students ||--o{ group_members : joins
-  groups ||--o{ group_invitations : sends
-  assignments ||--o{ individual_works : has
+  students ||--o{ group_members : belongs
+  assignments ||--o{ individual_works : "thư mục bài cá nhân"
+  assignments ||--o{ group_reports : "SV báo nhóm sai"
   assignments ||--o{ topics : has
   groups ||--o| topics : owns
   students ||--o{ topics : "owns (cá nhân)"
@@ -78,7 +79,7 @@ erDiagram
   students ||--o{ submissions : "bài cá nhân"
   submissions ||--o{ submission_files : contains
   submissions ||--o{ submission_events : logs
-  assignments ||--o{ assignment_grades : has
+  assignments ||--o{ assignment_grades : "điểm tải lên"
   students ||--o{ assignment_grades : gets
   course_sections ||--o{ section_grades : has
   students ||--o{ section_grades : gets
@@ -86,6 +87,7 @@ erDiagram
   students ||--o{ student_term_results : has
   semesters ||--o{ student_term_results : has
   students ||--o{ academic_warnings : has
+  import_jobs ||--o{ assignment_grades : "lần tải lên"
   users ||--o{ uploads : owns
 ```
 
@@ -102,13 +104,14 @@ erDiagram
   users ||--o{ audit_logs : performs
   users ||--o{ import_jobs : creates
   users ||--o{ report_exports : creates
+  tags ||--o{ topic_trend_snapshots : "thống kê"
 ```
 
 ## 3. Danh sách bảng
 
 | # | Bảng | Nhóm | Mô tả |
 |---|---|---|---|
-| 1 | `users` | Auth | Tài khoản đăng nhập mọi vai trò |
+| 1 | `users` | Auth | Tài khoản đăng nhập mọi vai trò (+ cài đặt nhận thông báo) |
 | 2 | `refresh_tokens` | Auth | Refresh token (hash), xoay vòng |
 | 3 | `password_reset_tokens` | Auth | Token đặt lại mật khẩu |
 | 4 | `faculties` | Danh mục | Khoa |
@@ -127,21 +130,21 @@ erDiagram
 | 17 | `parents` | Hồ sơ | PH |
 | 18 | `parent_students` | Hồ sơ | Liên kết PH – SV |
 | 19 | `enterprises` | Hồ sơ | DN |
-| 20 | `lecturer_drive_links` | Drive | Thư mục gốc Drive của GV |
+| 20 | `lecturer_drive_links` | Drive | Liên kết Google Drive của GV (OAuth / SA) + thư mục gốc |
 | 21 | `assignments` | Bài tập | Bài tập |
-| 22 | `groups` | Nhóm | Nhóm làm bài |
+| 22 | `groups` | Nhóm | Nhóm (GV tạo từ file Excel) |
 | 23 | `group_members` | Nhóm | Thành viên nhóm |
-| 24 | `group_invitations` | Nhóm | Lời mời |
-| 25 | `individual_works` | Nhóm | SV chọn làm cá nhân |
-| 26 | `topics` | Đề tài | Đề tài của nhóm/SV |
+| 24 | `group_reports` | Nhóm | SV báo nhóm chưa đúng |
+| 25 | `individual_works` | Nhóm | Thư mục Drive của SV làm bài cá nhân |
+| 26 | `topics` | Đề tài | Đề tài (tên + từ khóa) của nhóm/SV |
 | 27 | `tags` | Đề tài | Từ khóa |
 | 28 | `topic_tags` | Đề tài | Đề tài – từ khóa |
 | 29 | `topic_histories` | Đề tài | Lịch sử sửa đề tài |
-| 30 | `uploads` | Nộp bài | Tệp đã tải qua tus, chưa gắn vào bài |
+| 30 | `uploads` | Nộp bài | Tệp đã tải lên, chưa gắn vào bài |
 | 31 | `submissions` | Nộp bài | Bài nộp (chung / cá nhân) |
 | 32 | `submission_files` | Nộp bài | Tệp của bài nộp |
 | 33 | `submission_events` | Nộp bài | Lịch sử thao tác nộp |
-| 34 | `assignment_grades` | Điểm | Điểm bài tập của từng SV |
+| 34 | `assignment_grades` | Điểm | Điểm bài tập của từng SV (tải lên từ Excel) |
 | 35 | `section_grades` | Điểm | Điểm học phần |
 | 36 | `grade_change_requests` | Điểm | Yêu cầu sửa điểm sau khóa |
 | 37 | `student_term_results` | Điểm | GPA kỳ, CPA lưu sẵn |
@@ -152,8 +155,11 @@ erDiagram
 | 42 | `notifications` | Thông báo | Thông báo trong ứng dụng |
 | 43 | `audit_logs` | Hệ thống | Nhật ký hệ thống |
 | 44 | `system_settings` | Hệ thống | Cấu hình key–value |
-| 45 | `import_jobs` | Hệ thống | Lịch sử import Excel |
+| 45 | `import_jobs` | Hệ thống | Lịch sử tải lên Excel (SV, SV vào LHP, nhóm, điểm bài tập, điểm học phần) |
 | 46 | `report_exports` | Hệ thống | Báo cáo xuất nền |
+| 47 | `topic_trend_snapshots` | Thống kê | Số liệu phân tích đề tài – nhu cầu DN tính sẵn theo kỳ |
+
+**Đã bỏ ở v3.0:** `group_invitations`, `group_member_changes`, `rubric_criteria`, `rubric_scores`, `grade_appeals`, `notification_settings` (chuyển thành cột `users.notification_prefs`).
 
 ## 4. Chi tiết bảng
 
@@ -174,6 +180,7 @@ Ký hiệu: **PK** khóa chính · **FK** khóa ngoại · **UQ** duy nhất · 
 | *locked_until* | timestamptz | | Khóa tạm |
 | *email* | varchar(255) | | Email liên lạc / khôi phục (đồng bộ từ hồ sơ) |
 | *last_login_at* | timestamptz | | |
+| notification_prefs | jsonb | NN, `{}` | Cài đặt nhận thông báo: `{channels: {<loại>: {app, email}}, digest}` (UC11.4) |
 | created_at, updated_at | timestamptz | | |
 
 #### `refresh_tokens`
@@ -316,18 +323,20 @@ Trạng thái duyệt dùng `users.status` (`PENDING`/`ACTIVE`/`REJECTED`/`LOCKE
 ### 4.5. Drive
 
 #### `lecturer_drive_links`
-| Cột | Kiểu | Ràng buộc |
-|---|---|---|
-| id | uuid | PK |
-| lecturer_id | uuid | FK, UQ (mỗi GV 1 thư mục gốc đang dùng) |
-| auth_mode | `drive_auth_mode(SERVICE_ACCOUNT\|OAUTH)` | mặc định `SERVICE_ACCOUNT` |
-| root_folder_id | varchar(100) | NN |
-| root_folder_url | text | NN |
-| root_folder_name | varchar(255) | |
-| *shared_drive_id* | varchar(100) | |
-| status | `drive_link_status(OK\|NO_PERMISSION\|NOT_FOUND\|NOT_SHARED_DRIVE\|QUOTA_EXCEEDED)` | |
-| *oauth_refresh_token_enc* | text | Mở rộng — mã hóa AES-256-GCM |
-| checked_at | timestamptz | |
+| Cột | Kiểu | Ràng buộc | Ghi chú |
+|---|---|---|---|
+| id | uuid | PK | |
+| lecturer_id | uuid | FK, UQ | Mỗi GV một liên kết đang dùng |
+| auth_mode | `drive_auth_mode(OAUTH\|SERVICE_ACCOUNT)` | mặc định `OAUTH` | |
+| root_folder_id | varchar(100) | NN | OAuth: thư mục `EduPortfolio_<MãGV>` hệ thống tự tạo; SA: thư mục GV chia sẻ |
+| root_folder_url | text | NN | |
+| *root_folder_name* | varchar(255) | | |
+| *shared_drive_id* | varchar(100) | | Chế độ SA |
+| status | `drive_link_status(OK\|NO_PERMISSION\|NOT_FOUND\|NOT_SHARED_DRIVE\|QUOTA_EXCEEDED)` | | Cập nhật khi *Kiểm tra lại* |
+| *google_email* | varchar(255) | | Tài khoản Google đã liên kết (OAuth) |
+| *refresh_token_enc* | text | | Refresh token OAuth (scope `drive.file`), mã hóa AES-256-GCM, khóa suy ra từ bí mật máy chủ |
+| *linked_at* | timestamptz | | |
+| checked_at | timestamptz | | |
 
 ### 4.6. Bài tập, nhóm, đề tài
 
@@ -336,23 +345,27 @@ Trạng thái duyệt dùng `users.status` (`PENDING`/`ACTIVE`/`REJECTED`/`LOCKE
 |---|---|---|---|
 | id | uuid | PK | |
 | section_id | uuid | FK, NN | |
+| *batch_id* | uuid | | Chung cho các bài tập giao cùng lúc ở nhiều LHP (UC04.8) |
 | title | varchar(200) | NN | |
 | *description* | text | | HTML đã làm sạch |
-| work_mode | `work_mode(INDIVIDUAL\|GROUP\|CHOICE)` | NN | |
-| *min_members*, *max_members* | smallint | `CHECK 1 ≤ min ≤ max ≤ 10` | Null nếu INDIVIDUAL |
-| product_types | `product_type[]` | NN | `IMAGE, FIGMA, VIDEO, SOURCE, GIT_LINK` |
+| work_mode | `work_mode(INDIVIDUAL\|GROUP)` | NN | `GROUP`: nhóm lấy từ file Excel GV tải lên |
+| has_individual_part | boolean | false | Bài nhóm có khu vực nộp phần cá nhân |
+| product_types | `product_type[]` | NN | `IMAGE, FIGMA, VIDEO, SOURCE, GIT_LINK, REPORT` |
 | open_at | timestamptz | NN | |
 | due_at | timestamptz | NN, `CHECK due_at > open_at` | |
 | allow_late | boolean | false | |
 | *late_due_at* | timestamptz | `CHECK late_due_at > due_at` | |
-| late_penalty_percent | smallint | 0, `CHECK 0..100` | |
-| weight | smallint | 1 | Trọng số trong cột điểm bài tập |
+| weight | smallint | 10, `CHECK 1..100` | Trọng số (%) khi tính cột *Bài tập* của điểm học phần |
+| suggested_topics | text[] | `{}` | Đề tài gợi ý (tối đa 10) |
 | status | `assignment_status(DRAFT\|OPEN\|CLOSED)` | NN | |
+| auto_open | boolean | true | `DRAFT` + `auto_open` = hẹn giờ mở; `false` = bản nháp |
+| *brief_file_name*, *brief_file_path*, *brief_file_size*, *brief_mime_type*, *brief_drive_file_id* | | | Tệp đề bài |
 | drive_parent_folder_id | varchar(100) | NN | Thư mục nhận bài GV chọn |
 | drive_folder_id | varchar(100) | NN | `<MaLHP>_<TenBaiTap>` |
-| *drive_migration_status* | `migration_status(RUNNING\|DONE\|FAILED)` | | UC04.6 |
-| *deadline_processed_at* | timestamptz | | Bộ hẹn giờ đã khóa nhóm |
-| created_by | uuid | FK lecturers | |
+| *groups_imported_at* | timestamptz | | Lần áp dụng danh sách nhóm gần nhất |
+| *grades_published_at* | timestamptz | | Công bố điểm bài tập cho SV |
+| *deadline_processed_at* | timestamptz | | Bộ hẹn giờ đã đóng bài khi quá hạn cuối |
+| created_by | uuid | FK lecturers | GV tạo bài – xác định tài khoản Drive dùng để ghi tệp |
 | *deleted_at* | timestamptz | | |
 | created_at, updated_at | | | |
 
@@ -362,14 +375,10 @@ Trạng thái duyệt dùng `users.status` (`PENDING`/`ACTIVE`/`REJECTED`/`LOCKE
 | id | uuid | PK |
 | assignment_id | uuid | FK, NN |
 | seq | smallint | NN; UQ(assignment_id, seq) → `Nhom01` |
-| name | varchar(50) | NN; UQ(assignment_id, lower(name)) |
-| leader_id | uuid | FK students |
-| invite_code | char(8) | UQ |
-| invite_code_active | boolean | true |
-| status | `group_status(OPEN\|LOCKED)` | |
-| *locked_at* | timestamptz | |
-| *locked_by* | uuid | FK users, null = hệ thống |
-| *lock_reason* | `lock_reason(DEADLINE\|LECTURER\|CLOSED)` | |
+| code | varchar(20) | NN; UQ(assignment_id, lower(code)) — *Mã nhóm* trong file Excel |
+| name | varchar(100) | NN — *Tên nhóm* |
+| *leader_id* | uuid | FK students — *Trưởng nhóm* (đánh `x` trong file), chỉ để hiển thị |
+| *import_job_id* | uuid | FK import_jobs — lần tải lên tạo/sửa nhóm |
 | *drive_folder_id*, *drive_shared_folder_id* | varchar(100) | Thư mục nhóm, `Bai_chung` |
 | created_at, updated_at | | |
 
@@ -379,18 +388,28 @@ Trạng thái duyệt dùng `users.status` (`PENDING`/`ACTIVE`/`REJECTED`/`LOCKE
 | group_id | uuid | FK, ON DELETE CASCADE |
 | student_id | uuid | FK |
 | assignment_id | uuid | FK (lưu thừa để ràng buộc) |
-| role | `member_role(LEADER\|MEMBER)` | |
+| role | `member_role(LEADER\|MEMBER)` | Theo cột *Trưởng nhóm* |
 | joined_at | timestamptz | |
-| *drive_personal_folder_id* | varchar(100) | |
+| *drive_personal_folder_id* | varchar(100) | Thư mục phần cá nhân |
 | | | PK(group_id, student_id); **UQ(assignment_id, student_id)** — BR-07 |
 
-#### `group_invitations`
-`id PK · group_id FK · inviter_id FK students · invitee_id FK students · status invitation_status(PENDING|ACCEPTED|DECLINED|CANCELLED|EXPIRED) · expires_at · responded_at? · created_at`
-Partial UQ `(group_id, invitee_id) WHERE status='PENDING'`.
+#### `group_reports`
+| Cột | Kiểu | Ghi chú |
+|---|---|---|
+| id | uuid | PK |
+| assignment_id | uuid | FK |
+| student_id | uuid | FK — SV gửi |
+| *group_id* | uuid | FK — nhóm SV đang ở lúc gửi (null nếu chưa có nhóm) |
+| content | varchar(500) | Nội dung SV mô tả |
+| status | `report_status(OPEN\|RESOLVED)` | Partial UQ `(assignment_id, student_id) WHERE status='OPEN'` |
+| *resolution_note* | varchar(500) | Ghi chú của GV |
+| *resolved_by* | uuid | FK lecturers |
+| *resolved_at* | timestamptz | |
+| created_at | timestamptz | |
 
 #### `individual_works`
 `assignment_id FK · student_id FK · drive_folder_id? · created_at · PK(assignment_id, student_id)`
-Service bảo đảm SV không đồng thời có `individual_works` và `group_members` trong cùng bài tập.
+Chỉ dùng cho bài `INDIVIDUAL`: lưu thư mục `CaNhan_<MSSV>_<HoTen>` trên Drive, tạo ở lần nộp đầu.
 
 #### `topics`
 | Cột | Kiểu | Ràng buộc |
@@ -398,14 +417,14 @@ Service bảo đảm SV không đồng thời có `individual_works` và `group_
 | id | uuid | PK |
 | assignment_id | uuid | FK, NN |
 | *group_id* | uuid | FK |
-| *student_id* | uuid | FK — khi làm cá nhân |
+| *student_id* | uuid | FK — bài cá nhân |
 | title | varchar(200) | NN, `CHECK length ≥ 5` |
-| *description* | varchar(1000) | |
-| *technologies* | varchar(200) | |
-| search_text | text | `f_unaccent(title ‖ description ‖ technologies ‖ tags)` |
+| search_text | text | `f_unaccent(title ‖ tags)` |
 | created_by, updated_by | uuid | FK users |
 | created_at, updated_at | | |
 | | | `CHECK (num_nonnulls(group_id, student_id) = 1)`; UQ(assignment_id, group_id); UQ(assignment_id, student_id) |
+
+Đề tài chỉ gồm **tên + từ khóa** (`topic_tags`); không có mô tả, công nghệ, trạng thái duyệt.
 
 #### `tags`
 `id PK · name varchar(50) · normalized_name varchar(50) UQ · merged_into_id? FK tags · is_hidden boolean · created_by? · created_at`
@@ -441,29 +460,25 @@ Service bảo đảm SV không đồng thời có `individual_works` và `group_
 | *topic_id* | uuid | FK | Đề tài tại thời điểm nộp |
 | last_submitted_by | uuid | FK students | |
 | *figma_url*, *git_url* | varchar(500) | | |
-| *note* | varchar(2000) | | |
+| *note* | varchar(2000) | | Ghi chú / hướng dẫn chạy / mô tả phần việc |
+| *contribution_percent* | smallint | `CHECK 0..100` | Mức đóng góp tự đánh giá (phần cá nhân trong bài nhóm) |
 | version | integer | 1 | Tăng mỗi lần nộp lại |
 | submitted_at | timestamptz | NN | |
 | is_late | boolean | false | |
-| status | `submission_status(SUBMITTED\|LATE\|GRADED\|RETURNED)` | NN | |
+| status | `submission_status(SUBMITTED\|LATE)` | NN | |
 | sync_status | `sync_summary(PENDING\|SYNCED\|ERROR)` | NN | |
-| *score* | numeric(3,1) | | Điểm gốc |
-| *effective_score* | numeric(3,1) | | Sau trừ nộp muộn |
-| *feedback* | text | | |
-| *graded_by* | uuid | FK lecturers | |
-| *graded_at* | timestamptz | | |
-| *return_reason* | text | | |
-| *resubmit_due_at* | timestamptz | | |
 | created_at, updated_at | | | |
 | | | `CHECK ((kind='GROUP_SHARED' AND group_id IS NOT NULL AND student_id IS NULL) OR (kind='PERSONAL' AND student_id IS NOT NULL AND group_id IS NULL))` | |
 | | | Partial UQ `(assignment_id, group_id) WHERE kind='GROUP_SHARED'` · Partial UQ `(assignment_id, student_id) WHERE kind='PERSONAL'` | BR-10 |
+
+Không có cột chấm điểm: điểm nằm ở `assignment_grades` (theo SV).
 
 #### `submission_files`
 | Cột | Kiểu | Ghi chú |
 |---|---|---|
 | id | uuid | PK |
 | submission_id | uuid | FK CASCADE |
-| file_type | `file_type(IMAGE\|VIDEO\|SOURCE)` | |
+| file_type | `file_type(IMAGE\|VIDEO\|SOURCE\|DOCUMENT)` | `DOCUMENT` = tệp báo cáo |
 | original_name | varchar(255) | |
 | mime_type | varchar(100) | Đã kiểm tra bằng magic bytes |
 | size_bytes | bigint | |
@@ -489,9 +504,9 @@ Service bảo đảm SV không đồng thời có `individual_works` và `group_
 | kind | submission_kind | |
 | *group_id*, *student_id* | uuid | Chủ bài |
 | actor_id | uuid | FK users |
-| action | `submission_action(SUBMIT\|RESUBMIT\|DELETE_FILES\|GRADE\|RETURN\|SYNC_FAILED)` | |
+| action | `submission_action(SUBMIT\|RESUBMIT\|DELETE_FILES\|SYNC_FAILED)` | |
 | version | integer | |
-| detail | jsonb | `{added:[{name,size}], removed:[...], score?, reason?}` |
+| detail | jsonb | `{added:[{name,size}], removed:[{name}]}` — nộp lại chỉ liệt kê tệp bị thay |
 | created_at | timestamptz | |
 
 ### 4.8. Điểm
@@ -501,13 +516,14 @@ Service bảo đảm SV không đồng thời có `individual_works` và `group_
 |---|---|---|
 | assignment_id | uuid | FK |
 | student_id | uuid | FK |
-| *submission_id* | uuid | FK |
-| score | numeric(3,1) | NN |
-| is_override | boolean | false |
-| *note* | varchar(500) | |
-| graded_by | uuid | FK lecturers |
-| graded_at | timestamptz | |
+| *score* | numeric(3,1) | `CHECK 0..10`; null = chưa có điểm |
+| *note* | varchar(1000) | Nhận xét của GV |
+| *import_job_id* | uuid | FK import_jobs — lần tải lên ghi điểm này |
+| updated_by | uuid | FK lecturers |
+| updated_at | timestamptz | |
 | | | PK(assignment_id, student_id) |
+
+Điểm ghi theo **từng SV** kể cả bài nhóm (GV tự điền cùng điểm cho cả nhóm trong file nếu muốn). SV chỉ thấy khi `assignments.grades_published_at` khác null.
 
 #### `section_grades`
 | Cột | Kiểu | Ràng buộc |
@@ -520,6 +536,7 @@ Service bảo đảm SV không đồng thời có `individual_works` và `group_
 | *letter* | varchar(2) | A, B+, … F |
 | *gpa4* | numeric(2,1) | |
 | status | `grade_status(DRAFT\|PUBLISHED)` | |
+| *import_job_id* | uuid | FK import_jobs |
 | updated_by | uuid | FK users |
 | updated_at | timestamptz | |
 | | | UQ(section_id, student_id) |
@@ -548,9 +565,9 @@ Service bảo đảm SV không đồng thời có `individual_works` và `group_
 |---|---|---|
 | id | uuid | PK |
 | student_id | uuid | FK |
-| type | `warning_type(OVERDUE_SUBMISSION\|LOW_COURSE_SCORE\|LOW_GPA\|GPA_DROP)` | |
+| type | `warning_type(LOW_COURSE_SCORE\|LOW_GPA\|GPA_DROP)` | |
 | message | varchar(500) | |
-| *ref_type*, *ref_id* | varchar, uuid | assignment / section / semester |
+| *ref_type*, *ref_id* | varchar, uuid | section / semester |
 | dedupe_key | varchar(150) | UQ |
 | created_at | timestamptz | |
 
@@ -604,10 +621,15 @@ Service bảo đảm SV không đồng thời có `individual_works` và `group_
 `key varchar(100) PK · value jsonb · updated_by? · updated_at`
 
 #### `import_jobs`
-`id PK · type import_type(STUDENTS|SECTION_STUDENTS|SECTION_GRADES) · file_name · status(PREVIEW|COMPLETED|FAILED) · total_rows · success_rows · error_rows · errors jsonb · result_path? · created_by · created_at`
+`id PK · type import_type(STUDENTS|SECTION_STUDENTS|ASSIGNMENT_GROUPS|ASSIGNMENT_GRADES|SECTION_GRADES) · *assignment_id?* FK · *section_id?* FK · file_name · status(PREVIEW|COMPLETED|CANCELLED|FAILED) · total_rows · success_rows · error_rows · errors jsonb (lỗi theo dòng/ô) · preview jsonb (dữ liệu đã chuẩn hóa chờ áp dụng) · result_path? · created_by · created_at · completed_at?`
+Bản `PREVIEW` hết hạn sau 24 giờ. Mỗi lần GV tải file nhóm/điểm đều tạo một dòng – dùng làm lịch sử tải lên.
 
 #### `report_exports`
 `id PK · report_type varchar(50) · format(XLSX|PDF) · filters jsonb · status(PENDING|DONE|FAILED) · file_path? · expires_at · created_by · created_at`
+
+#### `topic_trend_snapshots`
+`semester_id FK · tag_id FK · major_id? FK · topic_count int (số đề tài SV đã nộp) · student_count int · enterprise_search_count int (lượt DN tìm từ khóa) · enterprise_view_count int (lượt DN xem bài có từ khóa) · demand_index numeric(5,2) · computed_at · UQ(semester_id, tag_id, major_id)`
+Job `stats.topic-trends` tính lại hằng đêm. `demand_index` = (tỉ trọng lượt DN quan tâm) ÷ (tỉ trọng số đề tài SV); > 1,2 là **thiếu hụt**, < 0,8 là **dư thừa**. Phần hiển thị cho DN (bản đồ năng lực) chỉ tính SV `discoverable` và không lộ danh tính.
 
 ## 5. Chỉ mục (index)
 
@@ -618,12 +640,14 @@ Service bảo đảm SV không đồng thời có `individual_works` và `group_
 | students | GIN `search_text gin_trgm_ops` | Tìm theo kỹ năng/đề tài |
 | section_schedules | `(day_of_week)` + join `course_sections(semester_id, lecturer_id)` | Kiểm tra trùng lịch |
 | section_students | `(student_id)` | LHP của SV |
-| assignments | `(section_id, status)`; `(status, due_at)`; `(status, late_due_at)` | Danh sách, Bộ hẹn giờ |
+| assignments | `(section_id, status)`; `(status, due_at)`; `(status, late_due_at)`; `(status, open_at) WHERE auto_open`; `(batch_id)` | Danh sách, Bộ hẹn giờ, giao nhiều LHP |
 | group_members | `(student_id)` | Nhóm của SV |
-| group_invitations | `(invitee_id, status)`; `(status, expires_at)` | Lời mời của tôi, job hết hạn |
+| group_reports | `(assignment_id, status)` | Phản hồi nhóm chờ xử lý |
+| import_jobs | `(assignment_id, type, created_at DESC)`; `(section_id, type, created_at DESC)` | Lịch sử tải lên |
 | topics | GIN `search_text gin_trgm_ops`; `(assignment_id)` | Tìm bài, cảnh báo trùng |
 | tags | GIN `normalized_name gin_trgm_ops` | Autocomplete |
 | submissions | `(assignment_id, status)`; `(group_id)`; `(student_id)` | |
+| assignment_grades | `(student_id)` | Điểm của tôi |
 | submission_files | `(submission_id, sort_order) WHERE deleted_at IS NULL`; `(sync_status, next_retry_at)` | Hiển thị, đồng bộ lại |
 | submission_events | `(assignment_id, group_id)`; `(assignment_id, student_id)` | Lịch sử |
 | view_requests | `(status, expires_at)`; `(enterprise_id, status)`; `(student_id, status)` | Job hết hạn, kiểm tra quyền |
@@ -705,9 +729,48 @@ FROM best;
 ```
 GPA kỳ: cùng công thức nhưng lấy mọi học phần đã công bố trong kỳ (không lọc "lần cao nhất").
 
+### 6.6. Phân tích cung – cầu đề tài (UC10.7)
+
+```sql
+WITH supply AS (
+  SELECT tt.tag_id, count(DISTINCT t.id) AS topics
+  FROM topics t JOIN topic_tags tt ON tt.topic_id = t.id
+  JOIN assignments a ON a.id = t.assignment_id
+  JOIN course_sections cs ON cs.id = a.section_id
+  WHERE cs.semester_id = $semester
+    AND EXISTS (SELECT 1 FROM submissions s WHERE s.topic_id = t.id)
+  GROUP BY tt.tag_id),
+demand AS (
+  SELECT (jsonb_array_elements_text(criteria->'tagIds'))::uuid AS tag_id, count(*) AS hits
+  FROM enterprise_search_logs
+  WHERE created_at BETWEEN $from AND $to
+  GROUP BY 1)
+SELECT g.name, COALESCE(s.topics, 0) AS topics, COALESCE(d.hits, 0) AS hits,
+       ROUND( (COALESCE(d.hits, 0)::numeric / NULLIF(SUM(d.hits) OVER (), 0))
+            / NULLIF(COALESCE(s.topics, 0)::numeric / NULLIF(SUM(s.topics) OVER (), 0), 0), 2) AS demand_index
+FROM tags g
+LEFT JOIN supply s ON s.tag_id = g.id
+LEFT JOIN demand d ON d.tag_id = g.id
+WHERE g.merged_into_id IS NULL AND NOT g.is_hidden
+  AND (s.topics IS NOT NULL OR d.hits IS NOT NULL)
+ORDER BY demand_index DESC NULLS LAST;
+```
+
 ## 7. Dữ liệu khởi tạo (seed)
 
-| Dữ liệu | Số lượng (môi trường demo) |
+**Seed chạy thử (mặc định, `npm run db:seed`)** – xóa sạch dữ liệu cũ (kể cả tệp đã tải lên) rồi tạo:
+
+| Dữ liệu | Nội dung |
+|---|---|
+| Học kỳ | `2026-2027-1` (kỳ hiện tại) |
+| Môn học / LHP | Môn học 1 (Thiết kế, 3 TC) · LHP `MH01_01` |
+| Giảng viên | `GV001` / mật khẩu `GV001` – phụ trách MH01_01 |
+| Sinh viên | `SV0001` / `01012005` và `SV0002` / `02022005` – cùng lớp MH01_01 |
+| Bài tập, nhóm, điểm | Không có – GV tự giao bài và tải file để kiểm thử |
+
+**Seed demo đầy đủ (dùng cho chạy thử tháng 11 và bảo vệ):**
+
+| Dữ liệu | Số lượng |
 |---|---|
 | Admin | 1 (`admin` / mật khẩu từ biến môi trường) |
 | Khoa / ngành / khóa / lớp SH / phòng | 2 / 4 / 3 / 8 / 10 |
@@ -716,7 +779,7 @@ GPA kỳ: cùng công thức nhưng lấy mọi học phần đã công bố tro
 | Môn học | 10 (4 Thiết kế, 4 Lập trình, 2 Khác) |
 | GV / SV / PH | 6 / 120 / ~150 |
 | LHP | 12 (kèm lịch học) |
-| Bài tập / nhóm / bài nộp | 20 / 60 / 150 (tệp mẫu nhỏ) |
+| Bài tập / nhóm / bài nộp | 20 / 60 / 150 (tệp mẫu nhỏ); kèm file Excel nhóm và điểm mẫu |
 | DN | 5 (3 đã duyệt, 1 chờ, 1 từ chối) + 15 yêu cầu xem bài |
 | `system_settings` | Giá trị mặc định ở Specification UC02.13 |
 
