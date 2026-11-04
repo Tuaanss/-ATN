@@ -6,11 +6,13 @@ import { AppException, notFound } from '../../common/errors/app-exception';
 import { AuditService } from '../../common/audit/audit.service';
 import { DEFAULT_CONFIG, SystemConfigService, SystemConfigValue } from '../../common/config/system-config.service';
 import { MailService } from '../../infra/mail/mail.service';
+import { DriveService } from '../../infra/drive/drive.service';
 import { env } from '../../config/env';
 import { tempPassword } from './admin-users.service';
 
 const DAY = 86_400_000;
-const startOfDay = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
+/** Drive của GV dùng từ mức này (%) thì cảnh báo trên Tổng quan. */
+const NEAR_FULL_PCT = 90;
 const login = `${env.WEB_ORIGIN.replace(/\/$/, '')}/login`;
 
 export interface EnterpriseInput {
@@ -31,6 +33,7 @@ export class AdminSystemService {
     private readonly audit: AuditService,
     private readonly config: SystemConfigService,
     private readonly mail: MailService,
+    private readonly drive: DriveService,
   ) {}
 
   // ================================================================ tổng quan (Admin_Dashboard)
@@ -41,9 +44,8 @@ export class AdminSystemService {
    */
   async dashboard() {
     const now = new Date();
-    const weeksFrom = startOfDay(new Date(now.getTime() - 7 * 8 * DAY + DAY));
     const semester = await this.prisma.semester.findFirst({ where: { isCurrent: true } });
-    const [students, discoverable, withWork, lecturers, entActive, entPending, viewPending, grants, gradeReq, driveLinks, failedFiles, subs, storage, sync, views] = await Promise.all([
+    const [students, discoverable, withWork, lecturers, entActive, entPending, viewPending, grants, gradeReq, driveLinks, failedFiles, storage, sync, views] = await Promise.all([
       this.prisma.student.count(),
       this.prisma.student.count({ where: { discoverable: true } }),
       this.prisma.student.count({ where: { OR: [{ submissions: { some: {} } }, { groupMembers: { some: { group: { submissions: { some: { kind: 'GROUP_SHARED' } } } } } }] } }),
@@ -55,29 +57,54 @@ export class AdminSystemService {
       this.prisma.viewRequest.count({ where: { status: 'PENDING' } }),
       this.prisma.viewRequest.count({ where: { status: 'APPROVED', expiresAt: { gt: now } } }),
       this.prisma.gradeChangeRequest.count({ where: { status: 'PENDING' } }),
-      this.prisma.lecturerDriveLink.findMany({ select: { lecturerId: true, status: true, lecturer: { select: { code: true, fullName: true } } } }),
+      this.prisma.lecturerDriveLink.findMany({ select: { lecturerId: true, status: true, refreshTokenEnc: true, lecturer: { select: { code: true, fullName: true } } } }),
       this.prisma.submissionFile.count({ where: { deletedAt: null, syncStatus: { in: ['FAILED', 'MISSING'] } } }),
-      this.prisma.submission.findMany({ where: { submittedAt: { gte: weeksFrom } }, select: { submittedAt: true } }),
       this.prisma.submissionFile.groupBy({ by: ['fileType'], where: { deletedAt: null }, _sum: { sizeBytes: true }, _count: { _all: true } }),
       this.prisma.submissionFile.groupBy({ by: ['syncStatus'], where: { deletedAt: null }, _count: { _all: true } }),
       this.prisma.enterpriseView.findMany({ where: { createdAt: { gte: new Date(now.getTime() - 30 * DAY) } }, select: { studentId: true, enterpriseId: true } }),
     ]);
 
-    const weeks = Array.from({ length: 8 }, (_, i) => {
-      const from = new Date(weeksFrom.getTime() + i * 7 * DAY);
-      return { from, count: subs.filter((s) => s.submittedAt >= from && s.submittedAt < new Date(from.getTime() + 7 * DAY)).length };
-    });
     const syncCount = (s: string) => sync.find((x) => x.syncStatus === s)?._count._all ?? 0;
     // GV đang có lớp trong học kỳ: chưa liên kết Drive hoặc liên kết lỗi → bài nộp không lên được Drive
     const lecturerIds = new Set(lecturers.map((l) => l.lecturerId));
     const linked = driveLinks.filter((d) => lecturerIds.has(d.lecturerId) && d.status === 'OK').length;
-    const driveErrors = driveLinks.filter((d) => d.status !== 'OK');
+
+    // Drive của GV trong học kỳ: chưa liên kết, lỗi kết nối, sắp đầy → các dòng "Cần xử lý"; tra cứu từng GV ở trang Giảng viên
+    const people = await this.prisma.lecturer.findMany({ where: { id: { in: [...lecturerIds] } }, select: { id: true, code: true }, orderBy: { code: 'asc' } });
+    const drives = await Promise.all(
+      people.map(async (p) => {
+        const link = driveLinks.find((d) => d.lecturerId === p.id);
+        const quota = link?.status === 'OK' && link.refreshTokenEnc ? await this.drive.quota(p.id) : null;
+        return { code: p.code, status: link?.status ?? 'NOT_LINKED', usedPct: quota?.limit ? Math.round((quota.used / quota.limit) * 100) : null };
+      }),
+    );
+
+    // Tài khoản theo vai trò: tổng, đăng nhập trong 30 ngày, đang bị khóa
+    const [byStatus, recent] = await Promise.all([
+      this.prisma.user.groupBy({ by: ['role', 'status'], where: { role: { not: 'ADMIN' }, status: { not: 'DISABLED' } }, _count: { _all: true } }),
+      this.prisma.user.groupBy({ by: ['role'], where: { role: { not: 'ADMIN' }, lastLoginAt: { gte: new Date(now.getTime() - 30 * DAY) } }, _count: { _all: true } }),
+    ]);
+    const users = (['STUDENT', 'LECTURER', 'PARENT', 'ENTERPRISE'] as const).map((role) => ({
+      role,
+      total: byStatus.filter((x) => x.role === role).reduce((a, x) => a + x._count._all, 0),
+      active30: recent.find((x) => x.role === role)?._count._all ?? 0,
+      locked: byStatus.find((x) => x.role === role && x.status === 'LOCKED')?._count._all ?? 0,
+    }));
 
     return {
       semester: semester?.code ?? null,
-      todo: { enterprisesPending: entPending, viewRequests: viewPending, gradeRequests: gradeReq, driveErrors: driveErrors.map((d) => ({ code: d.lecturer.code, fullName: d.lecturer.fullName, status: d.status })), failedFiles },
-      drive: { lecturers: lecturerIds.size, linked },
-      weeks,
+      todo: { enterprisesPending: entPending, viewRequests: viewPending, gradeRequests: gradeReq, failedFiles },
+      drive: {
+        lecturers: lecturerIds.size,
+        linked,
+        notLinked: drives.filter((x) => x.status === 'NOT_LINKED').map((x) => x.code),
+        errors: drives.filter((x) => x.status !== 'OK' && x.status !== 'NOT_LINKED').map((x) => ({ code: x.code, status: x.status })),
+        nearFull: drives
+          .filter((x) => x.status === 'OK' && (x.usedPct ?? 0) >= NEAR_FULL_PCT)
+          .sort((a, b) => b.usedPct! - a.usedPct!)
+          .map((x) => ({ code: x.code, usedPct: x.usedPct! })),
+      },
+      users,
       storage: storage.map((s) => ({ fileType: s.fileType, bytes: Number(s._sum.sizeBytes ?? 0), files: s._count._all })),
       sync: { synced: syncCount('SYNCED'), pending: syncCount('PENDING') + syncCount('UPLOADING'), failed: syncCount('FAILED') + syncCount('MISSING') },
       enterprise: {

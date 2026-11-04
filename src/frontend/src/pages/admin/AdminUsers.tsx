@@ -89,11 +89,17 @@ export function LecturersPage() {
   const [q, setQ] = useState('');
   const [fac, setFac] = useState('');
   const [st, setSt] = useState('');
+  // ?drive=issue: mở từ Tổng quan – GV chưa liên kết hoặc lỗi kết nối Drive
+  const [params] = useSearchParams();
+  const [dr, setDr] = useState(params.get('drive') ?? '');
   const [edit, setEdit] = useState<Lecturer | null | 'new'>(null);
   const acc = useAccountActions();
   if (!list.data || !cat.data) return <Loading />;
   const all = list.data;
-  const rows = all.filter((g) => (!q || norm(`${g.code} ${g.fullName} ${g.email}`).includes(norm(q))) && (!fac || g.faculty?.id === fac) && (!st || g.status === st));
+  const driveOf = (g: Lecturer) => (!g.drive ? 'NONE' : g.drive.status === 'OK' ? 'OK' : 'ERR');
+  const rows = all.filter(
+    (g) => (!q || norm(`${g.code} ${g.fullName} ${g.email}`).includes(norm(q))) && (!fac || g.faculty?.id === fac) && (!st || g.status === st) && (!dr || (dr === 'issue' ? driveOf(g) !== 'OK' : driveOf(g) === dr)),
+  );
   return (
     <div className="page">
       <PageHead
@@ -132,6 +138,13 @@ export function LecturersPage() {
             <option value="">Mọi trạng thái</option>
             <option value="ACTIVE">Hoạt động</option>
             <option value="LOCKED">Đã khóa</option>
+          </Select>
+          <Select label="Lọc theo Google Drive" value={dr} onChange={setDr}>
+            <option value="">Mọi trạng thái Drive</option>
+            <option value="OK">Đã liên kết</option>
+            <option value="NONE">Chưa liên kết</option>
+            <option value="ERR">Lỗi kết nối</option>
+            <option value="issue">Cần chú ý (chưa liên kết / lỗi)</option>
           </Select>
         </Toolbar>
         <Table
