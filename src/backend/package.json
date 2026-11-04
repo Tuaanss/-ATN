@@ -1,8 +1,8 @@
 {
-  "name": "@eduportfolio/backend",
+  "name": "@frameup/backend",
   "version": "0.1.0",
   "private": true,
-  "description": "EduPortfolio API – NestJS 11 trên Node.js 22",
+  "description": "FrameUp API – NestJS 11 trên Node.js 22",
   "scripts": {
     "dev": "nest start --watch",
     "build": "nest build",

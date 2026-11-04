@@ -40,7 +40,7 @@ function cellText(v: ExcelJS.CellValue): string {
 /** File mẫu: dòng tiêu đề in đậm, cố định dòng đầu, các dòng dữ liệu điền sẵn. */
 export async function buildSheet(sheetName: string, columns: SheetColumn[], rows: (string | number | null)[][], guide?: string[]): Promise<Buffer> {
   const wb = new ExcelJS.Workbook();
-  wb.creator = 'EduPortfolio';
+  wb.creator = 'FrameUp';
   const ws = wb.addWorksheet(sheetName, { views: [{ state: 'frozen', ySplit: 1 }] });
   ws.columns = columns.map((c) => ({ header: c.header, key: c.key, width: c.width ?? 16 }));
   const head = ws.getRow(1);

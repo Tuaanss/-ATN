@@ -216,7 +216,7 @@ export function EnterprisesPage() {
           <button
             className="btn"
             style={{ alignSelf: 'flex-start' }}
-            onClick={() => navigator.clipboard?.writeText(`EduPortfolio – tài khoản doanh nghiệp\nĐịa chỉ: ${location.origin}/login (chọn tab Doanh nghiệp)\nTên đăng nhập: ${created.username}\nMật khẩu tạm: ${created.password}\nVui lòng đổi mật khẩu ở lần đăng nhập đầu tiên.`)}
+            onClick={() => navigator.clipboard?.writeText(`FrameUp – tài khoản doanh nghiệp\nĐịa chỉ: ${location.origin}/login (chọn tab Doanh nghiệp)\nTên đăng nhập: ${created.username}\nMật khẩu tạm: ${created.password}\nVui lòng đổi mật khẩu ở lần đăng nhập đầu tiên.`)}
           >
             <Icon name="copy" size={16} /> Sao chép để gửi
           </button>

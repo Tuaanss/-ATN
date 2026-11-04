@@ -14,7 +14,7 @@ function AuthShell({ steps, step, children }: { steps: string[]; step: number; c
           <span style={{ width: 32, height: 32, borderRadius: 8, background: '#DB0000', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: '#fff' }}>
             <Icon name="logo" size={18} strokeWidth={2} />
           </span>
-          <span style={{ fontSize: 17, fontWeight: 700 }}>EduPortfolio</span>
+          <span style={{ fontSize: 17, fontWeight: 700 }}>FrameUp</span>
         </Link>
       </header>
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '40px 16px', gap: 24 }}>

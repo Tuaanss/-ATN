@@ -34,7 +34,7 @@ export const DEFAULT_CONFIG = {
   warning: { scoreThreshold: 4, gpaDrop: 0.5 },
   enterprise: { viewDaysMin: 14, viewDaysMax: 28 },
   reminder: { hours: 24 },
-  email: { sender: 'EduPortfolio <no-reply@eduportfolio.local>' },
+  email: { sender: 'FrameUp <no-reply@frameup.local>' },
 };
 export type SystemConfigValue = typeof DEFAULT_CONFIG;
 

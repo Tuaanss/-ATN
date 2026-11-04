@@ -75,12 +75,8 @@ export class DriveService {
   authUrl(state: string) {
     return this.oauthClient().generateAuthUrl({
       access_type: 'offline',
-<<<<<<< HEAD
       // select_account: luôn cho GV chọn tài khoản Google, không tự dùng tài khoản mặc định của trình duyệt
       prompt: 'select_account consent',
-=======
-      prompt: 'consent',
->>>>>>> b1fd9e4c892fe38462ae662b50912f41f481d8b8
       state,
       scope: ['https://www.googleapis.com/auth/drive.file', 'https://www.googleapis.com/auth/userinfo.email'],
     });
@@ -157,7 +153,7 @@ export class DriveService {
     if (folderId.startsWith(LOCAL_PREFIX)) {
       const dir = this.localPath(folderId);
       await fs.mkdir(dir, { recursive: true });
-      const probe = path.join(dir, '.eduportfolio_check.txt');
+      const probe = path.join(dir, '.frameup_check.txt');
       await fs.writeFile(probe, 'x');
       await fs.unlink(probe);
       return { id: folderId, name: path.basename(dir) };
@@ -186,7 +182,7 @@ export class DriveService {
 
     try {
       const { data } = await drive.files.create({
-        requestBody: { name: '.eduportfolio_check.txt', parents: [folderId] },
+        requestBody: { name: '.frameup_check.txt', parents: [folderId] },
         media: { mimeType: 'text/plain', body: Readable.from(['x']) },
         fields: 'id',
         supportsAllDrives: true,
@@ -367,7 +363,7 @@ export class DriveService {
     if (msg.includes('storageQuotaExceeded'))
       return new AppException('DRIVE_NOT_SHARED_DRIVE', 'Thư mục đang ở My Drive; hãy chuyển sang Shared Drive', HttpStatus.UNPROCESSABLE_ENTITY);
     if (status === 404)
-      return new AppException('DRIVE_FOLDER_NOT_FOUND', 'Không thấy thư mục: link sai, chưa chia sẻ cho tài khoản hệ thống, hoặc không phải thư mục do EduPortfolio tạo', HttpStatus.UNPROCESSABLE_ENTITY);
+      return new AppException('DRIVE_FOLDER_NOT_FOUND', 'Không thấy thư mục: link sai, chưa chia sẻ cho tài khoản hệ thống, hoặc không phải thư mục do FrameUp tạo', HttpStatus.UNPROCESSABLE_ENTITY);
     if (status === 403)
       return new AppException('DRIVE_NO_WRITE_PERMISSION', 'Tài khoản hệ thống chưa có quyền ghi vào thư mục', HttpStatus.UNPROCESSABLE_ENTITY);
     return new AppException('DRIVE_FOLDER_NOT_FOUND', 'Không kiểm tra được thư mục Drive, vui lòng thử lại', HttpStatus.UNPROCESSABLE_ENTITY);

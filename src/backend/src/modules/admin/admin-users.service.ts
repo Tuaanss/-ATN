@@ -77,7 +77,7 @@ export class AdminUsersService {
     await this.prisma.user.update({ where: { id: userId }, data: { passwordHash: await argon2.hash(pw), mustChangePassword: true, failedLoginCount: 0, lockedUntil: null } });
     const to = u.lecturer?.email ?? u.enterprise?.email ?? u.student?.email ?? u.email;
     if (to && (u.lecturer || u.enterprise))
-      await this.mail.send({ to, subject: 'Mật khẩu EduPortfolio đã được đặt lại', text: `Quản trị viên đã đặt lại mật khẩu cho tài khoản ${u.username}.\nMật khẩu tạm thời: ${pw}\nBạn sẽ phải đổi mật khẩu ở lần đăng nhập tiếp theo.`, action: { label: 'Đăng nhập', url: login } });
+      await this.mail.send({ to, subject: 'Mật khẩu FrameUp đã được đặt lại', text: `Quản trị viên đã đặt lại mật khẩu cho tài khoản ${u.username}.\nMật khẩu tạm thời: ${pw}\nBạn sẽ phải đổi mật khẩu ở lần đăng nhập tiếp theo.`, action: { label: 'Đăng nhập', url: login } });
     await this.audit.log({ actorId: adminId, action: 'RESET_PASSWORD', entityType: 'user', entityId: userId, summary: `Đặt lại mật khẩu ${u.username}` });
     return { ok: true, tempPassword: u.lecturer || u.enterprise ? pw : null, hint: u.student ? 'Mật khẩu về ngày sinh (ddmmyyyy)' : u.parent ? 'Mật khẩu về số điện thoại' : 'Mật khẩu tạm đã gửi qua email' };
   }
@@ -121,7 +121,7 @@ export class AdminUsersService {
     const user = await this.prisma.user.create({
       data: { username: code, passwordHash: await argon2.hash(pw), role: 'LECTURER', mustChangePassword: await this.mustChange(), email: d.email, lecturer: { create: { code, fullName: d.fullName.trim(), email: d.email, phone: d.phone || null, facultyId: d.facultyId || null } } },
     });
-    await this.mail.send({ to: d.email, subject: 'Tài khoản giảng viên EduPortfolio', text: `Tài khoản của bạn đã được tạo.\nTên đăng nhập: ${code}\nMật khẩu tạm thời: ${pw}\nBạn sẽ phải đổi mật khẩu ở lần đăng nhập đầu tiên.`, action: { label: 'Đăng nhập', url: login } });
+    await this.mail.send({ to: d.email, subject: 'Tài khoản giảng viên FrameUp', text: `Tài khoản của bạn đã được tạo.\nTên đăng nhập: ${code}\nMật khẩu tạm thời: ${pw}\nBạn sẽ phải đổi mật khẩu ở lần đăng nhập đầu tiên.`, action: { label: 'Đăng nhập', url: login } });
     await this.audit.log({ actorId: adminId, action: 'CREATE_ACCOUNT', entityType: 'user', entityId: user.id, summary: `Tạo tài khoản GV ${code}` });
     return { ok: true, tempPassword: pw };
   }

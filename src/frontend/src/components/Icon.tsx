@@ -3,7 +3,8 @@ import type { CSSProperties } from 'react';
 // Bộ biểu tượng lấy nguyên từ các trang mẫu (d:\doan\project) – stroke 1.8, viewBox 24.
 
 const PATHS = {
-  logo: "<path d=\"M4 4h11a4 4 0 0 1 4 4v12H8a4 4 0 0 1-4-4z\"/><path d=\"M4 16a4 4 0 0 1 4-4h11\"/>",
+  // FrameUp: khung ảnh/video (4 góc) + mũi tên tải lên
+  logo: "<path d=\"M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5\"/><path d=\"M12 16V8M8.5 11.5 12 8l3.5 3.5\"/>",
   image: "<rect x=\"3\" y=\"4\" width=\"18\" height=\"16\" rx=\"2\"/><circle cx=\"9\" cy=\"10\" r=\"2\"/><path d=\"m21 17-5-5-9 8\"/>",
   video: "<rect x=\"3\" y=\"6\" width=\"13\" height=\"12\" rx=\"2\"/><path d=\"m16 10 5-3v10l-5-3\"/>",
   code: "<path d=\"m8 7-5 5 5 5M16 7l5 5-5 5\"/>",

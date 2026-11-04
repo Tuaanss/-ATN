@@ -1,4 +1,4 @@
-// EduPortfolio – Prisma schema (MySQL 8)
+// FrameUp – Prisma schema (MySQL 8)
 // Phạm vi v3.0 (docs/DatabaseDesign.md): hệ thống lưu trữ kết quả học tập –
 // GV giao bài, tải danh sách nhóm và điểm bằng Excel; SV xem nhóm, nhập đề tài, nộp bài.
 
@@ -357,7 +357,7 @@ model LecturerNote {
   @@map("lecturer_notes")
 }
 
-/// Thư mục học kỳ trên Drive của GV: EduPortfolio_<GV>/<năm học>_<HK>/
+/// Thư mục học kỳ trên Drive của GV: FrameUp_<GV>/<năm học>_<HK>/
 model LecturerSemesterFolder {
   lecturerId   String   @map("lecturer_id") @db.Char(36)
   semesterId   String   @map("semester_id") @db.Char(36)

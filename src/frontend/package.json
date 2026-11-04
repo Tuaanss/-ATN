@@ -1,9 +1,9 @@
 {
-  "name": "@eduportfolio/frontend",
+  "name": "@frameup/frontend",
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "EduPortfolio Web – React 19 + Vite 6",
+  "description": "FrameUp Web – React 19 + Vite 6",
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",

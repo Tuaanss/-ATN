@@ -145,7 +145,7 @@ export function DrivePage() {
                     <Icon name="refresh" size={16} />
                     Kiểm tra lại
                   </button>
-                  <button className="btn" type="button" disabled={reorganize.isPending || l.status === 'EXPIRED'} onClick={() => reorganize.mutate()} title="Chuyển thư mục bài tập cũ vào EduPortfolio/<năm học>_<HK>/<lớp học phần>">
+                  <button className="btn" type="button" disabled={reorganize.isPending || l.status === 'EXPIRED'} onClick={() => reorganize.mutate()} title="Chuyển thư mục bài tập cũ vào FrameUp/<năm học>_<HK>/<lớp học phần>">
                     {reorganize.isPending ? <span className="spinner" /> : <Icon name="folder" size={16} />}
                     Sắp xếp theo học kỳ
                   </button>
@@ -157,7 +157,7 @@ export function DrivePage() {
             ) : (
               <>
                 <p style={{ fontSize: 14, lineHeight: 1.6, color: '#4A4E57' }}>
-                  Đăng nhập tài khoản Google của bạn và cho phép EduPortfolio tạo thư mục nhận bài. Ứng dụng chỉ thấy các tệp do chính nó tạo, không đọc tệp khác trong Drive.
+                  Đăng nhập tài khoản Google của bạn và cho phép FrameUp tạo thư mục nhận bài. Ứng dụng chỉ thấy các tệp do chính nó tạo, không đọc tệp khác trong Drive.
                 </p>
                 <button className="btn btn-p" type="button" disabled={!d.oauthAvailable || start.isPending} onClick={() => start.mutate()} style={{ alignSelf: 'flex-start' }}>
                   <Icon name="drive" size={16} />

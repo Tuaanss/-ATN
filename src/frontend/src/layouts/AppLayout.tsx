@@ -108,7 +108,7 @@ export function AppLayout() {
               <span style={{ width: 32, height: 32, borderRadius: 8, background: '#DB0000', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: '#fff' }}>
                 <Icon name="logo" size={18} strokeWidth={2} />
               </span>
-              <span style={{ fontSize: 17, fontWeight: 700, letterSpacing: '-.01em' }}>EduPortfolio</span>
+              <span style={{ fontSize: 17, fontWeight: 700, letterSpacing: '-.01em' }}>FrameUp</span>
             </Link>
           </div>
           <div style={{ padding: '0 12px', fontSize: 11, fontWeight: 600, letterSpacing: '.08em', textTransform: 'uppercase', color: '#8A8E97' }}>{roleLabel}</div>

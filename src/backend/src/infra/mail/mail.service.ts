@@ -44,7 +44,7 @@ export class MailService {
     const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
     return `<!doctype html><html><body style="margin:0;background:#F5F5F5;font-family:Arial,sans-serif;color:#1A1C21">
 <div style="max-width:560px;margin:24px auto;background:#fff;border:1px solid #E3E1D9;border-radius:12px;overflow:hidden">
-<div style="background:#DB0000;color:#fff;padding:16px 24px;font-weight:700;font-size:16px">EduPortfolio</div>
+<div style="background:#DB0000;color:#fff;padding:16px 24px;font-weight:700;font-size:16px">FrameUp</div>
 <div style="padding:24px"><h2 style="margin:0 0 12px;font-size:18px">${esc(m.subject)}</h2>
 <p style="margin:0 0 20px;font-size:14px;line-height:1.6;white-space:pre-line">${esc(m.text)}</p>
 ${m.action ? `<a href="${esc(m.action.url)}" style="display:inline-block;background:#DB0000;color:#fff;text-decoration:none;padding:10px 18px;border-radius:8px;font-weight:600;font-size:14px">${esc(m.action.label)}</a>` : ''}

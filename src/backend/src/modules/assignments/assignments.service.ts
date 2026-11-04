@@ -92,7 +92,7 @@ export class AssignmentsService {
     return { url: this.drive.authUrl(state) };
   }
 
-  /** Nhận mã từ Google → lưu refresh token, tạo thư mục gốc "EduPortfolio" trong Drive của GV. */
+  /** Nhận mã từ Google → lưu refresh token, tạo thư mục gốc "FrameUp" trong Drive của GV. */
   async oauthCallback(lecturerId: string, lecturerCode: string, code: string, state: string) {
     const st = this.oauthStates.get(state);
     this.oauthStates.delete(state);
@@ -110,7 +110,7 @@ export class AssignmentsService {
     if (!keepRoot) {
       await this.prisma.lecturerSemesterFolder.deleteMany({ where: { lecturerId } });
       await this.prisma.courseSection.updateMany({ where: { lecturerId }, data: { driveFolderId: null } });
-      const name = `EduPortfolio_${lecturerCode}`;
+      const name = `FrameUp_${lecturerCode}`;
       const rootId = await this.drive.createFolder(name, 'root', lecturerId);
       await this.prisma.lecturerDriveLink.update({
         where: { lecturerId },
@@ -162,7 +162,7 @@ export class AssignmentsService {
   }
 
   // ---------------------------------------------------------------- cây thư mục theo học kỳ
-  //  EduPortfolio_<GV>/
+  //  FrameUp_<GV>/
   //  └── <năm học>_<HK1|HK2|HE>/              lecturer_semester_folders
   //      └── <MaLHP>_<TenMon>/                 course_sections.drive_folder_id
   //          └── <MaLHP>_<TenBaiTap>/          assignments.drive_folder_id

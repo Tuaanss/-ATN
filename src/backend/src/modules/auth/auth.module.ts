@@ -60,7 +60,7 @@ export class AuthService {
     await this.prisma.passwordResetToken.create({ data: { userId: user.id, tokenHash: sha(token), expiresAt: new Date(Date.now() + RESET_MINUTES * 60_000) } });
     await this.mail.send({
       to: email,
-      subject: 'Đặt lại mật khẩu EduPortfolio',
+      subject: 'Đặt lại mật khẩu FrameUp',
       text: `Bạn (hoặc ai đó) vừa yêu cầu đặt lại mật khẩu cho tài khoản ${user.username}.\nLiên kết có hiệu lực trong ${RESET_MINUTES} phút và chỉ dùng được một lần. Nếu không phải bạn, hãy bỏ qua thư này.`,
       action: { label: 'Đặt lại mật khẩu', url: `${env.WEB_ORIGIN.replace(/\/$/, '')}/reset-password?token=${token}` },
     });

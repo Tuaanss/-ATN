@@ -25,7 +25,7 @@ const schema = z.object({
   SMTP_PORT: z.coerce.number().default(587),
   SMTP_USER: z.string().optional(),
   SMTP_PASS: z.string().optional(),
-  SMTP_FROM: z.string().default('EduPortfolio <no-reply@eduportfolio.local>'),
+  SMTP_FROM: z.string().default('FrameUp <no-reply@frameup.local>'),
   /** Nhắc hạn nộp trước bao nhiêu giờ (FR-06.15) */
   REMINDER_HOURS: z.coerce.number().default(24),
 });

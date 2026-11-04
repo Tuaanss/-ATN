@@ -8,7 +8,6 @@ import { DEFAULT_CONFIG, SystemConfigService, SystemConfigValue } from '../../co
 import { MailService } from '../../infra/mail/mail.service';
 import { env } from '../../config/env';
 import { tempPassword } from './admin-users.service';
-import { strs } from '../../common/utils/json';
 
 const DAY = 86_400_000;
 const startOfDay = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
@@ -36,64 +35,59 @@ export class AdminSystemService {
 
   // ================================================================ tổng quan (Admin_Dashboard)
 
+  /**
+   * Tổng quan Admin: hệ thống là kho lưu bài nộp (không quản lý đào tạo) nên chỉ theo dõi
+   * việc cần duyệt, an toàn lưu trữ (đồng bộ Drive, kết nối của GV) và kết nối doanh nghiệp.
+   */
   async dashboard() {
     const now = new Date();
     const weeksFrom = startOfDay(new Date(now.getTime() - 7 * 8 * DAY + DAY));
-    const [students, lecturers, parents, entTotal, entPending, gradeReq, driveErr, failedFiles, subs, topics, storage, sync, logins, semester] = await Promise.all([
+    const semester = await this.prisma.semester.findFirst({ where: { isCurrent: true } });
+    const [students, discoverable, withWork, lecturers, entActive, entPending, viewPending, grants, gradeReq, driveLinks, failedFiles, subs, storage, sync, views] = await Promise.all([
       this.prisma.student.count(),
-      this.prisma.lecturer.count(),
-      this.prisma.parent.count({ where: { user: { status: { not: 'DISABLED' } } } }),
-      this.prisma.enterprise.count({ where: { user: { status: { in: ['ACTIVE', 'LOCKED'] } } } }),
+      this.prisma.student.count({ where: { discoverable: true } }),
+      this.prisma.student.count({ where: { OR: [{ submissions: { some: {} } }, { groupMembers: { some: { group: { submissions: { some: { kind: 'GROUP_SHARED' } } } } } }] } }),
+      semester
+        ? this.prisma.courseSection.findMany({ where: { semesterId: semester.id }, distinct: ['lecturerId'], select: { lecturerId: true } })
+        : this.prisma.lecturer.findMany({ select: { id: true } }).then((l) => l.map((x) => ({ lecturerId: x.id }))),
+      this.prisma.enterprise.count({ where: { user: { status: 'ACTIVE' } } }),
       this.prisma.enterprise.count({ where: { user: { status: 'PENDING' } } }),
+      this.prisma.viewRequest.count({ where: { status: 'PENDING' } }),
+      this.prisma.viewRequest.count({ where: { status: 'APPROVED', expiresAt: { gt: now } } }),
       this.prisma.gradeChangeRequest.count({ where: { status: 'PENDING' } }),
-      this.prisma.lecturerDriveLink.findMany({ where: { status: { not: 'OK' } }, include: { lecturer: { select: { code: true, fullName: true } } } }),
+      this.prisma.lecturerDriveLink.findMany({ select: { lecturerId: true, status: true, lecturer: { select: { code: true, fullName: true } } } }),
       this.prisma.submissionFile.count({ where: { deletedAt: null, syncStatus: { in: ['FAILED', 'MISSING'] } } }),
       this.prisma.submission.findMany({ where: { submittedAt: { gte: weeksFrom } }, select: { submittedAt: true } }),
-      this.prisma.topic.findMany({ select: { title: true, keywords: true } }),
       this.prisma.submissionFile.groupBy({ by: ['fileType'], where: { deletedAt: null }, _sum: { sizeBytes: true }, _count: { _all: true } }),
       this.prisma.submissionFile.groupBy({ by: ['syncStatus'], where: { deletedAt: null }, _count: { _all: true } }),
-      this.prisma.auditLog.findMany({ where: { action: 'LOGIN', createdAt: { gte: startOfDay(new Date(now.getTime() - 6 * DAY)) } }, select: { actorId: true, createdAt: true } }),
-      this.prisma.semester.findFirst({ where: { isCurrent: true } }),
+      this.prisma.enterpriseView.findMany({ where: { createdAt: { gte: new Date(now.getTime() - 30 * DAY) } }, select: { studentId: true, enterpriseId: true } }),
     ]);
-    const viewPending = await this.prisma.viewRequest.count({ where: { status: 'PENDING' } });
 
     const weeks = Array.from({ length: 8 }, (_, i) => {
       const from = new Date(weeksFrom.getTime() + i * 7 * DAY);
       return { from, count: subs.filter((s) => s.submittedAt >= from && s.submittedAt < new Date(from.getTime() + 7 * DAY)).length };
     });
-    const kw = new Map<string, { label: string; count: number }>();
-    for (const t of topics)
-      for (const k of strs(t.keywords)) {
-        const key = k.trim().toLowerCase();
-        if (!key) continue;
-        const e = kw.get(key) ?? { label: k.trim(), count: 0 };
-        e.count++;
-        kw.set(key, e);
-      }
-    const days = Array.from({ length: 7 }, (_, i) => {
-      const from = startOfDay(new Date(now.getTime() - (6 - i) * DAY));
-      const to = new Date(from.getTime() + DAY);
-      return { date: from, users: new Set(logins.filter((l) => l.createdAt >= from && l.createdAt < to).map((l) => l.actorId)).size };
-    });
     const syncCount = (s: string) => sync.find((x) => x.syncStatus === s)?._count._all ?? 0;
+    // GV đang có lớp trong học kỳ: chưa liên kết Drive hoặc liên kết lỗi → bài nộp không lên được Drive
+    const lecturerIds = new Set(lecturers.map((l) => l.lecturerId));
+    const linked = driveLinks.filter((d) => lecturerIds.has(d.lecturerId) && d.status === 'OK').length;
+    const driveErrors = driveLinks.filter((d) => d.status !== 'OK');
 
     return {
       semester: semester?.code ?? null,
-      counts: { students, lecturers, parents, enterprises: entTotal, enterprisesPending: entPending, viewRequestsPending: viewPending },
+      todo: { enterprisesPending: entPending, viewRequests: viewPending, gradeRequests: gradeReq, driveErrors: driveErrors.map((d) => ({ code: d.lecturer.code, fullName: d.lecturer.fullName, status: d.status })), failedFiles },
+      drive: { lecturers: lecturerIds.size, linked },
       weeks,
-      todo: {
-        enterprisesPending: entPending,
-        viewRequests: viewPending,
-        gradeRequests: gradeReq,
-        driveErrors: driveErr.map((d) => ({ code: d.lecturer.code, fullName: d.lecturer.fullName, status: d.status })),
-        failedFiles,
-      },
-      topKeywords: [...kw.values()].sort((a, b) => b.count - a.count).slice(0, 8),
-      topics: topics.length,
       storage: storage.map((s) => ({ fileType: s.fileType, bytes: Number(s._sum.sizeBytes ?? 0), files: s._count._all })),
       sync: { synced: syncCount('SYNCED'), pending: syncCount('PENDING') + syncCount('UPLOADING'), failed: syncCount('FAILED') + syncCount('MISSING') },
-      activeUsers: days,
-      activeUsers7d: new Set(logins.map((l) => l.actorId)).size,
+      enterprise: {
+        students,
+        withWork,
+        discoverable,
+        active: entActive,
+        grants,
+        views30d: { views: views.length, students: new Set(views.map((v) => v.studentId)).size, enterprises: new Set(views.map((v) => v.enterpriseId)).size },
+      },
     };
   }
 
@@ -129,8 +123,8 @@ export class AdminSystemService {
     });
     await this.mail.send({
       to: d.email,
-      subject: 'Tài khoản doanh nghiệp EduPortfolio',
-      text: `Kính gửi ${d.contactName.trim()} – ${d.name.trim()},\nKhoa đã tạo tài khoản để doanh nghiệp tìm kiếm sinh viên trên EduPortfolio.\nTên đăng nhập: ${d.email}\nMật khẩu tạm thời: ${pw}\nVui lòng đổi mật khẩu ở lần đăng nhập đầu tiên.`,
+      subject: 'Tài khoản doanh nghiệp FrameUp',
+      text: `Kính gửi ${d.contactName.trim()} – ${d.name.trim()},\nKhoa đã tạo tài khoản để doanh nghiệp tìm kiếm sinh viên trên FrameUp.\nTên đăng nhập: ${d.email}\nMật khẩu tạm thời: ${pw}\nVui lòng đổi mật khẩu ở lần đăng nhập đầu tiên.`,
       action: { label: 'Đăng nhập', url: login },
     });
     await this.audit.log({ actorId: adminId, action: 'CREATE_ACCOUNT', entityType: 'enterprise', entityId: user.id, summary: `Tạo tài khoản doanh nghiệp ${d.name.trim()} (MST ${d.taxCode})` });

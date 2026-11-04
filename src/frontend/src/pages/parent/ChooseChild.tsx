@@ -23,7 +23,7 @@ export function ChooseChild() {
           <span style={{ width: 32, height: 32, borderRadius: 8, background: '#DB0000', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: '#fff' }}>
             <Icon name="logo" size={18} strokeWidth={2} />
           </span>
-          <b style={{ fontSize: 17 }}>EduPortfolio</b>
+          <b style={{ fontSize: 17 }}>FrameUp</b>
         </span>
         <span className="muted" style={{ fontSize: 13 }}>
           Đăng nhập: <b className="mono">{phone}</b>

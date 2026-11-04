@@ -143,7 +143,7 @@ export function LoginPage() {
           <span style={{ width: 32, height: 32, borderRadius: 8, background: '#fff', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: '#DB0000' }}>
             <Icon name="logo" size={18} strokeWidth={2} />
           </span>
-          <span style={{ fontSize: 17, fontWeight: 700, letterSpacing: '-.01em' }}>EduPortfolio</span>
+          <span style={{ fontSize: 17, fontWeight: 700, letterSpacing: '-.01em' }}>FrameUp</span>
         </Link>
         <div key={role} className="login-pitch" style={{ display: 'flex', flexDirection: 'column', gap: 24, flex: 1, justifyContent: 'center' }}>
           <span style={{ alignSelf: 'flex-start', fontSize: 12, fontWeight: 700, letterSpacing: '.06em', textTransform: 'uppercase', padding: '6px 12px', borderRadius: 999, background: 'rgba(255,255,255,.18)' }}>{pitch.tag}</span>
@@ -172,7 +172,7 @@ export function LoginPage() {
             ))}
           </div>
         </div>
-        <span style={{ fontSize: 12, color: 'rgba(255,255,255,.75)' }}>EduPortfolio · Phiên bản 1.1</span>
+        <span style={{ fontSize: 12, color: 'rgba(255,255,255,.75)' }}>FrameUp · Phiên bản 1.1</span>
       </div>
 
       <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '32px 16px' }}>

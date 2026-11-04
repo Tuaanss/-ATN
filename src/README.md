@@ -1,4 +1,4 @@
-# EduPortfolio
+# FrameUp
 
 Hệ thống quản lý kết quả học tập đa phương tiện của sinh viên — mã nguồn.
 Thiết kế chi tiết nằm ở [`../docs`](../docs) (Requirement, Specification, Architecture, DatabaseDesign…).
@@ -59,14 +59,14 @@ Yêu cầu: **Node.js ≥ 22** và **MySQL 8** (MySQL Installer, XAMPP/Laragon c
 **Tạo CSDL và tài khoản cho hệ thống** – chạy một lần trong MySQL Workbench / MySQL Command Line Client bằng tài khoản `root`:
 
 ```sql
-CREATE DATABASE eduportfolio CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-CREATE USER 'edu'@'localhost' IDENTIFIED BY 'edu';
-GRANT ALL PRIVILEGES ON eduportfolio.* TO 'edu'@'localhost';
+CREATE DATABASE frameup CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE USER 'frameup'@'localhost' IDENTIFIED BY 'frameup';
+GRANT ALL PRIVILEGES ON frameup.* TO 'frameup'@'localhost';
 FLUSH PRIVILEGES;
 ```
 
-(Dùng tài khoản / mật khẩu / cổng khác thì sửa `DATABASE_URL` trong `backend/.env`, dạng `mysql://<user>:<mật khẩu>@localhost:3306/eduportfolio`.
-Có Docker mà chưa cài MySQL: `docker compose -f docker/compose.dev.yml up -d` – đã tạo sẵn CSDL và tài khoản `edu`.)
+(Dùng tài khoản / mật khẩu / cổng khác thì sửa `DATABASE_URL` trong `backend/.env`, dạng `mysql://<user>:<mật khẩu>@localhost:3306/frameup`.
+Có Docker mà chưa cài MySQL: `docker compose -f docker/compose.dev.yml up -d` – đã tạo sẵn CSDL và tài khoản `frameup`.)
 
 ```bash
 # 1. Cài thư viện (một lần, ở thư mục src/)
@@ -107,7 +107,7 @@ Mật khẩu SV là ngày sinh `ddmmyyyy` (Requirement D2). Sai mật khẩu 5 l
 | `DRIVE_MODE` | Cách hoạt động |
 |---|---|
 | `local` (mặc định) | Mô phỏng Drive bằng thư mục `backend/data/drive/` |
-| `google` | Ghi thật lên Google Drive. Mỗi giảng viên bấm **Liên kết tài khoản Google** ở trang *Kết nối Google Drive* (OAuth, quyền `drive.file`); hệ thống tự tạo thư mục `EduPortfolio_<MãGV>` trong My Drive của GV và ghi bài nộp vào đó |
+| `google` | Ghi thật lên Google Drive. Mỗi giảng viên bấm **Liên kết tài khoản Google** ở trang *Kết nối Google Drive* (OAuth, quyền `drive.file`); hệ thống tự tạo thư mục `FrameUp_<MãGV>` trong My Drive của GV và ghi bài nộp vào đó |
 
 Bật Drive thật (OAuth – dùng được với Gmail cá nhân):
 
@@ -121,7 +121,7 @@ Bật Drive thật (OAuth – dùng được với Gmail cá nhân):
    GOOGLE_OAUTH_CLIENT_ID=<Client ID>
    GOOGLE_OAUTH_CLIENT_SECRET=<Client secret>
    ```
-5. Khởi động lại API → đăng nhập `GV001` → **Kết nối Google Drive** → *Liên kết tài khoản Google* → đồng ý. Sau đó GV giao bài và SV nộp bài; tệp xuất hiện trong `EduPortfolio_GV001/<MaLHP>_<TenBaiTap>/…` trên Drive.
+5. Khởi động lại API → đăng nhập `GV001` → **Kết nối Google Drive** → *Liên kết tài khoản Google* → đồng ý. Sau đó GV giao bài và SV nộp bài; tệp xuất hiện trong `FrameUp_GV001/<MaLHP>_<TenBaiTap>/…` trên Drive.
 
 Lưu ý: ứng dụng ở trạng thái *Testing* thì Google cho refresh token sống 7 ngày – hết hạn thì bấm liên kết lại. Refresh token được mã hóa AES-256-GCM trong CSDL.
 
@@ -162,7 +162,7 @@ git init
 git add .
 git commit -m "feat: giao bài tập, nộp bài, dashboard GV/SV"
 git branch -M main
-git remote add origin https://github.com/<tai-khoan>/eduportfolio.git
+git remote add origin https://github.com/<tai-khoan>/frameup.git
 git push -u origin main
 ```
 

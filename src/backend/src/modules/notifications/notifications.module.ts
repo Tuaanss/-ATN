@@ -94,7 +94,7 @@ export class NotificationsService {
     const link = n.link ? `${env.WEB_ORIGIN.replace(/\/$/, '')}${n.link}` : undefined;
     for (const u of users.filter((x) => channel(x, 'email'))) {
       const to = u.student?.email ?? u.lecturer?.email ?? u.email;
-      if (to) void this.mail.send({ to, subject: n.title, text: n.body ?? '', action: link ? { label: 'Mở EduPortfolio', url: link } : undefined });
+      if (to) void this.mail.send({ to, subject: n.title, text: n.body ?? '', action: link ? { label: 'Mở FrameUp', url: link } : undefined });
     }
     return users.length;
   }
