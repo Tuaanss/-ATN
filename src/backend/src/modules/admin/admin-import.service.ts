@@ -8,8 +8,8 @@ import { SheetColumn, buildSheet, normCode, readSheet } from '../../common/utils
 import { AdminUsersService, LecturerInput } from './admin-users.service';
 import { AdminAcademicService, CourseInput, SectionInput, Session } from './admin-academic.service';
 
-export type ImportKind = 'lecturers' | 'courses' | 'sections';
-export const IMPORT_KINDS: ImportKind[] = ['lecturers', 'courses', 'sections'];
+export type ImportKind = 'lecturers' | 'courses' | 'sections' | 'faculties' | 'majors' | 'cohorts' | 'classes' | 'enrollments';
+export const IMPORT_KINDS: ImportKind[] = ['lecturers', 'courses', 'sections', 'faculties', 'majors', 'cohorts', 'classes', 'enrollments'];
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const PHONE = /^(03|05|07|08|09)\d{8}$/;
@@ -50,6 +50,36 @@ const COLS: Record<ImportKind, SheetColumn[]> = {
     { key: 'we', header: 'Tuần kết thúc', width: 12, aliases: ['Đến tuần'] },
     { key: 'schedule', header: 'Lịch học', width: 40, required: true },
   ],
+  faculties: [
+    { key: 'code', header: 'Mã khoa', width: 12, required: true },
+    { key: 'name', header: 'Tên khoa', width: 36, required: true },
+  ],
+  majors: [
+    { key: 'code', header: 'Mã ngành', width: 12, required: true },
+    { key: 'name', header: 'Tên ngành', width: 36, required: true },
+    { key: 'faculty', header: 'Mã khoa', width: 12, aliases: ['Khoa'], required: true },
+  ],
+  cohorts: [
+    { key: 'name', header: 'Khóa', width: 10, aliases: ['Tên khóa'], required: true },
+    { key: 'year', header: 'Năm nhập học', width: 14, aliases: ['Năm bắt đầu'] },
+  ],
+  classes: [
+    { key: 'code', header: 'Mã lớp', width: 16, aliases: ['Lớp', 'Lớp hành chính', 'Lớp sinh hoạt'], required: true },
+    { key: 'major', header: 'Mã ngành', width: 12, aliases: ['Ngành'], required: true },
+    { key: 'cohort', header: 'Khóa', width: 10, aliases: ['Tên khóa'], required: true },
+    { key: 'year', header: 'Năm nhập học', width: 14, aliases: ['Năm bắt đầu'] },
+  ],
+  enrollments: [
+    { key: 'section', header: 'Mã lớp HP', width: 14, aliases: ['Mã lớp học phần', 'Lớp HP'], required: true },
+    { key: 'code', header: 'MSSV', width: 14, aliases: ['MSV', 'Mã sinh viên'], required: true },
+    { key: 'name', header: 'Họ tên', width: 28, aliases: ['Họ và tên'] },
+  ],
+};
+
+/** Năm nhập học suy từ tên khóa: D26 / K26 / 26 → 2026. */
+const yearOf = (cohort: string) => {
+  const m = cohort.match(/(\d{2})$/);
+  return m ? 2000 + Number(m[1]) : null;
 };
 
 /** "T2 1-3 A2-301; T5 6-8 B1-101" → các buổi học. Thứ 2–7, CN; tiết 1–12. */
@@ -93,8 +123,16 @@ export class AdminImportService {
     private readonly academic: AdminAcademicService,
   ) {}
 
-  async template(kind: ImportKind) {
-    const [fac, course, lec] = await Promise.all([this.prisma.faculty.findFirst(), this.prisma.course.findFirst(), this.prisma.lecturer.findFirst()]);
+  async template(kind: ImportKind, sectionId?: string) {
+    if (kind === 'enrollments' && sectionId) return this.sectionTemplate(sectionId);
+    const [fac, course, lec, major, section, student] = await Promise.all([
+      this.prisma.faculty.findFirst(),
+      this.prisma.course.findFirst(),
+      this.prisma.lecturer.findFirst(),
+      this.prisma.major.findFirst(),
+      this.prisma.courseSection.findFirst({ where: { semester: { isCurrent: true } } }),
+      this.prisma.student.findFirst(),
+    ]);
     const f = fac?.code ?? 'TKTT';
     const rows: Record<ImportKind, (string | number)[][]> = {
       lecturers: [
@@ -104,6 +142,26 @@ export class AdminImportService {
       courses: [
         ['TK101', 'Thiết kế giao diện', 3, 'Thiết kế', f, 10, 30, 20, 40],
         ['LT201', 'Lập trình Web', 3, 'Lập trình', f, 10, 20, 20, 50],
+      ],
+      faculties: [
+        ['DPT', 'Khoa Đa phương tiện'],
+        ['CNTT', 'Khoa Công nghệ thông tin'],
+      ],
+      majors: [
+        ['CNDPT', 'Công nghệ đa phương tiện', f],
+        ['TTDPT', 'Truyền thông đa phương tiện', f],
+      ],
+      cohorts: [
+        ['D26', 2026],
+        ['D27', ''],
+      ],
+      classes: [
+        ['D26CQPT01-B', major?.code ?? 'CNDPT', 'D26', 2026],
+        ['D26CQPT02-B', major?.code ?? 'CNDPT', 'D26', ''],
+      ],
+      enrollments: [
+        [section?.code ?? 'TK101_01', student?.studentCode ?? 'B26DCPT001', student?.fullName ?? 'Nguyễn Văn A'],
+        [section?.code ?? 'TK101_01', 'B26DCPT002', 'Trần Thị B'],
       ],
       sections: [
         [`${course?.code ?? 'TK101'}_05`, course?.code ?? 'TK101', lec?.code ?? 'GV0100', 50, 1, 15, 'T3 1-3 A2-302'],
@@ -127,16 +185,53 @@ export class AdminImportService {
         'Lịch học: mỗi buổi dạng "T2 1-3 A2-301" (thứ, tiết bắt đầu-kết thúc, phòng); nhiều buổi cách nhau bằng dấu chấm phẩy. Chủ nhật ghi CN.',
         'Hệ thống kiểm tra trùng lịch giảng viên / phòng với các lớp đã có và giữa các dòng trong tệp.',
       ],
+      faculties: [
+        'Mỗi dòng là một khoa. Bắt buộc: Mã khoa (tối đa 20 ký tự), Tên khoa. Mã và tên khoa không được trùng.',
+      ],
+      majors: [
+        'Mỗi dòng là một ngành. Bắt buộc: Mã ngành (tối đa 20 ký tự, không trùng), Tên ngành, Mã khoa (theo Danh mục › Khoa).',
+      ],
+      cohorts: [
+        'Mỗi dòng là một khóa tuyển sinh. Bắt buộc: Khóa (VD: D26, tối đa 10 ký tự, không trùng).',
+        'Năm nhập học để trống thì lấy theo 2 số cuối của tên khóa (D26 → 2026).',
+      ],
+      classes: [
+        'Mỗi dòng là một lớp hành chính. Bắt buộc: Mã lớp, Mã ngành (theo Danh mục › Ngành), Khóa (VD: D26).',
+        'Khóa chưa có trong Danh mục sẽ được tạo mới; Năm nhập học để trống thì lấy theo 2 số cuối của tên khóa (D26 → 2026).',
+        'Sau khi có lớp, import sinh viên với cột "Lớp" là mã lớp hành chính.',
+      ],
+      enrollments: [
+        'Mỗi dòng xếp một sinh viên vào một lớp học phần. Một tệp có thể xếp cho nhiều lớp.',
+        'Bắt buộc: Mã lớp HP, MSSV (phải có sẵn trong hệ thống). Cột Họ tên chỉ để đối chiếu.',
+        'Hệ thống bỏ qua sinh viên đã ở trong lớp, đã học môn này ở lớp khác cùng học kỳ, trùng lịch học, hoặc khi lớp đã đủ sĩ số.',
+      ],
     };
-    const NAME: Record<ImportKind, string> = { lecturers: 'Mau_import_giang_vien.xlsx', courses: 'Mau_import_mon_hoc.xlsx', sections: 'Mau_import_lop_hoc_phan.xlsx' };
+    const NAME: Record<ImportKind, string> = {
+      lecturers: 'Mau_import_giang_vien.xlsx',
+      courses: 'Mau_import_mon_hoc.xlsx',
+      sections: 'Mau_import_lop_hoc_phan.xlsx',
+      faculties: 'Mau_import_khoa.xlsx',
+      majors: 'Mau_import_nganh.xlsx',
+      cohorts: 'Mau_import_khoa_hoc.xlsx',
+      classes: 'Mau_import_lop_hanh_chinh.xlsx',
+      enrollments: 'Mau_xep_sinh_vien_vao_lop_hoc_phan.xlsx',
+    };
     return { buffer: await buildSheet('Du_lieu', COLS[kind], rows[kind], guide[kind]), fileName: NAME[kind] };
   }
 
-  async preview(kind: ImportKind, file: Express.Multer.File, semesterId?: string) {
-    const raw = await readSheet(file, COLS[kind]);
+  async preview(kind: ImportKind, file: Express.Multer.File, semesterId?: string, sectionId?: string) {
+    // xếp vào một lớp cụ thể: chỉ cần cột MSSV
+    const one = kind === 'enrollments' && sectionId ? await this.prisma.courseSection.findUnique({ where: { id: sectionId } }) : null;
+    if (kind === 'enrollments' && sectionId && !one) throw new AppException('NOT_FOUND', 'Lớp học phần không tồn tại', HttpStatus.NOT_FOUND);
+    const raw = await readSheet(file, one ? COLS.enrollments.map((c) => (c.key === 'section' ? { ...c, required: false } : c)) : COLS[kind]);
     const rows: Row[] = raw.map(({ row, values }) => ({ row, ok: true, problems: [], cells: values }));
     if (kind === 'lecturers') await this.checkLecturers(rows);
     if (kind === 'courses') await this.checkCourses(rows);
+    if (kind === 'faculties') await this.checkFaculties(rows);
+    if (kind === 'majors') await this.checkMajors(rows);
+    if (kind === 'cohorts') await this.checkCohorts(rows);
+    if (kind === 'classes') await this.checkClasses(rows);
+    if (kind === 'enrollments') await this.checkEnrollments(rows, one?.code);
     if (kind === 'sections') {
       const sem = semesterId ? await this.prisma.semester.findUnique({ where: { id: semesterId } }) : await this.prisma.semester.findFirst({ where: { isCurrent: true } });
       if (!sem) throw new AppException('VALIDATION_ERROR', 'Chọn học kỳ mở lớp');
@@ -156,7 +251,20 @@ export class AdminImportService {
     let created = 0;
     const failed: { row: number; code: string; message: string }[] = [];
     const passwords: { code: string; fullName: string; email: string; password: string }[] = [];
-    for (const r of job.rows.filter((x) => x.ok)) {
+    if (kind === 'classes') created = await this.commitClasses(adminId, job.rows.filter((x) => x.ok), failed);
+    if (kind === 'enrollments') created = await this.commitEnrollments(adminId, job.rows.filter((x) => x.ok), failed);
+    for (const r of job.rows.filter((x) => x.ok && kind !== 'classes' && kind !== 'enrollments')) {
+      if (kind === 'faculties' || kind === 'majors' || kind === 'cohorts') {
+        try {
+          if (kind === 'faculties') await this.academic.saveFaculty(adminId, null, r.data as { code: string; name: string });
+          if (kind === 'majors') await this.academic.saveMajor(adminId, null, r.data as { code: string; name: string; facultyId: string });
+          if (kind === 'cohorts') await this.academic.saveCohort(adminId, null, r.data as { name: string; startYear: number });
+          created++;
+        } catch (e) {
+          failed.push({ row: r.row, code: r.cells.code ?? r.cells.name ?? '', message: (e as Error).message });
+        }
+        continue;
+      }
       try {
         if (kind === 'lecturers') {
           const d = r.data as LecturerInput;
@@ -170,7 +278,7 @@ export class AdminImportService {
         failed.push({ row: r.row, code: r.cells.code ?? '', message: (e as Error).message });
       }
     }
-    const LABEL: Record<ImportKind, string> = { lecturers: 'giảng viên', courses: 'môn học', sections: 'lớp học phần' };
+    const LABEL: Record<ImportKind, string> = { lecturers: 'giảng viên', courses: 'môn học', sections: 'lớp học phần', faculties: 'khoa', majors: 'ngành', cohorts: 'khóa', classes: 'lớp hành chính', enrollments: 'lượt xếp sinh viên vào lớp học phần' };
     await this.audit.log({ actorId: adminId, action: `IMPORT_${kind.toUpperCase()}`, entityType: kind, summary: `Import ${created} ${LABEL[kind]} từ Excel${failed.length ? `, lỗi ${failed.length}` : ''}` });
     return { created, failed, passwords };
   }
@@ -289,5 +397,217 @@ export class AdminImportService {
       if (!r.problems.length) accepted.push(d);
       r.data = d;
     }
+  }
+
+  // ---------------------------------------------------------------- khoa, ngành, khóa
+
+  private async checkFaculties(rows: Row[]) {
+    const existing = await this.prisma.faculty.findMany();
+    const codes = new Set(existing.map((f) => f.code.toUpperCase()));
+    const names = new Set(existing.map((f) => plain(f.name)));
+    const seenCode = new Set<string>();
+    const seenName = new Set<string>();
+    for (const r of rows) {
+      const code = normCode(r.cells.code ?? '');
+      const name = (r.cells.name ?? '').trim();
+      if (!code) r.problems.push('Thiếu mã khoa');
+      else if (code.length > 20) r.problems.push('Mã khoa tối đa 20 ký tự');
+      else if (codes.has(code)) r.problems.push('Mã khoa đã tồn tại');
+      else if (seenCode.has(code)) r.problems.push('Mã khoa lặp trong tệp');
+      if (!name) r.problems.push('Thiếu tên khoa');
+      else if (name.length > 200) r.problems.push('Tên khoa tối đa 200 ký tự');
+      else if (names.has(plain(name))) r.problems.push('Tên khoa đã tồn tại');
+      else if (seenName.has(plain(name))) r.problems.push('Tên khoa lặp trong tệp');
+      if (code) seenCode.add(code);
+      if (name) seenName.add(plain(name));
+      r.data = { code, name };
+    }
+  }
+
+  private async checkMajors(rows: Row[]) {
+    const [existing, faculties] = await Promise.all([this.prisma.major.findMany({ select: { code: true } }), this.prisma.faculty.findMany()]);
+    const codes = new Set(existing.map((m) => m.code.toUpperCase()));
+    const seen = new Set<string>();
+    for (const r of rows) {
+      const code = normCode(r.cells.code ?? '');
+      const name = (r.cells.name ?? '').trim();
+      const fac = faculties.find((f) => f.code.toUpperCase() === normCode(r.cells.faculty ?? ''));
+      if (!code) r.problems.push('Thiếu mã ngành');
+      else if (code.length > 20) r.problems.push('Mã ngành tối đa 20 ký tự');
+      else if (codes.has(code)) r.problems.push('Mã ngành đã tồn tại');
+      else if (seen.has(code)) r.problems.push('Mã ngành lặp trong tệp');
+      if (!name) r.problems.push('Thiếu tên ngành');
+      else if (name.length > 200) r.problems.push('Tên ngành tối đa 200 ký tự');
+      if (!r.cells.faculty) r.problems.push('Thiếu mã khoa');
+      else if (!fac) r.problems.push(`Không có khoa “${r.cells.faculty}”`);
+      if (code) seen.add(code);
+      r.data = { code, name, facultyId: fac?.id ?? '' };
+    }
+  }
+
+  private async checkCohorts(rows: Row[]) {
+    const existing = new Set((await this.prisma.cohort.findMany({ select: { name: true } })).map((c) => c.name.toUpperCase()));
+    const seen = new Set<string>();
+    for (const r of rows) {
+      const name = normCode(r.cells.name ?? '');
+      const year = r.cells.year ? Number(r.cells.year) : name ? yearOf(name) : null;
+      if (!name) r.problems.push('Thiếu tên khóa');
+      else if (name.length > 10) r.problems.push('Tên khóa tối đa 10 ký tự');
+      else if (existing.has(name)) r.problems.push('Khóa đã tồn tại');
+      else if (seen.has(name)) r.problems.push('Khóa lặp trong tệp');
+      if (r.cells.year && (!Number.isInteger(year) || year! < 2000 || year! > 2100)) r.problems.push('Năm nhập học không hợp lệ');
+      else if (name && !year) r.problems.push(`Không suy ra được năm nhập học từ “${name}”: cần ghi Năm nhập học`);
+      else if (!r.cells.year && year) r.cells.yearAuto = String(year);
+      if (name) seen.add(name);
+      r.data = { name, startYear: year ?? 0 };
+    }
+  }
+
+  // ---------------------------------------------------------------- lớp hành chính (kèm khóa mới)
+
+  private async checkClasses(rows: Row[]) {
+    const [classes, majors, cohorts] = await Promise.all([this.prisma.adminClass.findMany({ select: { code: true } }), this.prisma.major.findMany(), this.prisma.cohort.findMany()]);
+    const taken = new Set(classes.map((c) => c.code.toUpperCase()));
+    const seen = new Set<string>();
+    // khóa mới xuất hiện trong tệp: tên → năm nhập học (các dòng phải thống nhất)
+    const newCohorts = new Map<string, number>();
+    for (const r of rows) {
+      const c = r.cells;
+      const code = normCode(c.code ?? '');
+      const major = majors.find((m) => m.code.toUpperCase() === normCode(c.major ?? ''));
+      const cohortName = normCode(c.cohort ?? '');
+      const year = c.year ? Number(c.year) : null;
+      const cohort = cohorts.find((x) => x.name.toUpperCase() === cohortName);
+      if (!code) r.problems.push('Thiếu mã lớp');
+      else if (code.length > 30) r.problems.push('Mã lớp tối đa 30 ký tự');
+      else if (taken.has(code)) r.problems.push('Mã lớp đã tồn tại');
+      else if (seen.has(code)) r.problems.push('Mã lớp lặp trong tệp');
+      if (!major) r.problems.push(`Không có ngành “${c.major ?? ''}”`);
+      if (!cohortName) r.problems.push('Thiếu khóa');
+      else if (cohortName.length > 10) r.problems.push('Tên khóa tối đa 10 ký tự');
+      else if (c.year && (!Number.isInteger(year) || year! < 2000 || year! > 2100)) r.problems.push('Năm nhập học không hợp lệ');
+      else if (cohort && year && cohort.startYear !== year) r.problems.push(`Khóa ${cohort.name} đã có, năm nhập học ${cohort.startYear}`);
+      else if (!cohort) {
+        const y = year ?? newCohorts.get(cohortName) ?? yearOf(cohortName);
+        if (!y) r.problems.push(`Khóa ${cohortName} chưa có: cần ghi Năm nhập học`);
+        else if (newCohorts.has(cohortName) && newCohorts.get(cohortName) !== y) r.problems.push(`Khóa ${cohortName} ghi năm nhập học khác các dòng trên (${newCohorts.get(cohortName)})`);
+        else {
+          newCohorts.set(cohortName, y);
+          r.cells.cohortNew = String(y);
+        }
+      }
+      if (code) seen.add(code);
+      r.data = { code, majorId: major?.id ?? '', cohortId: cohort?.id ?? null, cohortName, year: cohort?.startYear ?? newCohorts.get(cohortName) ?? null };
+    }
+  }
+
+  private async commitClasses(adminId: string, rows: Row[], failed: { row: number; code: string; message: string }[]) {
+    const ids = new Map<string, string>();
+    let created = 0;
+    for (const r of rows) {
+      const d = r.data as { code: string; majorId: string; cohortId: string | null; cohortName: string; year: number };
+      try {
+        let cohortId = d.cohortId ?? ids.get(d.cohortName);
+        if (!cohortId) {
+          cohortId = (await this.prisma.cohort.findFirst({ where: { name: d.cohortName } }))?.id ?? (await this.academic.saveCohort(adminId, null, { name: d.cohortName, startYear: d.year })).id;
+          ids.set(d.cohortName, cohortId);
+        }
+        await this.academic.saveClass(adminId, null, { code: d.code, majorId: d.majorId, cohortId });
+        created++;
+      } catch (e) {
+        failed.push({ row: r.row, code: d.code, message: (e as Error).message });
+      }
+    }
+    return created;
+  }
+
+  // ---------------------------------------------------------------- xếp sinh viên vào lớp học phần
+
+  /** File mẫu xếp SV cho một lớp: chỉ cần điền MSSV, cột Mã lớp HP để trống. */
+  private async sectionTemplate(sectionId: string) {
+    const s = await this.prisma.courseSection.findUnique({ where: { id: sectionId }, include: { course: true } });
+    if (!s) throw new AppException('NOT_FOUND', 'Lớp học phần không tồn tại', HttpStatus.NOT_FOUND);
+    const buffer = await buildSheet('Du_lieu', COLS.enrollments, [], [
+      `Xếp sinh viên vào lớp ${s.code} – ${s.course.name}.`,
+      'Mỗi dòng một sinh viên: điền MSSV (bắt buộc), Họ tên chỉ để đối chiếu. Có thể để trống cột Mã lớp HP.',
+      'Sinh viên đã ở trong lớp, đã học môn này ở lớp khác cùng học kỳ, trùng lịch học, hoặc khi lớp đủ sĩ số sẽ bị bỏ qua.',
+    ]);
+    return { buffer, fileName: `Xep_sinh_vien_${s.code}.xlsx` };
+  }
+
+  private async checkEnrollments(rows: Row[], only?: string) {
+    if (only)
+      for (const r of rows) {
+        if (!r.cells.section) r.cells.section = only;
+        else if (normCode(r.cells.section) !== only.toUpperCase()) r.problems.push(`Dòng thuộc lớp ${r.cells.section}, không phải lớp ${only}`);
+      }
+    const secCodes = [...new Set(rows.map((r) => normCode(r.cells.section ?? '')).filter(Boolean))];
+    const stCodes = [...new Set(rows.map((r) => normCode(r.cells.code ?? '')).filter(Boolean))];
+    const [sections, students] = await Promise.all([
+      this.prisma.courseSection.findMany({ where: { code: { in: secCodes } }, include: { _count: { select: { students: true } } } }),
+      this.prisma.student.findMany({
+        where: { studentCode: { in: stCodes } },
+        include: { user: { select: { status: true } }, enrollments: { include: { section: { select: { id: true, code: true, courseId: true, semesterId: true, weekStart: true, weekEnd: true, sessions: true } } } } },
+      }),
+    ]);
+    type Sec = { id: string; code: string; courseId: string; semesterId: string; weekStart: number; weekEnd: number; sessions: unknown };
+    const secBy = new Map(sections.map((x) => [x.code.toUpperCase(), x]));
+    const stBy = new Map(students.map((x) => [x.studentCode.toUpperCase(), x]));
+    // trạng thái giả lập: lớp đã xếp của từng SV (CSDL + các dòng hợp lệ phía trên) và chỗ còn trống của từng lớp
+    const plan = new Map<string, Sec[]>(students.map((x) => [x.id, x.enrollments.map((e) => e.section)]));
+    const room = new Map(sections.map((x) => [x.id, x.maxStudents - x._count.students]));
+    const seen = new Map<string, number>();
+    const clash = (a: Sec, b: Sec) =>
+      a.semesterId === b.semesterId &&
+      a.weekStart <= b.weekEnd &&
+      b.weekStart <= a.weekEnd &&
+      (a.sessions as Session[]).some((x) => (b.sessions as Session[]).some((y) => x.day === y.day && x.from <= y.to && y.from <= x.to));
+    for (const r of rows) {
+      const secCode = normCode(r.cells.section ?? '');
+      const code = normCode(r.cells.code ?? '');
+      const sec = secBy.get(secCode);
+      const st = stBy.get(code);
+      if (!secCode) r.problems.push('Thiếu mã lớp HP');
+      else if (!sec) r.problems.push(`Không có lớp học phần “${r.cells.section}”`);
+      if (!code) r.problems.push('Thiếu MSSV');
+      else if (!st) r.problems.push(`Không có sinh viên ${code}`);
+      else if (st.user.status !== 'ACTIVE') r.problems.push('Tài khoản sinh viên đang bị khóa');
+      if (sec && st && !r.problems.length) {
+        const key = `${sec.id}:${st.id}`;
+        const mine = plan.get(st.id)!;
+        const same = mine.find((e) => e.semesterId === sec.semesterId && e.courseId === sec.courseId);
+        const clashWith = mine.find((e) => e.id !== sec.id && clash(e, sec));
+        if (seen.has(key)) r.problems.push(`Dòng lặp (đã có ở dòng ${seen.get(key)})`);
+        else if (mine.some((e) => e.id === sec.id)) r.problems.push('Sinh viên đã ở trong lớp');
+        else if (same) r.problems.push(`Đã học môn này ở lớp ${same.code}`);
+        else if (clashWith) r.problems.push(`Trùng lịch với lớp ${clashWith.code}`);
+        else if ((room.get(sec.id) ?? 0) <= 0) r.problems.push(`Lớp ${sec.code} đã đủ sĩ số (${sec.maxStudents})`);
+        else {
+          mine.push(sec);
+          room.set(sec.id, room.get(sec.id)! - 1);
+          seen.set(key, r.row);
+        }
+      }
+      r.data = { sectionId: sec?.id ?? '', code };
+    }
+  }
+
+  private async commitEnrollments(adminId: string, rows: Row[], failed: { row: number; code: string; message: string }[]) {
+    const bySection = new Map<string, Row[]>();
+    for (const r of rows) {
+      const d = r.data as { sectionId: string };
+      bySection.set(d.sectionId, [...(bySection.get(d.sectionId) ?? []), r]);
+    }
+    let created = 0;
+    for (const [sectionId, list] of bySection) {
+      // addStudents kiểm tra lại với dữ liệu mới nhất (có thể đã đổi sau bước xem trước)
+      const res = await this.academic.addStudents(adminId, sectionId, list.map((r) => (r.data as { code: string }).code));
+      created += res.added.length;
+      for (const sk of res.skipped) {
+        const r = list.find((x) => (x.data as { code: string }).code === sk.code);
+        failed.push({ row: r?.row ?? 0, code: sk.code, message: sk.reason });
+      }
+    }
+    return created;
   }
 }

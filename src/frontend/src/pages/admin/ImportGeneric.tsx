@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, Navigate, useParams } from 'react-router';
+import { Link, Navigate, useParams, useSearchParams } from 'react-router';
 import { useQueryClient } from '@tanstack/react-query';
 import { api, errorMessage } from '../../api/client';
 import { useCrumbs } from '../../layouts/AppLayout';
@@ -9,7 +9,7 @@ import { ExcelUpload, downloadFile } from '../../components/excel';
 import { Table, Tiles, useAdmin } from './kit';
 import { semName } from './AdminAcademic';
 
-type Kind = 'lecturers' | 'courses' | 'sections';
+type Kind = 'lecturers' | 'courses' | 'sections' | 'faculties' | 'majors' | 'cohorts' | 'classes' | 'enrollments';
 interface PRow {
   row: number;
   ok: boolean;
@@ -94,13 +94,98 @@ const CFG: Record<Kind, { title: string; noun: string; back: [string, string]; f
       ['Lịch học', 'Mỗi buổi "T2 1-3 A2-301" (thứ, tiết, phòng); nhiều buổi cách nhau dấu ;. Chủ nhật ghi CN.'],
       ['Trùng lịch', 'Kiểm tra trùng giờ giảng viên, trùng phòng với lớp đã có và giữa các dòng trong tệp.'],
     ],
-    note: 'Lớp được mở trong học kỳ chọn ở trên. Xếp sinh viên vào lớp trong mục chi tiết lớp sau khi import.',
+    note: 'Lớp được mở trong học kỳ chọn ở trên. Xếp sinh viên vào lớp bằng import xếp lớp hoặc trong mục chi tiết lớp.',
+  },
+  faculties: {
+    title: 'Import khoa từ Excel',
+    noun: 'khoa',
+    back: ['/admin/catalog', 'Danh mục'],
+    file: 'Mau_import_khoa.xlsx',
+    cols: [
+      ['code', 'Mã khoa'],
+      ['name', 'Tên khoa'],
+    ],
+    rules: [
+      ['Mã khoa', 'Bắt buộc, tối đa 20 ký tự, không trùng.'],
+      ['Tên khoa', 'Bắt buộc, không trùng với khoa đã có.'],
+    ],
+    note: 'Thứ tự đầu năm học: Khoa → Ngành → Khóa → Lớp hành chính → Sinh viên.',
+  },
+  majors: {
+    title: 'Import ngành từ Excel',
+    noun: 'ngành',
+    back: ['/admin/catalog', 'Danh mục'],
+    file: 'Mau_import_nganh.xlsx',
+    cols: [
+      ['code', 'Mã ngành'],
+      ['name', 'Tên ngành'],
+      ['faculty', 'Mã khoa'],
+    ],
+    rules: [
+      ['Mã ngành', 'Bắt buộc, tối đa 20 ký tự, không trùng.'],
+      ['Tên ngành', 'Bắt buộc.'],
+      ['Mã khoa', 'Bắt buộc, theo Danh mục › Khoa.'],
+    ],
+    note: 'Ngành của sinh viên lấy theo lớp hành chính; tạo ngành trước khi import lớp hành chính.',
+  },
+  cohorts: {
+    title: 'Import khóa từ Excel',
+    noun: 'khóa',
+    back: ['/admin/catalog', 'Danh mục'],
+    file: 'Mau_import_khoa_hoc.xlsx',
+    cols: [
+      ['name', 'Khóa'],
+      ['year', 'Năm nhập học'],
+    ],
+    rules: [
+      ['Khóa', 'Bắt buộc, VD: D26, tối đa 10 ký tự, không trùng.'],
+      ['Năm nhập học', 'Để trống thì lấy theo 2 số cuối tên khóa (D26 → 2026).'],
+    ],
+    note: 'Import lớp hành chính cũng tự tạo khóa còn thiếu; dùng mục này khi muốn tạo khóa trước.',
+  },
+  classes: {
+    title: 'Import lớp hành chính từ Excel',
+    noun: 'lớp hành chính',
+    back: ['/admin/catalog', 'Danh mục'],
+    file: 'Mau_import_lop_hanh_chinh.xlsx',
+    cols: [
+      ['code', 'Mã lớp'],
+      ['major', 'Mã ngành'],
+      ['cohort', 'Khóa'],
+    ],
+    rules: [
+      ['Mã lớp', 'Bắt buộc, không trùng, tối đa 30 ký tự.'],
+      ['Mã ngành', 'Theo Danh mục › Ngành.'],
+      ['Khóa', 'VD: D26. Khóa chưa có sẽ được tạo mới cùng lúc.'],
+      ['Năm nhập học', 'Để trống thì lấy theo 2 số cuối tên khóa (D26 → 2026).'],
+    ],
+    note: 'Đầu năm học: import lớp hành chính trước, sau đó import sinh viên với cột "Lớp" là mã lớp hành chính.',
+  },
+  enrollments: {
+    title: 'Xếp sinh viên vào lớp học phần từ Excel',
+    noun: 'lượt xếp lớp',
+    back: ['/admin/sections', 'Lớp học phần'],
+    file: 'Mau_xep_sinh_vien_vao_lop_hoc_phan.xlsx',
+    cols: [
+      ['section', 'Mã lớp HP'],
+      ['code', 'MSSV'],
+      ['name', 'Họ tên'],
+    ],
+    rules: [
+      ['Mã lớp HP, MSSV', 'Bắt buộc, phải có sẵn trong hệ thống. Một tệp xếp được nhiều lớp.'],
+      ['Môn học', 'Sinh viên không được học cùng một môn ở hai lớp trong một học kỳ.'],
+      ['Lịch học', 'Không trùng lịch với các lớp sinh viên đang học trong học kỳ.'],
+      ['Sĩ số', 'Không vượt sĩ số tối đa của lớp (tính cả các dòng phía trên trong tệp).'],
+    ],
+    note: 'Sinh viên được xếp vào lớp sẽ thấy lớp học phần và bài tập của lớp ngay sau khi import.',
   },
 };
 
 const cellOf = (k: Kind, key: string, c: Record<string, string>) => {
   if (k === 'courses' && key === 'w') return [c.wa, c.wb, c.wm, c.wf].every((x) => !x) ? '10 · 30 · 20 · 40' : [c.wa, c.wb, c.wm, c.wf].map((x) => x || 0).join(' · ');
   if (k === 'sections' && key === 'weeks') return `${c.ws || 1}–${c.we || 15}`;
+  if (k === 'cohorts' && key === 'year') return c.year || (c.yearAuto ? `${c.yearAuto} (theo tên khóa)` : '—');
+  if (k === 'classes' && key === 'cohort') return c.cohortNew ? `${c.cohort} (khóa mới · ${c.cohortNew})` : c.cohort || '—';
   return c[key] || '—';
 };
 
@@ -112,7 +197,7 @@ function csv(name: string, rows: (string | number)[][]) {
   a.click();
 }
 
-/** Import GV / môn học / lớp học phần từ Excel – cùng luồng 3 bước với import sinh viên. */
+/** Import GV / môn học / lớp học phần / lớp hành chính / xếp lớp từ Excel – cùng luồng 3 bước với import sinh viên. */
 export function ImportGeneric() {
   const { kind = '' } = useParams();
   const k = kind as Kind;
@@ -121,6 +206,10 @@ export function ImportGeneric() {
   const toast = useToast();
   const qc = useQueryClient();
   const sems = useAdmin<{ id: string; academicYear: string; term: string; isCurrent: boolean }[]>('/semesters', k === 'sections');
+  // ?section=<id>: xếp SV vào một lớp cụ thể (mở từ chi tiết lớp học phần) – tệp chỉ cần cột MSSV
+  const [sp] = useSearchParams();
+  const secId = k === 'enrollments' ? (sp.get('section') ?? '') : '';
+  const one = useAdmin<{ code: string; course: string }>(`/sections/${secId}/students`, !!secId);
   const [semester, setSemester] = useState('');
   const [busy, setBusy] = useState(false);
   const [prev, setPrev] = useState<Preview | null>(null);
@@ -129,14 +218,17 @@ export function ImportGeneric() {
   if (!cfg) return <Navigate to="/admin" replace />;
   const semId = semester || sems.data?.find((s) => s.isCurrent)?.id || sems.data?.[0]?.id || '';
   const step = done ? 3 : prev ? 2 : 1;
-  const tpl = `/admin/import/${k}/template`;
+  const tpl = `/admin/import/${k}/template${secId ? `?section=${secId}` : ''}`;
+  const title = secId ? `Xếp sinh viên vào lớp ${one.data?.code ?? ''}` : cfg.title;
+  const tplName = secId && one.data ? `Xep_sinh_vien_${one.data.code}.xlsx` : cfg.file;
+  const query = k === 'sections' && semId ? `?semester=${semId}` : secId ? `?section=${secId}` : '';
 
   const upload = async (f: File) => {
     setBusy(true);
     try {
       const fd = new FormData();
       fd.append('file', f);
-      setPrev((await api.post<Preview>(`/admin/import/${k}/preview${k === 'sections' && semId ? `?semester=${semId}` : ''}`, fd)).data);
+      setPrev((await api.post<Preview>(`/admin/import/${k}/preview${query}`, fd)).data);
       setFilter('');
     } catch (e) {
       toast.err(errorMessage(e));
@@ -158,17 +250,18 @@ export function ImportGeneric() {
   };
   const rows = prev?.rows.filter((r) => !filter || (filter === 'ok' ? r.ok : !r.ok)) ?? [];
   const errCount = done ? (prev?.errorRows ?? 0) + done.failed.length : 0;
+  const verb = k === 'enrollments' ? 'Xếp' : 'Tạo';
 
   return (
     <div className="page">
       <PageHead
-        title={cfg.title}
+        title={title}
         actions={
           <>
             <Link className="btn btn-g" to={cfg.back[0]}>
               <Icon name="chevronLeft" size={18} /> {cfg.back[1]}
             </Link>
-            <button className="btn" onClick={() => downloadFile(tpl, cfg.file).catch((e) => toast.err(errorMessage(e)))}>
+            <button className="btn" onClick={() => downloadFile(tpl, tplName).catch((e) => toast.err(errorMessage(e)))}>
               <Icon name="download" size={18} /> Tải tệp mẫu
             </button>
           </>
@@ -179,7 +272,7 @@ export function ImportGeneric() {
           steps={[
             { title: 'Chọn tệp', sub: prev ? prev.fileName : 'Tệp .xlsx theo mẫu', state: step > 1 ? 'done' : 'current' },
             { title: 'Kiểm tra dữ liệu', sub: prev ? `${prev.valid}/${prev.total} dòng hợp lệ` : 'Xem trước, lọc lỗi', state: step > 2 ? 'done' : step === 2 ? 'current' : 'todo' },
-            { title: 'Hoàn tất', sub: done ? `Đã tạo ${done.created} ${cfg.noun}` : `Tạo ${cfg.noun}`, state: step === 3 ? 'current' : 'todo' },
+            { title: 'Hoàn tất', sub: done ? `Đã ${verb.toLowerCase()} ${done.created} ${cfg.noun}` : `${verb} ${cfg.noun}`, state: step === 3 ? 'current' : 'todo' },
           ]}
         />
       </Card>
@@ -202,11 +295,11 @@ export function ImportGeneric() {
                 </div>
               </Card>
             )}
-            <ExcelUpload title="1. Chọn tệp danh sách" templateUrl={tpl} templateName={cfg.file} onFile={upload} busy={busy} disabled={k === 'sections' && !semId} />
+            <ExcelUpload title="1. Chọn tệp danh sách" templateUrl={tpl} templateName={tplName} onFile={upload} busy={busy} disabled={k === 'sections' && !semId} />
           </div>
           <Card title="Quy tắc dữ liệu">
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12, fontSize: 13, lineHeight: 1.5 }}>
-              {cfg.rules.map(([a, b]) => (
+              {(secId ? [['MSSV', 'Bắt buộc, phải có sẵn trong hệ thống. Cột Mã lớp HP để trống hoặc ghi đúng mã lớp này.'] as [string, string], ...cfg.rules.slice(1)] : cfg.rules).map(([a, b]) => (
                 <div key={a} style={{ display: 'flex', gap: 10 }}>
                   <span style={{ color: '#15803D', marginTop: 2 }}>
                     <Icon name="check" size={16} strokeWidth={2.2} />
@@ -217,7 +310,7 @@ export function ImportGeneric() {
                 </div>
               ))}
               <Note tone="blue" icon="info">
-                {cfg.note}
+                {secId && one.data ? `Tệp chỉ cần cột MSSV; tất cả sinh viên sẽ được xếp vào lớp ${one.data.code} – ${one.data.course}.` : cfg.note}
               </Note>
             </div>
           </Card>
@@ -231,7 +324,7 @@ export function ImportGeneric() {
               ['Tổng số dòng', prev.total, 'list'],
               ['Hợp lệ', prev.valid, 'check'],
               ['Có lỗi', prev.errorRows, 'warn'],
-              [`Sẽ tạo ${cfg.noun}`, prev.valid, 'plus'],
+              [`Sẽ ${verb.toLowerCase()} ${cfg.noun}`, prev.valid, 'plus'],
             ]}
           />
           <Card
@@ -255,20 +348,20 @@ export function ImportGeneric() {
               pageSize={15}
               cols={[
                 { h: 'Dòng', r: (r) => <span className="muted">{r.row}</span> },
-                ...cfg.cols.map(([key, h]) => ({ h, r: (r: PRow) => <span className={key === 'code' || key === 'course' || key === 'lecturer' ? 'mono' : undefined}>{cellOf(k, key, r.cells)}</span> })),
+                ...cfg.cols.map(([key, h]) => ({ h, r: (r: PRow) => <span className={['code', 'course', 'lecturer', 'section', 'major', 'faculty'].includes(key) || (k === 'cohorts' && key === 'name') ? 'mono' : undefined}>{cellOf(k, key, r.cells)}</span> })),
                 { h: 'Kết quả kiểm tra', r: (r) => (r.ok ? <Badge tone="green">Hợp lệ</Badge> : <span style={{ color: '#B42318', fontSize: 13 }}>{r.problems.join('; ')}</span>) },
               ]}
             />
           </Card>
           <Card>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
-              <span style={{ fontSize: 14 }}>{prev.errorRows ? `Các dòng lỗi sẽ được bỏ qua, chỉ tạo ${prev.valid} ${cfg.noun} hợp lệ.` : 'Tất cả các dòng đều hợp lệ.'}</span>
+              <span style={{ fontSize: 14 }}>{prev.errorRows ? `Các dòng lỗi sẽ được bỏ qua, chỉ ${verb.toLowerCase()} ${prev.valid} ${cfg.noun} hợp lệ.` : 'Tất cả các dòng đều hợp lệ.'}</span>
               <div style={{ display: 'flex', gap: 10 }}>
                 <button className="btn" onClick={() => setPrev(null)}>
                   Chọn tệp khác
                 </button>
                 <button className="btn btn-p" disabled={!prev.valid || busy} onClick={run}>
-                  {busy ? <span className="spinner" /> : <Icon name="check" size={18} />} Tạo {prev.valid} {cfg.noun}
+                  {busy ? <span className="spinner" /> : <Icon name="check" size={18} />} {verb} {prev.valid} {cfg.noun}
                 </button>
               </div>
             </div>
@@ -284,7 +377,7 @@ export function ImportGeneric() {
             </span>
             <h2 style={{ fontSize: 20 }}>Import hoàn tất</h2>
             <p className="muted">
-              Đã tạo {done.created} {cfg.noun}
+              {k === 'enrollments' ? 'Đã xếp' : 'Đã tạo'} {done.created} {cfg.noun}
               {errCount ? `, bỏ qua ${errCount} dòng lỗi` : ''}.
             </p>
             <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', justifyContent: 'center' }}>

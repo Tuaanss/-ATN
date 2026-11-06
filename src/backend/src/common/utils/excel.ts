@@ -91,7 +91,9 @@ export async function readSheet(file: { buffer?: Buffer; size: number; originaln
         }
       }
     });
-    if (Object.keys(found).length >= 2) {
+    // dòng tiêu đề: khớp ≥ 2 cột; mẫu chỉ có 1 cột bắt buộc (VD: chỉ MSSV) thì khớp đúng cột đó là đủ
+    const required = wanted.filter((c) => c.required);
+    if (Object.keys(found).length >= 2 || (required.length === 1 && required[0].key in found)) {
       headerRow = r;
       index = found;
     }

@@ -420,7 +420,7 @@ export function StudentsPage() {
           <KV
             rows={[
               ['Ngày sinh', fullDate(view.dateOfBirth)],
-              ['Lớp sinh hoạt', <span className="mono">{view.adminClass?.code ?? '—'}</span>],
+              ['Lớp hành chính', <span className="mono">{view.adminClass?.code ?? '—'}</span>],
               ['Ngành', view.major ?? '—'],
               ['Khóa', view.cohort ?? '—'],
               ['SĐT', view.phone ? <span className="mono">{view.phone}</span> : <span className="muted">Chưa khai báo</span>],
@@ -461,7 +461,7 @@ function StudentForm({ s, cat, onClose }: { s: Student | null; cat: Catalog; onC
     if (!v.studentCode.trim()) e.studentCode = 'Bắt buộc nhập MSSV.';
     if (!v.fullName.trim()) e.fullName = 'Bắt buộc nhập họ tên.';
     if (!/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(v.dateOfBirth.trim())) e.dateOfBirth = 'Định dạng dd/mm/yyyy.';
-    if (!v.adminClassId) e.adminClassId = 'Chọn lớp sinh hoạt.';
+    if (!v.adminClassId) e.adminClassId = 'Chọn lớp hành chính.';
     if (v.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.email)) e.email = 'Email không hợp lệ.';
     if (v.phone && !/^(03|05|07|08|09)\d{8}$/.test(v.phone)) e.phone = 'SĐT gồm 10 số, bắt đầu 03/05/07/08/09.';
     setErr(e);
@@ -501,7 +501,7 @@ function StudentForm({ s, cat, onClose }: { s: Student | null; cat: Catalog; onC
           </Field>
         </Full>
         <Full>
-          <Field label="Lớp sinh hoạt *" help="Ngành và khóa được lấy theo lớp sinh hoạt." error={err.adminClassId}>
+          <Field label="Lớp hành chính *" help="Ngành và khóa được lấy theo lớp hành chính." error={err.adminClassId}>
             <select className="inp" value={v.adminClassId} onChange={set('adminClassId')}>
               {cat.classes.map((c) => (
                 <option key={c.id} value={c.id}>

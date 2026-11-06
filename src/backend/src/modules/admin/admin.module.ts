@@ -213,6 +213,10 @@ export class AdminAcademicController {
   editClass(@CurrentUser() u: AuthUser, @Param('id', ParseUUIDPipe) id: string, @Body(new ZodPipe(classSchema)) d: z.infer<typeof classSchema>) {
     return this.svc.saveClass(u.sub, id, d);
   }
+  @Get('catalog/classes/:id/students')
+  classStudents(@Param('id', ParseUUIDPipe) id: string) {
+    return this.svc.classStudents(id);
+  }
   @Delete('catalog/classes/:id')
   delClass(@CurrentUser() u: AuthUser, @Param('id', ParseUUIDPipe) id: string) {
     return this.svc.deleteClass(u.sub, id);
@@ -349,14 +353,14 @@ export class AdminImportController {
   }
 
   @Get(':kind/template')
-  async template(@Param('kind') kind: string, @Res() res: Response) {
-    sendXlsx(res, await this.svc.template(this.kind(kind)));
+  async template(@Param('kind') kind: string, @Query('section') section: string | undefined, @Res() res: Response) {
+    sendXlsx(res, await this.svc.template(this.kind(kind), section || undefined));
   }
 
   @Post(':kind/preview')
   @ExcelUpload()
-  preview(@Param('kind') kind: string, @Query('semester') semester?: string, @UploadedFile() file?: Express.Multer.File) {
-    return this.svc.preview(this.kind(kind), excelFile(file), semester || undefined);
+  preview(@Param('kind') kind: string, @Query('semester') semester?: string, @Query('section') section?: string, @UploadedFile() file?: Express.Multer.File) {
+    return this.svc.preview(this.kind(kind), excelFile(file), semester || undefined, section || undefined);
   }
 
   @Post(':kind/:jobId/commit')

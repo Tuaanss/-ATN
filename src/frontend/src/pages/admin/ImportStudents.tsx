@@ -104,7 +104,7 @@ export function ImportStudents() {
                 ['MSSV', 'Bắt buộc, không trùng trong tệp và trong hệ thống.'],
                 ['Họ tên', 'Bắt buộc, tối đa 100 ký tự.'],
                 ['Ngày sinh', 'Bắt buộc, dd/mm/yyyy — dùng làm mật khẩu ban đầu.'],
-                ['Lớp', `Mã lớp sinh hoạt phải có trong danh mục${cat.data?.classes.length ? `, VD: ${cat.data.classes.slice(0, 2).map((c) => c.code).join(', ')}` : ''}. Khóa, ngành lấy theo lớp.`],
+                ['Lớp', `Mã lớp hành chính phải có trong danh mục${cat.data?.classes.length ? `, VD: ${cat.data.classes.slice(0, 2).map((c) => c.code).join(', ')}` : ''}. Khóa, ngành lấy theo lớp.`],
                 ['Email, SĐT', 'Không bắt buộc — sinh viên tự khai báo khi đăng nhập lần đầu.'],
               ].map(([k, v]) => (
                 <div key={k} style={{ display: 'flex', gap: 10 }}>

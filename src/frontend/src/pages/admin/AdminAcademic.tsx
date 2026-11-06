@@ -4,7 +4,7 @@ import { useCrumbs } from '../../layouts/AppLayout';
 import { Icon } from '../../components/Icon';
 import { Badge, Bar, Card, Field, Loading, PageHead, Tabs, type Tone } from '../../components/ui';
 import { COURSE_TYPE, fullDate } from '../../utils/format';
-import { Actions, Count, FormModal, Full, Grid2, IconBtn, SearchBox, Select, Table, Toolbar, norm, useAct, useAdmin, useConfirm, type Col } from './kit';
+import { Actions, Count, FormModal, Full, Grid2, IconBtn, SearchBox, Select, StatusBadge, Table, Toolbar, norm, useAct, useAdmin, useConfirm, type Col } from './kit';
 import type { Catalog } from './AdminUsers';
 
 const PRODUCTS: Record<string, string> = { DESIGN: 'Ảnh thiết kế, link Figma, báo cáo', PROGRAMMING: 'Video demo, mã nguồn, link GitHub, báo cáo', OTHER: 'Tùy giảng viên chọn' };
@@ -27,6 +27,9 @@ export function CatalogPage() {
   const [tab, setTab] = useState<CatKey>('faculties');
   const [q, setQ] = useState('');
   const [edit, setEdit] = useState<Row | 'new' | null>(null);
+  const [fCohort, setFCohort] = useState('');
+  const [fMajor, setFMajor] = useState('');
+  const [view, setView] = useState<string | null>(null);
   if (!q0.data) return <Loading />;
   const c = q0.data;
   const num = (n: unknown) => <span style={{ fontVariantNumeric: 'tabular-nums' }}>{String(n)}</span>;
@@ -81,9 +84,9 @@ export function CatalogPage() {
       ],
     },
     classes: {
-      label: 'Lớp sinh hoạt',
+      label: 'Lớp hành chính',
       api: 'classes',
-      hint: 'Lớp hành chính; ngành và khóa của sinh viên lấy theo lớp.',
+      hint: 'Ngành và khóa của sinh viên lấy theo lớp.',
       rows: c.classes.map((x) => ({ ...x, majorId: x.major.id, cohortId: x.cohort.id })) as unknown as Row[],
       cols: [
         { h: 'Mã lớp', r: (x) => <b className="mono">{String(x.code)}</b> },
@@ -110,7 +113,9 @@ export function CatalogPage() {
     },
   };
   const cur = CATS[tab];
-  const rows = cur.rows.filter((x) => !q || norm(Object.values(x).map((v) => (typeof v === 'object' && v ? Object.values(v).join(' ') : String(v))).join(' ')).includes(norm(q)));
+  const rows = cur.rows
+    .filter((x) => tab !== 'classes' || ((!fCohort || x.cohortId === fCohort) && (!fMajor || x.majorId === fMajor)))
+    .filter((x) => !q || norm(Object.values(x).map((v) => (typeof v === 'object' && v ? Object.values(v).join(' ') : String(v))).join(' ')).includes(norm(q)));
   const del = async (x: Row) => {
     if (!(await confirm({ title: `Xóa ${cur.label.toLowerCase()}`, msg: <>Xóa <b>{String(x.name ?? x.code)}</b> khỏi danh mục?</>, ok: 'Xóa', danger: true }))) return;
     await act.mutateAsync({ method: 'delete', path: `catalog/${cur.api}/${x.id}`, ok: 'Đã xóa.' }).catch(() => undefined);
@@ -123,6 +128,7 @@ export function CatalogPage() {
           align: 'right',
           r: (x) => (
             <Actions>
+              {tab === 'classes' && <IconBtn icon="eye" title="Xem danh sách sinh viên" onClick={() => setView(x.id)} />}
               <IconBtn icon="edit" title="Sửa" onClick={() => setEdit(x)} />
               <IconBtn icon="trash" title="Xóa" onClick={() => del(x)} />
             </Actions>
@@ -136,9 +142,14 @@ export function CatalogPage() {
         title="Quản lý danh mục"
         actions={
           cur.api && (
-            <button className="btn btn-p" onClick={() => setEdit('new')}>
-              <Icon name="plus" size={18} /> Thêm {cur.label.toLowerCase()}
-            </button>
+            <>
+              <Link className="btn" to={`/admin/import/${tab}`}>
+                <Icon name="sheet" size={18} /> Import {cur.label.toLowerCase()}
+              </Link>
+              <button className="btn btn-p" onClick={() => setEdit('new')}>
+                <Icon name="plus" size={18} /> Thêm {cur.label.toLowerCase()}
+              </button>
+            </>
           )
         }
       />
@@ -149,6 +160,8 @@ export function CatalogPage() {
             onChange={(k) => {
               setTab(k);
               setQ('');
+              setFCohort('');
+              setFMajor('');
             }}
             items={(Object.keys(CATS) as CatKey[]).map((k) => ({
               key: k,
@@ -162,15 +175,98 @@ export function CatalogPage() {
           />
         </div>
         <Toolbar>
-          <SearchBox value={q} onChange={setQ} placeholder="Tìm trong danh mục…" />
+          <SearchBox value={q} onChange={setQ} placeholder={tab === 'classes' ? 'Tìm mã lớp, ngành, khóa…' : 'Tìm trong danh mục…'} />
+          {tab === 'classes' && (
+            <>
+              <Select label="Khóa" value={fCohort} onChange={setFCohort}>
+                <option value="">Tất cả khóa</option>
+                {c.cohorts.map((x) => (
+                  <option key={x.id} value={x.id}>
+                    {x.name}
+                  </option>
+                ))}
+              </Select>
+              <Select label="Ngành" value={fMajor} onChange={setFMajor}>
+                <option value="">Tất cả ngành</option>
+                {c.majors.map((x) => (
+                  <option key={x.id} value={x.id}>
+                    {x.code} – {x.name}
+                  </option>
+                ))}
+              </Select>
+            </>
+          )}
           <span className="muted" style={{ fontSize: 13 }}>
             {cur.hint}
           </span>
         </Toolbar>
-        <Table rows={rows} rowKey={(x) => x.id} cols={cols} pageSize={10} />
+        <Table rows={rows} rowKey={(x) => x.id} cols={cols} pageSize={10} onRow={tab === 'classes' ? (x) => setView(x.id) : undefined} />
       </Card>
+      {view && <ClassStudents id={view} onClose={() => setView(null)} />}
       {edit && cur.fields && <CatalogForm cat={c} label={cur.label} api={cur.api!} fields={cur.fields} row={edit === 'new' ? null : edit} onClose={() => setEdit(null)} />}
     </div>
+  );
+}
+
+interface ClassDetail {
+  id: string;
+  code: string;
+  major: string;
+  cohort: string;
+  students: { id: string; studentCode: string; fullName: string; dateOfBirth: string; email: string | null; phone: string | null; status: string }[];
+}
+
+/** Danh sách sinh viên của một lớp hành chính, tìm theo MSSV / họ tên / email / SĐT. */
+function ClassStudents({ id, onClose }: { id: string; onClose: () => void }) {
+  const q0 = useAdmin<ClassDetail>(`/catalog/classes/${id}/students`);
+  const [q, setQ] = useState('');
+  const [st, setSt] = useState('');
+  const d = q0.data;
+  const list = (d?.students ?? []).filter((x) => (!st || x.status === st) && (!q || norm(`${x.studentCode} ${x.fullName} ${x.email ?? ''} ${x.phone ?? ''}`).includes(norm(q))));
+  return (
+    <FormModal
+      title={d ? `Lớp ${d.code} · ${d.major} · Khóa ${d.cohort}` : 'Danh sách sinh viên'}
+      width={960}
+      onClose={onClose}
+      foot={
+        <button className="btn" onClick={onClose}>
+          Đóng
+        </button>
+      }
+    >
+      {!d ? (
+        <Loading />
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+            <SearchBox value={q} onChange={setQ} placeholder="Tìm MSSV, họ tên, email, SĐT…" />
+            <Select label="Trạng thái" value={st} onChange={setSt}>
+              <option value="">Tất cả trạng thái</option>
+              <option value="ACTIVE">Hoạt động</option>
+              <option value="FIRST_LOGIN">Chưa đăng nhập lần đầu</option>
+              <option value="LOCKED">Đã khóa</option>
+            </Select>
+            <span className="muted" style={{ fontSize: 13, marginLeft: 'auto' }}>
+              {list.length === d.students.length ? `${d.students.length} sinh viên` : `${list.length} / ${d.students.length} sinh viên`}
+            </span>
+          </div>
+          <Table
+            rows={list}
+            rowKey={(x) => x.id}
+            pageSize={10}
+            empty={d.students.length ? 'Không có sinh viên phù hợp.' : 'Lớp chưa có sinh viên.'}
+            cols={[
+              { h: 'MSSV', r: (x) => <span className="mono">{x.studentCode}</span> },
+              { h: 'Họ tên', r: (x) => <b>{x.fullName}</b> },
+              { h: 'Ngày sinh', r: (x) => fullDate(x.dateOfBirth) },
+              { h: 'Email', r: (x) => x.email ?? '—' },
+              { h: 'SĐT', r: (x) => x.phone ?? '—' },
+              { h: 'Trạng thái', r: (x) => <StatusBadge s={x.status} /> },
+            ]}
+          />
+        </div>
+      )}
+    </FormModal>
   );
 }
 

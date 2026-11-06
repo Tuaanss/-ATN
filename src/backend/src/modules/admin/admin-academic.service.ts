@@ -112,7 +112,7 @@ export class AdminAcademicService {
   async deleteMajor(adminId: string, id: string) {
     const m = await this.prisma.major.findUnique({ where: { id }, include: { _count: { select: { classes: true } } } });
     if (!m) throw notFound('Ngành');
-    if (m._count.classes) throw inUse(`ngành đang có ${m._count.classes} lớp sinh hoạt`);
+    if (m._count.classes) throw inUse(`ngành đang có ${m._count.classes} lớp hành chính`);
     await this.prisma.major.delete({ where: { id } });
     await this.log(adminId, 'DELETE_CATALOG', 'major', id, `Xóa ngành ${m.code}`);
     return { ok: true };
@@ -129,7 +129,7 @@ export class AdminAcademicService {
   async deleteCohort(adminId: string, id: string) {
     const c = await this.prisma.cohort.findUnique({ where: { id }, include: { _count: { select: { classes: true } } } });
     if (!c) throw notFound('Khóa');
-    if (c._count.classes) throw inUse(`khóa đang có ${c._count.classes} lớp sinh hoạt`);
+    if (c._count.classes) throw inUse(`khóa đang có ${c._count.classes} lớp hành chính`);
     await this.prisma.cohort.delete({ where: { id } });
     await this.log(adminId, 'DELETE_CATALOG', 'cohort', id, `Xóa khóa ${c.name}`);
     return { ok: true };
@@ -141,17 +141,46 @@ export class AdminAcademicService {
       this.unique(e, 'Mã lớp đã tồn tại'),
     );
     if (id) await this.prisma.student.updateMany({ where: { adminClassId: id }, data: { major: c.major.name, cohort: c.cohort.name } });
-    await this.log(adminId, id ? 'UPDATE_CATALOG' : 'CREATE_CATALOG', 'admin_class', c.id, `${id ? 'Sửa' : 'Thêm'} lớp sinh hoạt ${c.code}`);
+    await this.log(adminId, id ? 'UPDATE_CATALOG' : 'CREATE_CATALOG', 'admin_class', c.id, `${id ? 'Sửa' : 'Thêm'} lớp hành chính ${c.code}`);
     return c;
   }
 
   async deleteClass(adminId: string, id: string) {
     const c = await this.prisma.adminClass.findUnique({ where: { id }, include: { _count: { select: { students: true } } } });
-    if (!c) throw notFound('Lớp sinh hoạt');
+    if (!c) throw notFound('Lớp hành chính');
     if (c._count.students) throw inUse(`lớp đang có ${c._count.students} sinh viên`);
     await this.prisma.adminClass.delete({ where: { id } });
-    await this.log(adminId, 'DELETE_CATALOG', 'admin_class', id, `Xóa lớp sinh hoạt ${c.code}`);
+    await this.log(adminId, 'DELETE_CATALOG', 'admin_class', id, `Xóa lớp hành chính ${c.code}`);
     return { ok: true };
+  }
+
+  /** Danh sách sinh viên của một lớp hành chính (Danh mục › Lớp hành chính › Xem sinh viên). */
+  async classStudents(id: string) {
+    const c = await this.prisma.adminClass.findUnique({
+      where: { id },
+      include: {
+        major: true,
+        cohort: true,
+        students: { include: { user: { select: { status: true, mustChangePassword: true, lastLoginAt: true } } }, orderBy: { studentCode: 'asc' } },
+      },
+    });
+    if (!c) throw notFound('Lớp hành chính');
+    return {
+      id: c.id,
+      code: c.code,
+      major: c.major.name,
+      cohort: c.cohort.name,
+      students: c.students.map((s) => ({
+        id: s.id,
+        studentCode: s.studentCode,
+        fullName: s.fullName,
+        dateOfBirth: s.dateOfBirth,
+        email: s.email,
+        phone: s.phone,
+        status: s.user.status === 'ACTIVE' && s.user.mustChangePassword ? 'FIRST_LOGIN' : s.user.status,
+        lastLoginAt: s.user.lastLoginAt,
+      })),
+    };
   }
 
   // ================================================================ học kỳ (UC02.8)

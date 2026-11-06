@@ -37,7 +37,7 @@ const STUDENT_COLS: SheetColumn[] = [
   { key: 'code', header: 'MSSV', width: 14, aliases: ['MSV', 'Mã sinh viên'], required: true },
   { key: 'name', header: 'Họ tên', width: 28, aliases: ['Họ và tên'], required: true },
   { key: 'dob', header: 'Ngày sinh', width: 14, required: true },
-  { key: 'class', header: 'Lớp', width: 14, aliases: ['Lớp sinh hoạt', 'Mã lớp'], required: true },
+  { key: 'class', header: 'Lớp', width: 14, aliases: ['Lớp hành chính', 'Lớp sinh hoạt', 'Mã lớp'], required: true },
   { key: 'email', header: 'Email', width: 26 },
   { key: 'phone', header: 'SĐT', width: 14, aliases: ['Số điện thoại'] },
 ];
@@ -166,7 +166,7 @@ export class AdminUsersService {
   private async classInfo(adminClassId?: string | null) {
     if (!adminClassId) return { adminClassId: null, cohort: null, major: null };
     const c = await this.prisma.adminClass.findUnique({ where: { id: adminClassId }, include: { major: true, cohort: true } });
-    if (!c) throw new AppException('VALIDATION_ERROR', 'Lớp sinh hoạt không tồn tại');
+    if (!c) throw new AppException('VALIDATION_ERROR', 'Lớp hành chính không tồn tại');
     return { adminClassId: c.id, cohort: c.cohort.name, major: c.major.name };
   }
 
@@ -221,7 +221,7 @@ export class AdminUsersService {
 
   async studentTemplate() {
     const buffer = await buildSheet('Sinh_vien', STUDENT_COLS, [['SV1001', 'Nguyễn Văn A', '15/03/2005', (await this.prisma.adminClass.findFirst())?.code ?? 'D22TKDH1', 'a.nguyen@email.com', '0912345678']], [
-      'Mỗi dòng là một sinh viên. Cột bắt buộc: MSSV, Họ tên, Ngày sinh (dd/mm/yyyy), Lớp (mã lớp sinh hoạt đã có trong Danh mục).',
+      'Mỗi dòng là một sinh viên. Cột bắt buộc: MSSV, Họ tên, Ngày sinh (dd/mm/yyyy), Lớp (mã lớp hành chính đã có trong Danh mục).',
       'Email, SĐT không bắt buộc – sinh viên tự khai báo khi đăng nhập lần đầu.',
       'Mật khẩu ban đầu = ngày sinh dạng ddmmyyyy; sinh viên phải đổi ở lần đăng nhập đầu tiên.',
       'Tối đa 2.000 dòng, 5 MB.',

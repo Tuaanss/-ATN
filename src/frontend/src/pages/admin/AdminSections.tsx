@@ -103,8 +103,11 @@ export function SectionsPage() {
         title="Lớp học phần"
         actions={
           <>
+            <Link className="btn" to="/admin/import/enrollments">
+              <Icon name="users" size={18} /> Xếp sinh viên từ Excel
+            </Link>
             <Link className="btn" to="/admin/import/sections">
-              <Icon name="sheet" size={18} /> Import từ Excel
+              <Icon name="sheet" size={18} /> Import lớp học phần
             </Link>
             <button className="btn btn-p" onClick={() => setForm({ s: null })}>
               <Icon name="plus" size={18} /> Tạo lớp học phần
@@ -565,9 +568,14 @@ function SectionDetail({ id, sec, onClose, onEdit }: { id: string; sec?: Section
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
             <h3 style={{ fontSize: 15 }}>Danh sách sinh viên</h3>
-            <button className="btn btn-sm" onClick={() => setBulk(bulk === null ? '' : null)}>
-              <Icon name="sheet" size={15} /> Thêm hàng loạt
-            </button>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button className="btn btn-sm" onClick={() => setBulk(bulk === null ? '' : null)}>
+                <Icon name="list" size={15} /> Dán danh sách MSSV
+              </button>
+              <Link className="btn btn-sm" to={`/admin/import/enrollments?section=${id}`}>
+                <Icon name="sheet" size={15} /> Tải từ Excel
+              </Link>
+            </div>
           </div>
           {bulk === null ? (
             <form
@@ -615,7 +623,7 @@ function SectionDetail({ id, sec, onClose, onEdit }: { id: string; sec?: Section
                     <tr>
                       <th>#</th>
                       <th>Sinh viên</th>
-                      <th>Lớp SH</th>
+                      <th>Lớp HC</th>
                       <th />
                     </tr>
                   </thead>
