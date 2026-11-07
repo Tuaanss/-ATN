@@ -75,10 +75,10 @@ async function main() {
   await wipe();
 
   await prisma.user.create({ data: { username: 'admin', passwordHash: await argon2.hash('Admin@123'), role: 'ADMIN', mustChangePassword: false, email: 'admin@truong.edu.vn' } });
-  const faculty = await prisma.faculty.create({ data: { code: 'TKTT', name: 'Khoa Thiết kế & Truyền thông' } });
-  const major = await prisma.major.create({ data: { code: 'TKDH', name: 'Thiết kế đồ họa', facultyId: faculty.id } });
+  const faculty = await prisma.faculty.create({ data: { code: 'MULTIMEDIA', name: 'Khoa Đa phương tiện' } });
+  const major = await prisma.major.create({ data: { code: 'CNDPT', name: 'Công nghệ đa phương tiện', facultyId: faculty.id } });
   const cohort = await prisma.cohort.create({ data: { name: 'D22', startYear: 2022 } });
-  const cls = await prisma.adminClass.create({ data: { code: 'D22TKDH1', majorId: major.id, cohortId: cohort.id } });
+  const cls = await prisma.adminClass.create({ data: { code: 'D22DCPT01-B', majorId: major.id, cohortId: cohort.id } });
 
   const gv = await prisma.lecturer.create({
     data: {
@@ -102,7 +102,7 @@ async function main() {
           fullName: `Sinh viên ${i}`,
           dateOfBirth: dob,
           cohort: 'D22',
-          major: 'Thiết kế đồ họa',
+          major: 'Công nghệ đa phương tiện',
           adminClass: { connect: { id: cls.id } },
           email: `sinhvien${i}@email.com`,
           profileCompletedAt: new Date(),
