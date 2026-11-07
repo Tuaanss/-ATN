@@ -1,0 +1,10 @@
+{
+  // Cho editor/tsc kiểm tra seed.ts (nằm ngoài "include" của tsconfig chính, không đưa vào bản build)
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "rootDir": ".",
+    "noEmit": true,
+    "incremental": false
+  },
+  "include": ["./**/*.ts"]
+}
