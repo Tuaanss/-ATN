@@ -13,7 +13,6 @@ interface Sub {
   title: string;
   workMode: 'GROUP' | 'INDIVIDUAL';
   course: string;
-  courseType: string;
   sectionCode: string;
   semester: { code: string; academicYear: string; term: string };
   dueAt: string;

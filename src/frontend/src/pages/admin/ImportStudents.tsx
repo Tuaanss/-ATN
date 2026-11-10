@@ -62,7 +62,7 @@ export function ImportStudents() {
   };
   const errorReport = () => {
     const rows = [...(done?.skipped.map((r) => [r.row, r.studentCode, r.fullName, r.problems.join('; ')]) ?? []), ...(done?.failed.map((f) => [f.row, f.studentCode, '', f.message]) ?? [])];
-    const csv = '﻿' + [['Dòng', 'MSSV', 'Họ tên', 'Lỗi'], ...rows].map((r) => r.map((c) => `"${String(c ?? '').replace(/"/g, '""')}"`).join(',')).join('\r\n');
+    const csv = '﻿' + [['Dòng', 'MSV', 'Họ tên', 'Lỗi'], ...rows].map((r) => r.map((c) => `"${String(c ?? '').replace(/"/g, '""')}"`).join(',')).join('\r\n');
     const a = document.createElement('a');
     a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
     a.download = 'Bao_cao_loi_import_sinh_vien.csv';
@@ -101,7 +101,7 @@ export function ImportStudents() {
           <Card title="Quy tắc dữ liệu">
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12, fontSize: 13, lineHeight: 1.5 }}>
               {[
-                ['MSSV', 'Bắt buộc, không trùng trong tệp và trong hệ thống.'],
+                ['MSV', 'Bắt buộc, không trùng trong tệp và trong hệ thống.'],
                 ['Họ tên', 'Bắt buộc, tối đa 100 ký tự.'],
                 ['Ngày sinh', 'Bắt buộc, dd/mm/yyyy — dùng làm mật khẩu ban đầu.'],
                 ['Lớp', `Mã lớp hành chính phải có trong danh mục${cat.data?.classes.length ? `, VD: ${cat.data.classes.slice(0, 2).map((c) => c.code).join(', ')}` : ''}. Khóa, ngành lấy theo lớp.`],
@@ -155,7 +155,7 @@ export function ImportStudents() {
               pageSize={15}
               cols={[
                 { h: 'Dòng', r: (r) => <span className="muted">{r.row}</span> },
-                { h: 'MSSV', r: (r) => <span className="mono">{r.studentCode || '—'}</span> },
+                { h: 'MSV', r: (r) => <span className="mono">{r.studentCode || '—'}</span> },
                 { h: 'Họ tên', r: (r) => r.fullName || '—' },
                 { h: 'Ngày sinh', r: (r) => r.dateOfBirth || '—' },
                 { h: 'Lớp', r: (r) => <span className="mono">{r.classCode || '—'}</span> },

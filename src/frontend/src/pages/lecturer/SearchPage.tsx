@@ -5,7 +5,7 @@ import { api, fileUrl } from '../../api/client';
 import { useCrumbs } from '../../layouts/AppLayout';
 import { Icon } from '../../components/Icon';
 import { Badge, Card, Empty, PageHead, Seg } from '../../components/ui';
-import { COURSE_TYPE, ddmm, score10 } from '../../utils/format';
+import { ddmm, score10 } from '../../utils/format';
 
 type By = 'topic' | 'name' | 'code' | 'note';
 type Sort = 'relevance' | 'newest' | 'score';
@@ -16,7 +16,6 @@ interface Filters {
   semesters: { code: string; term: string; academicYear: string }[];
   courses: { code: string; name: string }[];
   sections: { id: string; code: string; course: string }[];
-  types: string[];
   suggestions: string[];
 }
 interface Item {
@@ -30,7 +29,7 @@ interface Item {
   note: { content: string; isSample: boolean } | null;
   members: { fullName: string; studentCode: string }[];
   cohorts: string[];
-  section: { code: string; course: string; courseType: string };
+  section: { code: string; course: string };
   semester: { code: string; term: string; academicYear: string };
   score: number | null;
   gradesPublished: boolean;
@@ -48,10 +47,10 @@ interface Result {
   items: Item[];
 }
 
-const BY_LABEL: Record<By, string> = { topic: 'Chủ đề / từ khóa', name: 'Tên sinh viên', code: 'MSSV', note: 'Ghi chú của tôi' };
-const PLACEHOLDER: Record<By, string> = { topic: 'Nhập tên đề tài hoặc từ khóa, VD: thương mại điện tử', name: 'Nhập họ tên sinh viên', code: 'Nhập MSSV, VD: SV0001', note: 'Tìm trong ghi chú bạn đã viết, VD: thiết kế đẹp' };
+const BY_LABEL: Record<By, string> = { topic: 'Chủ đề / từ khóa', name: 'Tên sinh viên', code: 'MSV', note: 'Ghi chú của tôi' };
+const PLACEHOLDER: Record<By, string> = { topic: 'Nhập tên đề tài hoặc từ khóa, VD: thương mại điện tử', name: 'Nhập họ tên sinh viên', code: 'Nhập MSV, VD: SV0001', note: 'Tìm trong ghi chú bạn đã viết, VD: thiết kế đẹp' };
 const shortTerm = (s: { term: string; academicYear: string }) => `${s.term === 'TERM_1' ? 'HK1' : s.term === 'TERM_2' ? 'HK2' : 'Hè'} ${s.academicYear.replace(/20(\d\d)-20(\d\d)/, '$1–$2')}`;
-const FILTER_KEYS = ['cohort', 'major', 'course', 'section', 'type', 'min', 'max', 'sample'] as const;
+const FILTER_KEYS = ['cohort', 'major', 'course', 'section', 'min', 'max', 'sample'] as const;
 
 function Thumb({ it }: { it: Item }) {
   const box = { width: 168, height: 112, borderRadius: 10, flexShrink: 0, overflow: 'hidden', position: 'relative' } as const;
@@ -107,7 +106,7 @@ export function SearchPage() {
     setParams(next);
   };
   const submit = (q = text) => update({ q: q.trim() || undefined });
-  const toggle = (key: 'cohort' | 'type', v: string) => {
+  const toggle = (key: 'cohort', v: string) => {
     const cur = draft[key] ? draft[key].split(',') : [];
     setDraft({ ...draft, [key]: (cur.includes(v) ? cur.filter((x) => x !== v) : [...cur, v]).join(',') });
   };
@@ -124,7 +123,7 @@ export function SearchPage() {
 
   return (
     <div className="page">
-      <PageHead title="Tìm kiếm bài nộp" sub="Tìm theo chủ đề, tên sinh viên, MSSV hoặc ghi chú của bạn; lọc theo khóa, ngành, môn học và bài mẫu. Không phân biệt dấu và hoa thường" />
+      <PageHead title="Tìm kiếm bài nộp" sub="Tìm theo chủ đề, tên sinh viên, MSV hoặc ghi chú của bạn; lọc theo khóa, ngành, môn học và bài mẫu. Không phân biệt dấu và hoa thường" />
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, fontSize: 13 }}>
         <span className="muted">Tìm theo</span>
@@ -231,19 +230,6 @@ export function SearchPage() {
               ))}
             </select>
           </div>
-          {!!f && f.types.length > 1 && (
-            <div>
-              <span className="lbl">Loại bài</span>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {f.types.map((t) => (
-                  <label key={t} style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 14 }}>
-                    <input type="checkbox" checked={draft.type.split(',').includes(t)} onChange={() => toggle('type', t)} />
-                    {COURSE_TYPE[t]?.label ?? t}
-                  </label>
-                ))}
-              </div>
-            </div>
-          )}
           <div>
             <span className="lbl">Khoảng điểm</span>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -278,7 +264,6 @@ export function SearchPage() {
             [0, 1, 2].map((i) => <div key={i} className="skeleton" style={{ height: 144 }} />)
           ) : r?.items.length ? (
             r.items.map((it) => {
-              const t = COURSE_TYPE[it.section.courseType] ?? COURSE_TYPE.OTHER;
               return (
                 <div key={it.submissionId} className="card" style={{ padding: 16, display: 'flex', gap: 18, alignItems: 'center', opacity: resQ.isFetching ? 0.6 : 1 }}>
                   <Thumb it={it} />
@@ -318,7 +303,6 @@ export function SearchPage() {
                     )}
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 10, flexShrink: 0, minWidth: 110 }}>
-                    <Badge tone={t.tone}>{t.label}</Badge>
                     {it.note?.isSample && (
                       <Badge tone="amber">
                         <Icon name="star" size={12} />

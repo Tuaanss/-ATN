@@ -5,7 +5,7 @@ import { useCrumbs } from '../../layouts/AppLayout';
 import { Icon } from '../../components/Icon';
 import { Badge, Card, Empty, Loading, PageHead, Stat, type Tone } from '../../components/ui';
 import { ddmm, fullDT } from '../../utils/format';
-import { gpa } from './common';
+import { avg } from './common';
 
 interface Dash {
   enterprise: { name: string; field: string };
@@ -13,7 +13,7 @@ interface Dash {
   active: { studentId: string; studentCode: string; fullName: string; approvedAt: string; daysLeft: number }[];
   history: { id: string; studentId: string; studentCode: string; fullName: string; state: string; adminNote: string | null; createdAt: string }[];
   searches: { id: string; summary: string; results: number; at: string; criteria: unknown }[];
-  interests: { studentId: string; studentCode: string; fullName: string; cohort: string | null; major: string | null; gpa: number | null }[];
+  interests: { studentId: string; studentCode: string; fullName: string; cohort: string | null; major: string | null; avgScore: number | null }[];
 }
 const ST: Record<string, [string, Tone]> = { PENDING: ['Chờ duyệt', 'amber'], ACTIVE: ['Đang còn hạn', 'green'], EXPIRED: ['Hết hạn', 'gray'], REJECTED: ['Từ chối', 'red'], REVOKED: ['Thu hồi', 'gray'] };
 
@@ -139,7 +139,7 @@ export function EnterpriseDashboard() {
                       {s.cohort ?? '—'} · {s.major ?? '—'}
                     </div>
                   </div>
-                  <b className="mono">{gpa(s.gpa)}</b>
+                  <b className="mono">{avg(s.avgScore)}</b>
                 </Link>
               ))}
             </div>

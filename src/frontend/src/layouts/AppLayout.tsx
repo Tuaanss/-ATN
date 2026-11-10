@@ -32,7 +32,7 @@ const NAV: Record<Role3, { to: string; label: string; icon: IconName; end?: bool
     { to: '/lecturer', label: 'Tổng quan', icon: 'home', end: true },
     { to: '/lecturer/sections', label: 'Lớp học phần', icon: 'grid', match: /^\/lecturer\/(sections|assignments\/(?!new))/ },
     { to: '/lecturer/assignments/new', label: 'Tạo bài tập', icon: 'plus' },
-    { to: '/lecturer/gradebook', label: 'Bảng điểm', icon: 'list' },
+    { to: '/lecturer/gradebook', label: 'Điểm bài tập', icon: 'list' },
     { to: '/lecturer/search', label: 'Tìm kiếm bài nộp', icon: 'search' },
     { to: '/lecturer/stats', label: 'Thống kê & xu hướng', icon: 'trend' },
     { to: '/lecturer/drive', label: 'Kết nối Google Drive', icon: 'drive' },
@@ -40,7 +40,7 @@ const NAV: Record<Role3, { to: string; label: string; icon: IconName; end?: bool
   STUDENT: [
     { to: '/student', label: 'Tổng quan', icon: 'home', end: true },
     { to: '/student/assignments', label: 'Bài tập của tôi', icon: 'list', match: /^\/student\/(assignments|courses)/ },
-    { to: '/student/grades', label: 'Kết quả học tập', icon: 'chart' },
+    { to: '/student/grades', label: 'Điểm bài tập', icon: 'chart' },
     { to: '/student/privacy', label: 'Doanh nghiệp & riêng tư', icon: 'shield' },
     { to: '/student/profile', label: 'Hồ sơ cá nhân', icon: 'user' },
   ],
@@ -52,7 +52,7 @@ const NAV: Record<Role3, { to: string; label: string; icon: IconName; end?: bool
     { to: '/enterprise', label: 'Yêu cầu & thống kê', icon: 'chart', end: true },
   ],
   PARENT: [
-    { to: '/parent', label: 'Điểm, GPA & CPA', icon: 'chart', end: true },
+    { to: '/parent', label: 'Điểm bài tập', icon: 'chart', end: true },
     { to: '/parent/submissions', label: 'Bài nộp của con', icon: 'image' },
     { to: '/parent/notifications', label: 'Thông báo & cảnh báo', icon: 'bell' },
     { to: '/parent/account', label: 'Đổi mật khẩu', icon: 'key' },
@@ -68,7 +68,6 @@ const NAV: Record<Role3, { to: string; label: string; icon: IconName; end?: bool
     { to: '/admin/catalog', label: 'Danh mục', icon: 'tag', group: 'Đào tạo' },
     { to: '/admin/semesters', label: 'Học kỳ & môn học', icon: 'calendar' },
     { to: '/admin/sections', label: 'Lớp học phần', icon: 'grid' },
-    { to: '/admin/grade-requests', label: 'Yêu cầu sửa điểm', icon: 'edit' },
     { to: '/admin/logs', label: 'Nhật ký hệ thống', icon: 'list', group: 'Hệ thống' },
     { to: '/admin/config', label: 'Cấu hình', icon: 'settings' },
   ],
@@ -96,7 +95,7 @@ export function AppLayout() {
     enabled: role !== 'PARENT',
   });
 
-  const sub = role === 'LECTURER' ? user!.code ?? '' : role === 'ADMIN' ? 'Quản trị viên' : role === 'PARENT' ? 'Phụ huynh' : role === 'ENTERPRISE' ? 'Doanh nghiệp' : `MSSV ${user!.code ?? ''}`;
+  const sub = role === 'LECTURER' ? user!.code ?? '' : role === 'ADMIN' ? 'Quản trị viên' : role === 'PARENT' ? 'Phụ huynh' : role === 'ENTERPRISE' ? 'Doanh nghiệp' : `MSV ${user!.code ?? ''}`;
 
   return (
     <CrumbCtx.Provider value={setCrumbs}>

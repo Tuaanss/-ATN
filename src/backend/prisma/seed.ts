@@ -9,7 +9,7 @@
  *   Sinh viên   SV0001 / 01012005   (ngày sinh 01/01/2005)
  *   Sinh viên   SV0002 / 02022005   (ngày sinh 02/02/2005)
  *
- * Hai sinh viên cùng lớp MH01_01 do GV001 phụ trách. Chưa có bài tập nào – GV tự giao để test.
+ * Hai sinh viên cùng lớp MH01_HK1_2627_01 do GV001 phụ trách. Chưa có bài tập nào – GV tự giao để test.
  */
 import { PrismaClient } from '@prisma/client';
 import * as argon2 from 'argon2';
@@ -27,7 +27,6 @@ const DATA_DIR = path.resolve(__dirname, '..', process.env.DATA_DIR ?? './data')
 
 async function wipe() {
   await prisma.auditLog.deleteMany();
-  await prisma.gradeChangeRequest.deleteMany();
   await prisma.lecturerNote.deleteMany();
   await prisma.lecturerSemesterFolder.deleteMany();
   await prisma.passwordResetToken.deleteMany();
@@ -43,7 +42,6 @@ async function wipe() {
   await prisma.assignmentView.deleteMany();
   await prisma.groupReport.deleteMany();
   await prisma.assignmentGrade.deleteMany();
-  await prisma.sectionGrade.deleteMany();
   await prisma.importJob.deleteMany();
   await prisma.notification.deleteMany();
   await prisma.submissionEvent.deleteMany();
@@ -142,21 +140,18 @@ async function main() {
   const semester = await prisma.semester.create({
     data: { code: '2026-2027-1', academicYear: '2026-2027', term: 'TERM_1', startDate: new Date('2026-08-31'), endDate: new Date('2027-01-15'), isCurrent: true },
   });
-  const course = await prisma.course.create({ data: { code: 'MH01', name: 'Môn học 1', credits: 3, courseType: 'DESIGN', facultyId: faculty.id } });
+  const course = await prisma.course.create({ data: { code: 'MH01', name: 'Môn học 1', credits: 3, facultyId: faculty.id } });
   await prisma.courseSection.create({
     data: {
-      code: 'MH01_01',
+      code: 'MH01_HK1_2627_01',
       courseId: course.id,
       semesterId: semester.id,
       lecturerId: gv.id,
-      maxStudents: 60,
-      schedule: 'T2 Tiết 1–3 · A2-301',
-      sessions: [{ day: 2, from: 1, to: 3, room: 'A2-301' }],
       students: { create: students.map((s) => ({ studentId: s.id })) },
     },
   });
 
-  console.log('Seed xong: 1 lớp MH01_01 · admin/Admin@123 · PH 0912345678/Phuhuynh@123 · DN hr@doanhnghiepa.vn/Doanhnghiep@123 · GV001/GV001 · SV0001/01012005 · SV0002/02022005 (chưa có bài tập).');
+  console.log('Seed xong: 1 lớp MH01_HK1_2627_01 · admin/Admin@123 · PH 0912345678/Phuhuynh@123 · DN hr@doanhnghiepa.vn/Doanhnghiep@123 · GV001/GV001 · SV0001/01012005 · SV0002/02022005 (chưa có bài tập).');
 }
 
 main()

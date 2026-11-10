@@ -5,8 +5,9 @@ import { api, errorMessage } from '../../api/client';
 import type { LecturerSection, ProductType, WorkMode } from '../../api/types';
 import { useCrumbs } from '../../layouts/AppLayout';
 import { Icon } from '../../components/Icon';
+import { DateInput } from '../../components/DateInput';
 import { Badge, Card, ChipInput, Field, KV, Loading, Note, PageHead, Seg, SwitchRow, useToast } from '../../components/ui';
-import { COURSE_TYPE, ddmmHHmm, endOfDayIn, fmtSize, fullDT, semesterLabel, toLocalInput } from '../../utils/format';
+import { ddmmHHmm, endOfDayIn, fmtSize, fullDT, semesterLabel, toLocalInput } from '../../utils/format';
 import { htmlToText, textToHtml } from '../../utils/html';
 
 interface EditData {
@@ -19,7 +20,6 @@ interface EditData {
   dueAt: string;
   allowLate: boolean;
   lateDueAt: string | null;
-  weight: number;
   suggestedTopics: string[];
   hasIndividualPart: boolean;
   status: 'DRAFT' | 'OPEN' | 'CLOSED';
@@ -48,7 +48,6 @@ const PRODUCTS: { key: string; label: string; types: ProductType[] }[] = [
   { key: 'code', label: 'Mã nguồn / link GitHub', types: ['SOURCE', 'GIT_LINK'] },
   { key: 'report', label: 'Báo cáo (PDF/DOCX)', types: ['REPORT'] },
 ];
-const SUGGESTED: Record<string, ProductType[]> = { DESIGN: ['IMAGE', 'FIGMA'], PROGRAMMING: ['VIDEO', 'SOURCE', 'GIT_LINK'], OTHER: ['IMAGE', 'REPORT'] };
 const fromInput = (v: string) => (v ? new Date(v) : null);
 
 /**
@@ -68,7 +67,15 @@ export function AssignmentForm() {
   const editQ = useQuery({ queryKey: ['lecturer', 'assignment', editId, 'edit'], queryFn: () => api.get<EditData>(`/lecturer/assignments/${editId}/edit`).then((r) => r.data), enabled: !!editId });
   const driveQ = useQuery({ queryKey: ['lecturer', 'drive-link'], queryFn: () => api.get<DriveLink>('/lecturer/drive-link').then((r) => r.data) });
   const edit = editQ.data;
-  const current = useMemo(() => (sectionsQ.data ?? []).filter((s) => s.semester.isCurrent || s.id === classId), [sectionsQ.data, classId]);
+  // học kỳ có lớp của GV, mới nhất trước – cho phép giao bài cả ở học kỳ đã qua (nhập bài tập cũ)
+  const semesters = useMemo(() => {
+    const map = new Map<string, LecturerSection['semester']>();
+    for (const s of sectionsQ.data ?? []) map.set(s.semester.code, s.semester);
+    return [...map.values()].sort((a, b) => new Date(b.endDate).getTime() - new Date(a.endDate).getTime());
+  }, [sectionsQ.data]);
+  const [semPick, setSemPick] = useState('');
+  const semCode = semPick || semesters.find((s) => s.isCurrent)?.code || semesters[0]?.code || '';
+  const current = useMemo(() => (sectionsQ.data ?? []).filter((s) => s.semester.code === semCode || s.id === classId), [sectionsQ.data, classId, semCode]);
   const fixed = sectionsQ.data?.find((s) => s.id === (classId ?? edit?.section.id));
 
   // ------------------------------------------------------------ trạng thái form
@@ -79,12 +86,10 @@ export function AssignmentForm() {
   const [desc, setDesc] = useState('');
   const [openAt, setOpenAt] = useState(toLocalInput(new Date()));
   const [dueAt, setDueAt] = useState(toLocalInput(endOfDayIn(14)));
-  const [weight, setWeight] = useState('10');
   const [brief, setBrief] = useState<File | null>(null);
   const [workMode, setWorkMode] = useState<WorkMode>('INDIVIDUAL');
   const [individualPart, setIndividualPart] = useState(false);
   const [products, setProducts] = useState<ProductType[]>([]);
-  const [productsTouched, setProductsTouched] = useState(false);
   const [allowLate, setAllowLate] = useState(false);
   const [lateDays, setLateDays] = useState('2');
   const [suggested, setSuggested] = useState<string[]>([]);
@@ -100,24 +105,19 @@ export function AssignmentForm() {
     setDesc(edit.description ? htmlToText(edit.description) : '');
     setOpenAt(toLocalInput(edit.openAt));
     setDueAt(toLocalInput(edit.dueAt));
-    setWeight(String(edit.weight));
     setWorkMode(edit.workMode);
     setIndividualPart(edit.hasIndividualPart);
     setProducts(edit.productTypes);
-    setProductsTouched(true);
     setAllowLate(edit.allowLate);
     setLateDays(edit.lateDueAt ? String(Math.max(1, Math.round((new Date(edit.lateDueAt).getTime() - new Date(edit.dueAt).getTime()) / 86400_000))) : '2');
     setSuggested(edit.suggestedTopics);
   }, [edit]);
 
-  // gợi ý sản phẩm theo loại môn (FR-04.03)
-  const courseType = (mode === 'multi' ? current.find((s) => selected.includes(s.id)) : fixed)?.course.type;
-  useEffect(() => {
-    if (!productsTouched && courseType) setProducts(SUGGESTED[courseType] ?? ['IMAGE']);
-  }, [courseType, productsTouched]);
 
   const hasGroup = workMode === 'GROUP';
   const chosen = mode === 'multi' ? current.filter((s) => selected.includes(s.id)) : fixed ? [fixed] : [];
+  // mọi lớp đã chọn thuộc học kỳ đã kết thúc (thời gian thực) → cho nhập bài tập cũ, hạn nộp trong quá khứ
+  const pastSemester = chosen.length > 0 && chosen.every((s) => new Date(s.semester.endDate).setHours(23, 59, 59, 999) < Date.now());
   const studentTotal = chosen.reduce((n, s) => n + s.studentCount, 0);
   const crumbSection = fixed ? { label: `${fixed.code} · ${fixed.course.name}`, to: `/lecturer/sections/${fixed.id}` } : null;
   useCrumbs(
@@ -137,10 +137,8 @@ export function AssignmentForm() {
     const open = fromInput(openAt);
     if (!due) e.dueAt = 'Chọn hạn nộp';
     else if (open && due <= open) e.dueAt = 'Hạn nộp phải sau ngày mở';
-    else if (due <= new Date() && !(edit && due.getTime() === new Date(edit.dueAt).getTime())) e.dueAt = 'Hạn nộp phải ở tương lai';
+    else if (!pastSemester && due <= new Date() && !(edit && due.getTime() === new Date(edit.dueAt).getTime())) e.dueAt = 'Hạn nộp phải ở tương lai';
     if (!products.length) e.products = 'Chọn ít nhất một loại sản phẩm';
-    const w = Number(weight);
-    if (!(w >= 1 && w <= 100)) e.weight = 'Trọng số 1–100%';
     if (allowLate && !(Number(lateDays) >= 1 && Number(lateDays) <= 14)) e.late = 'Số ngày nộp muộn 1–14';
     setErrors(e);
     return !Object.keys(e).length;
@@ -154,7 +152,6 @@ export function AssignmentForm() {
     productTypes: products,
     allowLate,
     lateDays: allowLate ? Number(lateDays) : undefined,
-    weight: Number(weight),
     suggestedTopics: suggested,
     folderUrl: folderUrl.trim() || undefined,
     publishNow: false,
@@ -243,6 +240,8 @@ export function AssignmentForm() {
     );
 
   const busy = save.isPending;
+  const pickedSem = semesters.find((s) => s.code === semCode);
+  const pastSemesterPick = !!pickedSem && new Date(pickedSem.endDate).setHours(23, 59, 59, 999) < Date.now();
   const filtered = current.filter((s) => !search || `${s.code} ${s.course.name}`.toLowerCase().includes(search.toLowerCase()));
   const sameCourse = current.find((s) => selected.includes(s.id))?.course.name ?? current[0]?.course.name;
   const dueText = mode === 'multi' && selected.length > 1 ? selected.map((id) => ddmmHHmm(fromInput(perDue[id] || dueAt))).filter((v, i, a) => a.indexOf(v) === i).join(' · ') + (Object.keys(perDue).length ? ' (theo lớp)' : '') : fullDT(fromInput(dueAt));
@@ -284,15 +283,12 @@ export function AssignmentForm() {
       <Field label="Mô tả / yêu cầu">
         <textarea className="inp" rows={4} value={desc} onChange={(e) => setDesc(e.target.value)} maxLength={10000} />
       </Field>
-      <div className="grid3" style={{ gap: 16 }}>
+      <div className="cols-1-1" style={{ gap: 16 }}>
         <Field label={mode === 'edit' ? 'Ngày mở' : 'Ngày mở *'} help={mode === 'edit' && edit?.locked.openAt ? 'Bài tập đã mở' : undefined}>
-          <input className="inp" type="datetime-local" value={openAt} onChange={(e) => setOpenAt(e.target.value)} disabled={mode === 'edit' && edit?.locked.openAt} />
+          <DateInput withTime value={openAt} onChange={setOpenAt} disabled={mode === 'edit' && edit?.locked.openAt} />
         </Field>
         <Field label={mode === 'multi' ? 'Hạn nộp chung *' : 'Hạn nộp *'} error={errors.dueAt} help={extendHelp}>
-          <input className={`inp${errors.dueAt ? ' inp-err' : ''}`} type="datetime-local" value={dueAt} onChange={(e) => setDueAt(e.target.value)} />
-        </Field>
-        <Field label="Trọng số điểm (%)" error={errors.weight}>
-          <input className="inp" type="number" min={1} max={100} value={weight} onChange={(e) => setWeight(e.target.value)} />
+          <DateInput withTime className={`inp${errors.dueAt ? ' inp-err' : ''}`} value={dueAt} onChange={setDueAt} />
         </Field>
       </div>
       <div>
@@ -354,7 +350,7 @@ export function AssignmentForm() {
   );
 
   const productsCard = (
-    <Card title="Sản phẩm nộp" extra={courseType && <Badge tone={COURSE_TYPE[courseType]?.tone ?? 'gray'}>Môn {COURSE_TYPE[courseType]?.label ?? ''}</Badge>}>
+    <Card title="Sản phẩm nộp">
       <div className="cols-1-1" style={{ gap: 10 }}>
         {PRODUCTS.map((p) => {
           const on = p.types.every((t) => products.includes(t));
@@ -364,7 +360,6 @@ export function AssignmentForm() {
                 type="checkbox"
                 checked={on}
                 onChange={() => {
-                  setProductsTouched(true);
                   setProducts((cur) => (on ? cur.filter((t) => !p.types.includes(t)) : [...new Set([...cur, ...p.types])]));
                 }}
               />
@@ -570,7 +565,7 @@ export function AssignmentForm() {
             ? `${edit!.section.code}${edit!.counts.groups ? ` · ${edit!.counts.groups} nhóm` : ''} · ${edit!.counts.submissions} bài đã nộp`
             : mode === 'class'
               ? `Bài tập ${fixed!.assignmentCount + 1} của lớp ${fixed!.code} · ${semesterLabel(fixed!.semester)}`
-              : semesterLabel(current[0]?.semester)
+              : semesterLabel(semesters.find((s) => s.code === semCode))
         }
         actions={headActions}
       />
@@ -585,10 +580,9 @@ export function AssignmentForm() {
               <span className="mono">{fixed.code}</span> · {fixed.course.name}
             </div>
             <div className="muted" style={{ fontSize: 13 }}>
-              {fixed.studentCount} sinh viên{fixed.schedule ? ` · ${fixed.schedule}` : ''} · {fixed.assignmentCount} bài tập hiện có
+              {fixed.studentCount} sinh viên · {fixed.assignmentCount} bài tập hiện có
             </div>
           </div>
-          <Badge tone={COURSE_TYPE[fixed.course.type]?.tone ?? 'gray'}>{COURSE_TYPE[fixed.course.type]?.label}</Badge>
         </div>
       )}
 
@@ -596,6 +590,31 @@ export function AssignmentForm() {
         <div className="col">
           {mode === 'multi' && (
             <Card title="Lớp học phần áp dụng *" extra={<Badge tone="gray">Chọn 1 hoặc nhiều lớp</Badge>}>
+              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+                <select
+                  className="inp"
+                  aria-label="Học kỳ"
+                  style={{ width: 240, height: 40 }}
+                  value={semCode}
+                  onChange={(e) => {
+                    setSemPick(e.target.value);
+                    setSelected([]);
+                    setPerDue({});
+                  }}
+                >
+                  {semesters.map((s) => (
+                    <option key={s.code} value={s.code}>
+                      {semesterLabel(s)}
+                      {s.isCurrent ? ' (hiện tại)' : new Date(s.endDate).setHours(23, 59, 59, 999) < Date.now() ? ' (đã kết thúc)' : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              {pastSemesterPick && (
+                <Note tone="amber" icon="info">
+                  Học kỳ đã kết thúc. Hạn nộp có thể chọn tùy ý: đặt <b>trong tương lai</b> để sinh viên đăng lại bài cũ lên hệ thống, hoặc <b>trong quá khứ</b> nếu chỉ lưu thông tin bài tập.
+                </Note>
+              )}
               <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
                 <label style={{ flex: 1, minWidth: 220, display: 'flex', alignItems: 'center', gap: 8, height: 40, border: '1px solid #D6D3C8', borderRadius: 8, padding: '0 12px', color: '#62666F' }}>
                   <Icon name="search" size={16} />
@@ -624,12 +643,12 @@ export function AssignmentForm() {
                         <span className="mono">{s.code}</span> · {s.course.name}
                       </div>
                       <div className="muted" style={{ fontSize: 12 }}>
-                        {s.studentCount} sinh viên{s.schedule ? ` · ${s.schedule}` : ''}
+                        {s.studentCount} sinh viên
                       </div>
                     </div>
                     <div style={{ width: 190 }} onClick={(e) => e.preventDefault()}>
                       {on ? (
-                        <input className="inp" type="datetime-local" aria-label="Hạn nộp riêng" style={{ height: 36, fontSize: 13 }} value={perDue[s.id] ?? dueAt} onChange={(e) => setPerDue((p) => ({ ...p, [s.id]: e.target.value }))} />
+                        <DateInput withTime aria-label="Hạn nộp riêng" style={{ height: 36, fontSize: 13 }} value={perDue[s.id] ?? dueAt} onChange={(x) => setPerDue((p) => ({ ...p, [s.id]: x }))} />
                       ) : (
                         <span className="muted" style={{ fontSize: 12 }}>
                           —

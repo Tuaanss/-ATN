@@ -111,8 +111,7 @@ export class StudentWorkService {
     return {
       id: s.id,
       code: s.code,
-      schedule: s.schedule,
-      course: { code: s.course.code, name: s.course.name, type: s.course.courseType, credits: s.course.credits, weights: { attendance: s.course.wAttendance, assignment: s.course.wAssignment, midterm: s.course.wMidterm, final: s.course.wFinal } },
+      course: { code: s.course.code, name: s.course.name, credits: s.course.credits },
       semester: { code: s.semester.code, academicYear: s.semester.academicYear, term: s.semester.term, isCurrent: s.semester.isCurrent, startDate: s.semester.startDate, endDate: s.semester.endDate },
       lecturer: { fullName: s.lecturer.fullName, email: s.lecturer.email },
     };
@@ -143,10 +142,10 @@ export class StudentWorkService {
     });
   }
 
-  /** "Bài tập của tôi": mọi bài đã mở của các lớp học kỳ hiện tại. */
+  /** "Bài tập của tôi": bài đã mở của học kỳ hiện tại + bài của học kỳ cũ vẫn đang nhận nộp (GV mở lại để SV đăng bài cũ). */
   async myAssignments(studentId: string) {
     const assignments = await this.prisma.assignment.findMany({
-      where: { deletedAt: null, status: { not: 'DRAFT' }, openAt: { lte: new Date() }, section: { semester: { isCurrent: true }, students: { some: { studentId } } } },
+      where: { deletedAt: null, status: { not: 'DRAFT' }, openAt: { lte: new Date() }, section: { students: { some: { studentId } } }, OR: [{ section: { semester: { isCurrent: true } } }, { status: 'OPEN', dueAt: { gte: new Date() } }, { status: 'OPEN', allowLate: true, lateDueAt: { gte: new Date() } }] },
       include: { section: { include: { course: true } } },
       orderBy: [{ dueAt: 'desc' }],
     });
@@ -300,7 +299,6 @@ export class StudentWorkService {
         lateDueAt: a.lateDueAt,
         suggestedTopics: a.suggestedTopics,
         hasIndividualPart: a.hasIndividualPart,
-        weight: a.weight,
         groupsImportedAt: a.groupsImportedAt,
         gradesPublishedAt: a.gradesPublishedAt,
         brief: a.briefFileName ? { name: a.briefFileName, size: Number(a.briefFileSize ?? 0) } : null,

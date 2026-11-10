@@ -5,14 +5,14 @@ import { useCrumbs } from '../../layouts/AppLayout';
 import { Icon } from '../../components/Icon';
 import { Badge, Card, Empty, Loading, Note, PageHead, initials } from '../../components/ui';
 import { fullDate, fullDT } from '../../utils/format';
-import { gpa } from './common';
+import { avg } from './common';
 import { TYPE } from './EnterpriseProfile';
 
 interface Grant {
   studentId: string;
   studentCode: string;
   fullName: string;
-  gpa: number | null;
+  avgScore: number | null;
   works: number;
   active: boolean;
   revoked: boolean;
@@ -60,7 +60,7 @@ export function EnterpriseGrants() {
                 <span style={{ flex: 1, minWidth: 0 }}>
                   <b style={{ display: 'block' }}>{x.fullName}</b>
                   <span className="muted" style={{ fontSize: 12 }}>
-                    {x.active ? `GPA ${gpa(x.gpa)} · ${x.works} bài` : x.revoked ? 'Đã thu hồi' : `Hết hạn ${x.expiresAt ? fullDate(x.expiresAt) : ''}`}
+                    {x.active ? `Điểm TB ${avg(x.avgScore)} · ${x.works} bài` : x.revoked ? 'Đã thu hồi' : `Hết hạn ${x.expiresAt ? fullDate(x.expiresAt) : ''}`}
                   </span>
                 </span>
                 {x.active ? <Badge tone={x.daysLeft <= 2 ? 'amber' : 'green'}>{`Còn ${x.daysLeft} ngày`}</Badge> : <Badge tone="gray">{x.revoked ? 'Thu hồi' : 'Hết hạn'}</Badge>}

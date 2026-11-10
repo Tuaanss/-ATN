@@ -7,7 +7,7 @@ import { Icon } from '../../components/Icon';
 import { Badge, Card, Empty, Field, Loading, Note, PageHead, initials, useToast } from '../../components/ui';
 import { fullDate } from '../../utils/format';
 import { FormModal } from '../admin/kit';
-import { AccessBadge, RequestModal, gpa, type Access } from './common';
+import { AccessBadge, RequestModal, avg, type Access } from './common';
 
 interface Work {
   submissionId: string | null;
@@ -30,7 +30,7 @@ interface Profile {
   bio: string | null;
   skills: string[];
   links: { github: string | null; behance: string | null; linkedin: string | null };
-  gpa: number | null;
+  avgScore: number | null;
   works: Work[];
   access: Access;
   pending: { createdAt: string; purpose: string; requestedDays: number } | null;
@@ -120,11 +120,11 @@ export function EnterpriseProfile() {
             )}
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, padding: '12px 0', borderTop: '1px solid #EFEDE6', borderBottom: '1px solid #EFEDE6' }}>
               <span className="muted" style={{ fontSize: 13 }}>
-                GPA
+                Điểm TB bài tập
               </span>
-              <b style={{ fontSize: 26 }}>{gpa(p.gpa)}</b>
+              <b style={{ fontSize: 26 }}>{avg(p.avgScore)}</b>
               <span className="muted" style={{ fontSize: 13 }}>
-                thang 4
+                thang 10
               </span>
             </div>
             {[
@@ -234,8 +234,8 @@ function InviteModal({ id, name, onClose, onDone }: { id: string; name: string; 
 }
 
 interface Dash {
-  recent: { studentId: string; studentCode: string; fullName: string; cohort: string | null; major: string | null; gpa: number | null; at: string }[];
-  interests: { studentId: string; studentCode: string; fullName: string; cohort: string | null; major: string | null; gpa: number | null }[];
+  recent: { studentId: string; studentCode: string; fullName: string; cohort: string | null; major: string | null; avgScore: number | null; at: string }[];
+  interests: { studentId: string; studentCode: string; fullName: string; cohort: string | null; major: string | null; avgScore: number | null }[];
 }
 
 /** Hồ sơ sinh viên: danh sách quan tâm + hồ sơ đã xem gần đây. */
@@ -256,7 +256,7 @@ export function EnterpriseStudents() {
                 {s.at ? ` · xem ${fullDate(s.at)}` : ''}
               </div>
             </div>
-            <b className="mono">{gpa(s.gpa)}</b>
+            <b className="mono">{avg(s.avgScore)}</b>
           </Link>
         ))}
       </div>

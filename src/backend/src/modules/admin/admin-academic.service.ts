@@ -1,36 +1,21 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
-import { CourseType, Prisma, TermType } from '@prisma/client';
+import { Prisma, TermType } from '@prisma/client';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { AppException, notFound } from '../../common/errors/app-exception';
 import { AuditService } from '../../common/audit/audit.service';
 import { normCode } from '../../common/utils/excel';
 
-export interface Session {
-  day: number; // 2..7 = Thứ 2..Thứ 7, 8 = Chủ nhật
-  from: number; // tiết 1..12
-  to: number;
-  room: string;
-}
 export interface SectionInput {
   semesterId: string;
   courseId: string;
   code: string;
   lecturerId: string;
-  maxStudents: number;
-  weekStart: number;
-  weekEnd: number;
-  sessions: Session[];
 }
 export interface CourseInput {
   code: string;
   name: string;
   credits: number;
-  courseType: CourseType;
   facultyId?: string | null;
-  wAttendance: number;
-  wAssignment: number;
-  wMidterm: number;
-  wFinal: number;
   isActive?: boolean;
 }
 export interface SemesterInput {
@@ -41,8 +26,13 @@ export interface SemesterInput {
 }
 
 const TERM_CODE: Record<TermType, string> = { TERM_1: '1', TERM_2: '2', SUMMER: 'HE' };
-const dayName = (d: number) => (d === 8 ? 'CN' : `T${d}`);
-export const scheduleText = (ss: Session[]) => ss.map((s) => `${dayName(s.day)} Tiết ${s.from}–${s.to}${s.room ? ` · ${s.room}` : ''}`).join('; ');
+const TERM_SHORT: Record<TermType, string> = { TERM_1: 'HK1', TERM_2: 'HK2', SUMMER: 'HE' };
+
+/** Tiền tố mã lớp học phần: MÃMÔN_HKx_YYYY – VD MH01 · HK1 · 2025-2026 → "MH01_HK1_2526". */
+export const sectionPrefix = (courseCode: string, sem: { term: TermType; academicYear: string }) =>
+  `${normCode(courseCode)}_${TERM_SHORT[sem.term]}_${sem.academicYear.slice(2, 4)}${sem.academicYear.slice(7, 9)}`;
+/** Mã lớp hợp lệ: <tiền tố>_<số thứ tự 2–3 chữ số>, VD MH01_HK1_2526_01. */
+export const sectionCodeOk = (code: string, prefix: string) => new RegExp(`^${prefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}_\\d{2,3}$`).test(normCode(code));
 const inUse = (what: string) => new AppException('CONFLICT', `Không xóa được: ${what}`, HttpStatus.CONFLICT);
 
 /** UC02.6, UC02.8 – UC02.10: danh mục, học kỳ, môn học, lớp học phần. */
@@ -65,12 +55,11 @@ export class AdminAcademicService {
   // ================================================================ danh mục (UC02.6)
 
   async catalog() {
-    const [faculties, majors, cohorts, classes, types] = await Promise.all([
+    const [faculties, majors, cohorts, classes] = await Promise.all([
       this.prisma.faculty.findMany({ include: { _count: { select: { majors: true, lecturers: true, courses: true } } }, orderBy: { code: 'asc' } }),
       this.prisma.major.findMany({ include: { faculty: true, classes: { include: { _count: { select: { students: true } } } } }, orderBy: { code: 'asc' } }),
       this.prisma.cohort.findMany({ include: { classes: { include: { _count: { select: { students: true } } } } }, orderBy: { startYear: 'desc' } }),
       this.prisma.adminClass.findMany({ include: { major: true, cohort: true, _count: { select: { students: true } } }, orderBy: { code: 'asc' } }),
-      this.prisma.course.groupBy({ by: ['courseType'], _count: { _all: true } }),
     ]);
     const sum = (cs: { _count: { students: number } }[]) => cs.reduce((a, c) => a + c._count.students, 0);
     return {
@@ -78,7 +67,6 @@ export class AdminAcademicService {
       majors: majors.map((m) => ({ id: m.id, code: m.code, name: m.name, faculty: { id: m.faculty.id, code: m.faculty.code, name: m.faculty.name }, classes: m.classes.length, students: sum(m.classes) })),
       cohorts: cohorts.map((c) => ({ id: c.id, name: c.name, startYear: c.startYear, classes: c.classes.length, students: sum(c.classes) })),
       classes: classes.map((c) => ({ id: c.id, code: c.code, major: { id: c.major.id, name: c.major.name }, cohort: { id: c.cohort.id, name: c.cohort.name }, students: c._count.students })),
-      courseTypes: (['DESIGN', 'PROGRAMMING', 'OTHER'] as CourseType[]).map((t) => ({ code: t, courses: types.find((x) => x.courseType === t)?._count._all ?? 0 })),
     };
   }
 
@@ -236,34 +224,20 @@ export class AdminAcademicService {
   // ================================================================ môn học (UC02.8)
 
   async courses() {
-    const cur = await this.prisma.semester.findFirst({ where: { isCurrent: true } });
-    const list = await this.prisma.course.findMany({ include: { faculty: true, sections: { select: { semesterId: true } } }, orderBy: { code: 'asc' } });
+    const list = await this.prisma.course.findMany({ include: { faculty: true, _count: { select: { sections: true } } }, orderBy: { code: 'asc' } });
     return list.map((c) => ({
       id: c.id,
       code: c.code,
       name: c.name,
       credits: c.credits,
-      courseType: c.courseType,
       faculty: c.faculty && { id: c.faculty.id, code: c.faculty.code, name: c.faculty.name },
-      wAttendance: c.wAttendance,
-      wAssignment: c.wAssignment,
-      wMidterm: c.wMidterm,
-      wFinal: c.wFinal,
       isActive: c.isActive,
-      sectionsTotal: c.sections.length,
-      sectionsCurrent: c.sections.filter((s) => s.semesterId === cur?.id).length,
+      sectionsTotal: c._count.sections,
     }));
   }
 
   async saveCourse(adminId: string, id: string | null, d: CourseInput) {
-    if (d.wAttendance + d.wAssignment + d.wMidterm + d.wFinal !== 100) throw new AppException('VALIDATION_ERROR', 'Tổng trọng số CC + BT + GK + CK phải bằng 100%');
-    if (id) {
-      const published = await this.prisma.courseSection.count({ where: { courseId: id, gradesPublishedAt: { not: null } } });
-      const old = await this.prisma.course.findUnique({ where: { id } });
-      if (published && old && (old.wAttendance !== d.wAttendance || old.wAssignment !== d.wAssignment || old.wMidterm !== d.wMidterm || old.wFinal !== d.wFinal))
-        throw new AppException('GRADES_LOCKED', 'Môn đã có lớp công bố điểm, không đổi được trọng số');
-    }
-    const data = { code: normCode(d.code), name: d.name.trim(), credits: d.credits, courseType: d.courseType, facultyId: d.facultyId || null, wAttendance: d.wAttendance, wAssignment: d.wAssignment, wMidterm: d.wMidterm, wFinal: d.wFinal, isActive: d.isActive ?? true };
+    const data = { code: normCode(d.code), name: d.name.trim(), credits: d.credits, facultyId: d.facultyId || null, isActive: d.isActive ?? true };
     const c = await (id ? this.prisma.course.update({ where: { id }, data }) : this.prisma.course.create({ data })).catch((e) => this.unique(e, 'Mã môn đã tồn tại'));
     await this.log(adminId, id ? 'UPDATE_COURSE' : 'CREATE_COURSE', 'course', c.id, `${id ? 'Sửa' : 'Thêm'} môn ${c.code} – ${c.name}`);
     return c;
@@ -296,61 +270,21 @@ export class AdminAcademicService {
         code: s.code,
         course: { id: s.course.id, code: s.course.code, name: s.course.name, credits: s.course.credits },
         lecturer: s.lecturer,
-        maxStudents: s.maxStudents,
         students: s._count.students,
         assignments: s._count.assignments,
-        weekStart: s.weekStart,
-        weekEnd: s.weekEnd,
-        sessions: s.sessions as unknown as Session[],
-        schedule: s.schedule,
-        gradesPublished: !!s.gradesPublishedAt,
       })),
     };
   }
 
-  private checkSessions(d: SectionInput) {
-    if (!d.sessions.length) throw new AppException('VALIDATION_ERROR', 'Thêm ít nhất một buổi học');
-    if (d.weekStart < 1 || d.weekEnd < d.weekStart || d.weekEnd > 25) throw new AppException('VALIDATION_ERROR', 'Tuần học không hợp lệ');
-    if (d.maxStudents < 1 || d.maxStudents > 300) throw new AppException('VALIDATION_ERROR', 'Sĩ số tối đa 1–300');
-    for (const s of d.sessions) {
-      if (s.day < 2 || s.day > 8 || s.from < 1 || s.to > 12 || s.to < s.from) throw new AppException('VALIDATION_ERROR', 'Buổi học không hợp lệ (tiết 1–12)');
-    }
-    d.sessions.forEach((a, i) =>
-      d.sessions.slice(i + 1).forEach((b) => {
-        if (a.day === b.day && a.from <= b.to && b.from <= a.to) throw new AppException('VALIDATION_ERROR', `Hai buổi ${dayName(a.day)} của lớp bị chồng tiết`);
-      }),
-    );
-  }
-
-  /** Trùng lịch: cùng thứ, giao tiết, giao tuần – cùng GV hoặc cùng phòng, trong cùng học kỳ. */
-  async conflicts(d: SectionInput, excludeId?: string) {
-    const others = await this.prisma.courseSection.findMany({
-      where: { semesterId: d.semesterId, id: excludeId ? { not: excludeId } : undefined, weekStart: { lte: d.weekEnd }, weekEnd: { gte: d.weekStart } },
-      include: { lecturer: { select: { fullName: true } } },
-    });
-    const out: { section: string; kind: 'LECTURER' | 'ROOM'; message: string }[] = [];
-    for (const o of others) {
-      for (const a of o.sessions as unknown as Session[]) {
-        for (const b of d.sessions) {
-          if (a.day !== b.day || a.from > b.to || b.from > a.to) continue;
-          const when = `${dayName(b.day)} tiết ${Math.max(a.from, b.from)}–${Math.min(a.to, b.to)}`;
-          if (o.lecturerId === d.lecturerId) out.push({ section: o.code, kind: 'LECTURER', message: `GV ${o.lecturer.fullName} đã dạy lớp ${o.code} vào ${when}` });
-          if (a.room && b.room && a.room.trim().toUpperCase() === b.room.trim().toUpperCase()) out.push({ section: o.code, kind: 'ROOM', message: `Phòng ${b.room} đã có lớp ${o.code} vào ${when}` });
-        }
-      }
-    }
-    return out;
-  }
-
   async saveSection(adminId: string, id: string | null, d: SectionInput) {
-    this.checkSessions(d);
-    d.sessions = d.sessions.map((s) => ({ day: s.day, from: s.from, to: s.to, room: s.room.trim() }));
-    const clash = await this.conflicts(d, id ?? undefined);
-    if (clash.length) throw new AppException('CONFLICT', `Trùng lịch: ${clash.map((c) => c.message).join('; ')}`, HttpStatus.CONFLICT);
+    const [course, sem] = await Promise.all([this.prisma.course.findUnique({ where: { id: d.courseId } }), this.prisma.semester.findUnique({ where: { id: d.semesterId } })]);
+    if (!course) throw notFound('Môn học');
+    if (!sem) throw notFound('Học kỳ');
+    const prefix = sectionPrefix(course.code, sem);
+    if (!sectionCodeOk(d.code, prefix)) throw new AppException('VALIDATION_ERROR', `Mã lớp phải dạng ${prefix}_01 (mã môn _ học kỳ _ năm học _ số thứ tự)`);
     if (id) {
-      const cur = await this.prisma.courseSection.findUnique({ where: { id }, include: { _count: { select: { students: true, assignments: true } } } });
+      const cur = await this.prisma.courseSection.findUnique({ where: { id }, include: { _count: { select: { assignments: true } } } });
       if (!cur) throw notFound('Lớp học phần');
-      if (d.maxStudents < cur._count.students) throw new AppException('VALIDATION_ERROR', `Lớp đã có ${cur._count.students} SV, sĩ số tối đa không được nhỏ hơn`);
       if (cur._count.assignments && (cur.lecturerId !== d.lecturerId || cur.courseId !== d.courseId || cur.semesterId !== d.semesterId))
         throw new AppException('CONFLICT', 'Lớp đã có bài tập, không đổi được môn, học kỳ hoặc giảng viên', HttpStatus.CONFLICT);
     }
@@ -359,24 +293,17 @@ export class AdminAcademicService {
       courseId: d.courseId,
       semesterId: d.semesterId,
       lecturerId: d.lecturerId,
-      maxStudents: d.maxStudents,
-      weekStart: d.weekStart,
-      weekEnd: d.weekEnd,
-      sessions: d.sessions as unknown as Prisma.InputJsonValue,
-      schedule: scheduleText(d.sessions).slice(0, 200),
     };
     const s = await (id ? this.prisma.courseSection.update({ where: { id }, data }) : this.prisma.courseSection.create({ data })).catch((e) => this.unique(e, 'Mã lớp học phần đã tồn tại'));
-    await this.log(adminId, id ? 'UPDATE_SECTION' : 'CREATE_SECTION', 'course_section', s.id, `${id ? 'Sửa' : 'Mở'} lớp học phần ${s.code} (${s.schedule})`);
+    await this.log(adminId, id ? 'UPDATE_SECTION' : 'CREATE_SECTION', 'course_section', s.id, `${id ? 'Sửa' : 'Mở'} lớp học phần ${s.code}`);
     return s;
   }
 
   async deleteSection(adminId: string, id: string) {
-    const s = await this.prisma.courseSection.findUnique({ where: { id }, include: { _count: { select: { assignments: true, grades: true, students: true } } } });
+    const s = await this.prisma.courseSection.findUnique({ where: { id }, include: { _count: { select: { assignments: true, students: true } } } });
     if (!s) throw notFound('Lớp học phần');
     if (s._count.students) throw inUse(`lớp đang có ${s._count.students} sinh viên, hãy gỡ sinh viên trước`);
     if (s._count.assignments) throw inUse(`lớp đã có ${s._count.assignments} bài tập`);
-    if (s._count.grades) throw inUse('lớp đã có bảng điểm');
-    await this.prisma.gradeChangeRequest.deleteMany({ where: { sectionId: id } });
     await this.prisma.courseSection.delete({ where: { id } });
     await this.log(adminId, 'DELETE_SECTION', 'course_section', id, `Xóa lớp học phần ${s.code}`);
     return { ok: true };
@@ -395,40 +322,30 @@ export class AdminAcademicService {
       code: s.code,
       course: s.course.name,
       lecturer: s.lecturer.fullName,
-      maxStudents: s.maxStudents,
       students: s.students.map((x) => ({ ...x.student, adminClass: x.student.adminClass?.code ?? null, enrolledAt: x.enrolledAt })),
     };
   }
 
-  /** Thêm SV theo danh sách MSSV (dán nhiều mã, cách nhau bởi dấu phẩy / xuống dòng). */
+  /** Thêm SV theo danh sách MSV (nhiều mã, cách nhau bởi dấu phẩy / xuống dòng). */
   async addStudents(adminId: string, id: string, codes: string[]) {
-    const s = await this.prisma.courseSection.findUnique({ where: { id }, include: { _count: { select: { students: true } } } });
+    const s = await this.prisma.courseSection.findUnique({ where: { id } });
     if (!s) throw notFound('Lớp học phần');
     const wanted = [...new Set(codes.map(normCode).filter(Boolean))];
     const found = await this.prisma.student.findMany({
       where: { studentCode: { in: wanted } },
-      include: { user: { select: { status: true } }, enrollments: { where: { section: { semesterId: s.semesterId } }, include: { section: { select: { code: true, courseId: true, weekStart: true, weekEnd: true, sessions: true } } } } },
+      include: { user: { select: { status: true } }, enrollments: { where: { sectionId: id }, select: { sectionId: true } } },
     });
-    const mine = s.sessions as unknown as Session[];
-    const clash = (o: { weekStart: number; weekEnd: number; sessions: unknown }) =>
-      o.weekStart <= s.weekEnd && s.weekStart <= o.weekEnd && (o.sessions as Session[]).some((a) => mine.some((b) => a.day === b.day && a.from <= b.to && b.from <= a.to));
     const byCode = new Map(found.map((x) => [x.studentCode.toUpperCase(), x]));
     const added: string[] = [];
     const skipped: { code: string; reason: string }[] = [];
-    let room = s.maxStudents - s._count.students;
     for (const code of wanted) {
       const st = byCode.get(code);
       if (!st) skipped.push({ code, reason: 'Không có sinh viên này' });
       else if (st.user.status !== 'ACTIVE') skipped.push({ code, reason: 'Tài khoản đang bị khóa' });
-      else if (st.enrollments.some((e) => e.sectionId === id)) skipped.push({ code, reason: 'Đã ở trong lớp' });
-      else if (st.enrollments.some((e) => e.section.courseId === s.courseId))
-        skipped.push({ code, reason: `Đã học môn này ở lớp ${st.enrollments.find((e) => e.section.courseId === s.courseId)!.section.code}` });
-      else if (st.enrollments.some((e) => clash(e.section))) skipped.push({ code, reason: `Trùng lịch với lớp ${st.enrollments.find((e) => clash(e.section))!.section.code}` });
-      else if (room <= 0) skipped.push({ code, reason: 'Lớp đã đủ sĩ số' });
+      else if (st.enrollments.length) skipped.push({ code, reason: 'Đã ở trong lớp' });
       else {
         await this.prisma.sectionStudent.create({ data: { sectionId: id, studentId: st.id } });
         added.push(code);
-        room--;
       }
     }
     if (added.length) await this.log(adminId, 'ASSIGN_STUDENTS', 'course_section', id, `Xếp ${added.length} SV vào lớp ${s.code}`);

@@ -1,4 +1,5 @@
 import { Controller, Get, Injectable, Module, Param, ParseUUIDPipe, Post, Query } from '@nestjs/common';
+import { vnDate } from '../../common/utils/date';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { AuthUser, CurrentUser, Roles } from '../../common/auth/auth.decorators';
@@ -11,7 +12,6 @@ import { StudentWorkService } from '../submissions/student-work.service';
 import { finalDeadline } from '../assignments/assignment-status';
 
 const REL = { FATHER: 'Bố', MOTHER: 'Mẹ', GUARDIAN: 'Người giám hộ' } as const;
-const num = (v: Prisma.Decimal | number | null | undefined) => (v == null ? null : Number(v));
 const f1 = (v: number) => v.toFixed(1).replace('.', ',');
 /** Khóa thông báo của phụ huynh theo từng con: ph:<studentId>:… */
 const key = (studentId: string, k: string) => `ph:${studentId}:${k}`.slice(0, 150);
@@ -69,9 +69,8 @@ export class ParentService {
         adminClass: s.adminClass?.code ?? null,
         major: s.adminClass?.major.name ?? s.major,
         cohort: s.adminClass?.cohort.name ?? s.cohort,
-        cpa: g.cpa,
-        credits: g.credits,
-        rank: g.rank,
+        avgScore: g.avg,
+        gradedAssignments: g.graded,
         unread,
         warnings: warn,
       });
@@ -83,38 +82,10 @@ export class ParentService {
 
   async results(userId: string, studentId: string) {
     await this.assertChild(userId, studentId);
+    // chỉ điểm từng bài tập đã công bố, nhóm theo học kỳ (không có điểm tổng kết học phần)
     const g = await this.grades.myGrades(studentId);
-    // các lớp đang học chưa công bố điểm tổng kết vẫn hiện trong học kỳ hiện tại
-    const current = await this.prisma.sectionStudent.findMany({
-      where: { studentId, section: { semester: { isCurrent: true } } },
-      include: { section: { include: { course: true, semester: true } } },
-    });
-    const sem = current[0]?.section.semester;
-    const terms = g.terms.map((t) => ({ ...t, inProgress: false }));
-    if (sem) {
-      let t = terms.find((x) => x.code === sem.code);
-      if (!t) {
-        t = { code: sem.code, academicYear: sem.academicYear, term: sem.term, gpa: null, credits: 0, courses: [], inProgress: true };
-        terms.unshift(t);
-      }
-      t.inProgress = true;
-      for (const e of current)
-        if (!t.courses.some((c) => c.sectionId === e.sectionId))
-          t.courses.push({
-            sectionId: e.sectionId,
-            sectionCode: e.section.code,
-            course: { code: e.section.course.code, name: e.section.course.name, credits: e.section.course.credits },
-            attendance: null,
-            assignment: null,
-            midterm: null,
-            final: null,
-            total: null,
-            letter: null,
-            gpa4: null,
-          });
-    }
     const cfg = await this.config.get();
-    return { ...g, terms, threshold: cfg.warning.scoreThreshold, scale: cfg.grading.scale };
+    return { ...g, threshold: cfg.warning.scoreThreshold };
   }
 
   // ---------------------------------------------------------------- bài nộp (chỉ xem)
@@ -156,7 +127,6 @@ export class ParentService {
         title: a.title,
         workMode: a.workMode,
         course: a.section.course.name,
-        courseType: a.section.course.courseType,
         sectionCode: a.section.code,
         semester: { code: a.section.semester.code, academicYear: a.section.semester.academicYear, term: a.section.semester.term },
         dueAt: finalDeadline(a),
@@ -187,7 +157,7 @@ export class ParentService {
     await this.sync(userId, studentId);
     const cfg = await this.config.get();
     const list = await this.prisma.notification.findMany({ where: { userId, dedupeKey: { startsWith: key(studentId, '') } }, orderBy: { createdAt: 'desc' }, take: 200 });
-    return { threshold: cfg.warning.scoreThreshold, gpaDrop: cfg.warning.gpaDrop, items: list };
+    return { threshold: cfg.warning.scoreThreshold, items: list };
   }
 
   async readAll(userId: string, studentId: string) {
@@ -198,7 +168,7 @@ export class ParentService {
 
   /**
    * Sinh thông báo cho phụ huynh từ dữ liệu học tập của con (mỗi sự kiện một lần nhờ dedupe_key):
-   * điểm mới công bố, điểm dưới ngưỡng, GPA giảm, bài nộp mới, sắp hết hạn, quá hạn chưa nộp.
+   * điểm bài tập mới công bố, điểm dưới ngưỡng, bài nộp mới, sắp hết hạn, quá hạn chưa nộp.
    */
   async sync(userId: string, studentId: string) {
     const cfg = (await this.config.get()).warning;
@@ -208,31 +178,6 @@ export class ParentService {
     const add = (k: string, type: string, title: string, body: string, link: string, at?: Date | null) =>
       rows.push({ userId, dedupeKey: key(studentId, k), type, title: title.slice(0, 200), body: body.slice(0, 1000), link: `${link}?child=${studentId}`, createdAt: at ?? undefined });
 
-    // điểm học phần
-    const sg = await this.prisma.sectionGrade.findMany({ where: { studentId, status: 'PUBLISHED' }, include: { section: { include: { course: true, semester: true } } } });
-    for (const g of sg) {
-      const at = g.section.gradesPublishedAt ?? g.updatedAt;
-      const total = num(g.total);
-      add(`sg:${g.sectionId}`, 'PH_GRADE', `Điểm học phần ${g.section.course.name} đã công bố`, `${name} đạt ${total == null ? '—' : f1(total)}${g.letter ? ` (${g.letter})` : ''} · lớp ${g.section.code}.`, '/parent', at);
-      const low = (
-        [
-          ['chuyên cần', num(g.attendance)],
-          ['bài tập', num(g.assignment)],
-          ['giữa kỳ', num(g.midterm)],
-          ['cuối kỳ', num(g.final)],
-          ['tổng kết', total],
-        ] as [string, number | null][]
-      ).filter(([, v]) => v != null && v < cfg.scoreThreshold);
-      if (low.length)
-        add(`sglow:${g.sectionId}`, 'PH_WARNING', `Điểm dưới ngưỡng · ${g.section.course.name}`, `${name} có điểm ${low.map(([k, v]) => `${k} ${f1(v!)}`).join(', ')} – thấp hơn ngưỡng ${f1(cfg.scoreThreshold)}.`, '/parent', at);
-    }
-    // GPA học kỳ giảm
-    const res = await this.grades.myGrades(studentId);
-    const done = [...res.terms].filter((t) => t.gpa != null).reverse();
-    for (let i = 1; i < done.length; i++) {
-      const drop = Math.round((done[i - 1].gpa! - done[i].gpa!) * 100) / 100;
-      if (drop >= cfg.gpaDrop) add(`gpa:${done[i].code}`, 'PH_WARNING', `GPA học kỳ giảm ${drop.toFixed(2).replace('.', ',')} điểm`, `GPA của ${name} học kỳ ${done[i].code} là ${done[i].gpa!.toFixed(2)}, kỳ trước ${done[i - 1].gpa!.toFixed(2)}.`, '/parent');
-    }
     // bài tập: điểm, bài nộp, hạn nộp
     const list = await this.submissions(userId, studentId);
     const now = Date.now();
@@ -244,11 +189,11 @@ export class ParentService {
       for (const f of a.feedback)
         add(`fb:${f.id}:${new Date(f.updatedAt).getTime()}`, 'PH_GRADE', `Giảng viên nhận xét bài “${a.title}”${f.personal ? ' (phần cá nhân)' : ''}`, `${f.lecturer}: ${f.content}`.slice(0, 1000), '/parent/submissions', new Date(f.updatedAt));
       if (a.submissionId && a.submittedAt)
-        add(`sub:${a.submissionId}`, 'PH_SUBMISSION', `${a.workMode === 'GROUP' ? 'Nhóm của ' + name : name} đã nộp “${a.title}”${a.isLate ? ' (muộn)' : ''}`, `${a.submittedBy} nộp lúc ${new Date(a.submittedAt).toLocaleString('vi-VN')} · ${a.course}.`, '/parent/submissions', new Date(a.submittedAt));
+        add(`sub:${a.submissionId}`, 'PH_SUBMISSION', `${a.workMode === 'GROUP' ? 'Nhóm của ' + name : name} đã nộp “${a.title}”${a.isLate ? ' (muộn)' : ''}`, `${a.submittedBy} nộp lúc ${vnDate(a.submittedAt, true)} · ${a.course}.`, '/parent/submissions', new Date(a.submittedAt));
       const due = new Date(a.dueAt).getTime();
-      if (a.status === 'MISSED') add(`miss:${a.id}`, 'PH_WARNING', `Quá hạn chưa nộp · ${a.title}`, `${name} chưa nộp bài “${a.title}” (${a.course}), hạn ${new Date(a.dueAt).toLocaleString('vi-VN')}.`, '/parent/submissions', new Date(a.dueAt));
+      if (a.status === 'MISSED') add(`miss:${a.id}`, 'PH_WARNING', `Quá hạn chưa nộp · ${a.title}`, `${name} chưa nộp bài “${a.title}” (${a.course}), hạn ${vnDate(a.dueAt, true)}.`, '/parent/submissions', new Date(a.dueAt));
       else if (!a.submissionId && due > now && due - now < 48 * 3600_000)
-        add(`due:${a.id}`, 'PH_DUE', `Sắp hết hạn nộp · ${a.title}`, `${name} chưa nộp, hạn ${new Date(a.dueAt).toLocaleString('vi-VN')} (${a.course}).`, '/parent/submissions');
+        add(`due:${a.id}`, 'PH_DUE', `Sắp hết hạn nộp · ${a.title}`, `${name} chưa nộp, hạn ${vnDate(a.dueAt, true)} (${a.course}).`, '/parent/submissions');
     }
     if (rows.length) await this.prisma.notification.createMany({ data: rows, skipDuplicates: true });
   }

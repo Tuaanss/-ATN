@@ -91,7 +91,7 @@ export async function readSheet(file: { buffer?: Buffer; size: number; originaln
         }
       }
     });
-    // dòng tiêu đề: khớp ≥ 2 cột; mẫu chỉ có 1 cột bắt buộc (VD: chỉ MSSV) thì khớp đúng cột đó là đủ
+    // dòng tiêu đề: khớp ≥ 2 cột; mẫu chỉ có 1 cột bắt buộc (VD: chỉ MSV) thì khớp đúng cột đó là đủ
     const required = wanted.filter((c) => c.required);
     if (Object.keys(found).length >= 2 || (required.length === 1 && required[0].key in found)) {
       headerRow = r;
@@ -128,16 +128,5 @@ export function parseScore(raw: string): { value: number | null; error?: string 
   return { value: Math.round(n * 10) / 10 };
 }
 
-/** Quy đổi điểm chữ và hệ 4 (BR-15). */
-export function letterOf(total: number): { letter: string; gpa4: number } {
-  if (total >= 8.5) return { letter: 'A', gpa4: 4 };
-  if (total >= 8.0) return { letter: 'B+', gpa4: 3.5 };
-  if (total >= 7.0) return { letter: 'B', gpa4: 3 };
-  if (total >= 6.5) return { letter: 'C+', gpa4: 2.5 };
-  if (total >= 5.5) return { letter: 'C', gpa4: 2 };
-  if (total >= 5.0) return { letter: 'D+', gpa4: 1.5 };
-  if (total >= 4.0) return { letter: 'D', gpa4: 1 };
-  return { letter: 'F', gpa4: 0 };
-}
 
 export const normCode = (s: string) => s.trim().toUpperCase();

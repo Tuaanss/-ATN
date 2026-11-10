@@ -16,7 +16,7 @@ const uuidOrNull = z.string().uuid().nullable().optional();
 
 const lecturerSchema = z.object({ code: text(20, 'Nhập mã giảng viên'), fullName: text(100, 'Nhập họ tên'), email: z.string().trim().email('Email không hợp lệ'), phone: z.string().trim().max(10).optional(), facultyId: uuidOrNull });
 const studentSchema = z.object({
-  studentCode: text(20, 'Nhập MSSV'),
+  studentCode: text(20, 'Nhập MSV'),
   fullName: text(100, 'Nhập họ tên'),
   dateOfBirth: text(10, 'Nhập ngày sinh'),
   adminClassId: uuidOrNull,
@@ -30,17 +30,11 @@ const majorSchema = z.object({ code: text(20, 'Nhập mã ngành'), name: text(2
 const cohortSchema = z.object({ name: text(10, 'Nhập tên khóa'), startYear: z.number().int().min(2000).max(2100) });
 const classSchema = z.object({ code: text(30, 'Nhập mã lớp'), majorId: z.string().uuid('Chọn ngành'), cohortId: z.string().uuid('Chọn khóa') });
 const semesterSchema = z.object({ academicYear: text(9), term: z.enum(['TERM_1', 'TERM_2', 'SUMMER']), startDate: text(10), endDate: text(10) });
-const weight = z.number().int().min(0).max(100);
 const courseSchema = z.object({
   code: text(20, 'Nhập mã môn'),
   name: text(200, 'Nhập tên môn'),
   credits: z.number().int().min(1, 'Tín chỉ 1–10').max(10, 'Tín chỉ 1–10'),
-  courseType: z.enum(['DESIGN', 'PROGRAMMING', 'OTHER']),
   facultyId: uuidOrNull,
-  wAttendance: weight,
-  wAssignment: weight,
-  wMidterm: weight,
-  wFinal: weight,
   isActive: z.boolean().optional(),
 });
 const sectionSchema = z.object({
@@ -48,12 +42,8 @@ const sectionSchema = z.object({
   courseId: z.string().uuid('Chọn môn'),
   code: text(30, 'Nhập mã lớp'),
   lecturerId: z.string().uuid('Chọn giảng viên'),
-  maxStudents: z.number().int(),
-  weekStart: z.number().int(),
-  weekEnd: z.number().int(),
-  sessions: z.array(z.object({ day: z.number().int(), from: z.number().int(), to: z.number().int(), room: z.string().max(30) })).max(7),
 });
-const codesSchema = z.object({ codes: z.array(z.string().max(20)).min(1, 'Nhập ít nhất một MSSV').max(300) });
+const codesSchema = z.object({ codes: z.array(z.string().max(20)).min(1, 'Nhập ít nhất một MSV').max(300) });
 const decideSchema = z.object({ action: z.enum(['approve', 'reject', 'lock', 'unlock']), reason: z.string().trim().max(500).optional() });
 const enterpriseSchema = z.object({
   name: text(200, 'Nhập tên doanh nghiệp'),
@@ -76,9 +66,8 @@ const configSchema = z.object({
     documentMax: z.number().int().min(1).max(20),
     linkDomains: z.array(z.string().trim().min(1).max(100)).max(30),
   }),
-  grading: z.object({ scale: z.array(z.tuple([z.number().min(0).max(10), z.string().trim().min(1).max(3), z.number().min(0).max(4)])).min(2).max(15), retake: z.enum(['HIGHEST', 'LATEST']) }),
   security: z.object({ maxFailed: z.number().int().min(3).max(20), lockMinutes: z.number().int().min(1).max(1440), forceChangeFirstLogin: z.boolean() }),
-  warning: z.object({ scoreThreshold: z.number().min(0).max(10), gpaDrop: z.number().min(0).max(4) }),
+  warning: z.object({ scoreThreshold: z.number().min(0).max(10) }),
   enterprise: z.object({ viewDaysMin: z.number().int().min(1).max(365), viewDaysMax: z.number().int().min(1).max(365) }),
   reminder: z.object({ hours: z.number().int().min(1).max(168) }),
   email: z.object({ sender: z.string().trim().min(3).max(200) }),
@@ -263,10 +252,6 @@ export class AdminAcademicController {
   @Get('sections')
   sections(@Query('semester') semester?: string) {
     return this.svc.sections(semester || undefined);
-  }
-  @Post('sections/check')
-  check(@Body(new ZodPipe(sectionSchema.extend({ id: z.string().uuid().optional() }))) d: SectionInput & { id?: string }) {
-    return this.svc.conflicts(d, d.id);
   }
   @Post('sections')
   addSection(@CurrentUser() u: AuthUser, @Body(new ZodPipe(sectionSchema)) d: SectionInput) {

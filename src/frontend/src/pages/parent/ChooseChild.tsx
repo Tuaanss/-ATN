@@ -71,8 +71,8 @@ export function ChooseChild() {
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 10, padding: '12px 0', borderTop: '1px solid #EFEDE6', borderBottom: '1px solid #EFEDE6' }}>
                 {[
-                  ['CPA', k.cpa != null ? k.cpa.toFixed(2) : '—'],
-                  ['Tín chỉ tích lũy', k.credits],
+                  ['Điểm TB bài tập', k.avgScore != null ? k.avgScore.toFixed(1).replace('.', ',') : '—'],
+                  ['Bài có điểm', k.gradedAssignments],
                   ['Thông báo mới', k.unread],
                 ].map(([l, v]) => (
                   <div key={String(l)} style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>

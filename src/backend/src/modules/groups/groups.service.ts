@@ -9,7 +9,7 @@ import { NotificationsService } from '../notifications/notifications.module';
 export const groupLabel = (seq: number, name: string) => `Nhóm ${String(seq).padStart(2, '0')} · ${name}`;
 
 const COLUMNS: SheetColumn[] = [
-  { key: 'code', header: 'MSSV', width: 14, aliases: ['MSV', 'Mã SV', 'Mã sinh viên'], required: true },
+  { key: 'code', header: 'MSV', width: 14, aliases: ['MSSV', 'Mã SV', 'Mã sinh viên'], required: true },
   { key: 'name', header: 'Họ tên', width: 28, aliases: ['Họ và tên', 'Tên sinh viên'] },
   // Form quen dùng: cột STT gộp ô cho cả nhóm → STT chính là số nhóm
   { key: 'group', header: 'Nhóm', width: 12, aliases: ['Mã nhóm', 'Nhóm số', 'STT nhóm', 'STT'], required: true },
@@ -104,16 +104,16 @@ export class GroupsService {
       // dòng trống của nhóm (ô STT gộp nhưng chưa có SV điền) → bỏ qua
       if (!code && !(values.name ?? '').trim()) continue;
       if (!code) {
-        fail('Thiếu MSSV');
+        fail('Thiếu MSV');
         continue;
       }
       const st = byCode.get(code);
       if (!st) {
-        fail(`MSSV ${code} không thuộc lớp ${a.section.code}`);
+        fail(`MSV ${code} không thuộc lớp ${a.section.code}`);
         continue;
       }
       if (seen.has(code)) {
-        fail(`MSSV ${code} lặp lại (đã có ở dòng ${seen.get(code)})`);
+        fail(`MSV ${code} lặp lại (đã có ở dòng ${seen.get(code)})`);
         plan.skipped.push(st.id);
         continue;
       }

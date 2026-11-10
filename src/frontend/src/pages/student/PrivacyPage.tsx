@@ -93,7 +93,7 @@ export function PrivacyPage() {
         <div className="col">
           <Card title="Cho phép doanh nghiệp tìm thấy tôi" extra={<Switch checked={d.discoverable} disabled={set.isPending} onChange={(v) => set.mutate(v)} label="Cho phép doanh nghiệp tìm thấy tôi" />}>
             <p style={{ fontSize: 13, lineHeight: 1.6, color: '#4A4E57' }}>
-              Doanh nghiệp chỉ thấy họ tên, khóa, ngành, GPA và đề tài đã nộp — không thấy SĐT, email, thông tin phụ huynh hay điểm từng môn.
+              Doanh nghiệp chỉ thấy họ tên, khóa, ngành, điểm TB bài tập và đề tài đã nộp — không thấy SĐT, email, thông tin phụ huynh hay điểm từng bài.
             </p>
           </Card>
           <Note tone="gray" icon="shield">

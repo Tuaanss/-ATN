@@ -21,7 +21,6 @@ export interface SearchQuery {
   semester?: string;
   course?: string;
   section?: string;
-  type?: string;
   min?: string;
   max?: string;
   sort?: 'relevance' | 'newest' | 'score';
@@ -37,7 +36,6 @@ export class SearchService {
   constructor(private readonly prisma: PrismaService) {}
 
   private async scope(lecturerId: string, q: SearchQuery) {
-    const types = list(q.type);
     const where: Prisma.SubmissionWhereInput = {
       assignment: {
         deletedAt: null,
@@ -45,7 +43,7 @@ export class SearchService {
           lecturerId,
           ...(q.section ? { id: q.section } : {}),
           ...(q.semester ? { semester: { code: q.semester } } : {}),
-          ...(q.course || types.length ? { course: { ...(q.course ? { code: q.course } : {}), ...(types.length ? { courseType: { in: types as never } } : {}) } } : {}),
+          ...(q.course ? { course: { code: q.course } } : {}),
         },
       },
       // gồm bài chung của nhóm, bài cá nhân và phần cá nhân trong bài nhóm
@@ -154,7 +152,7 @@ export class SearchService {
           note: note && { content: note.content, isSample: note.isSample },
           members: members.map((m) => ({ fullName: m.fullName, studentCode: m.studentCode })),
           cohorts: [...new Set(members.map((m) => m.cohort).filter(Boolean))] as string[],
-          section: { code: a.section.code, course: a.section.course.name, courseType: a.section.course.courseType },
+          section: { code: a.section.code, course: a.section.course.name },
           semester: { code: a.section.semester.code, term: a.section.semester.term, academicYear: a.section.semester.academicYear },
           score,
           gradesPublished: !!a.gradesPublishedAt,
@@ -200,7 +198,6 @@ export class SearchService {
       }),
       courses: uniq(sections.map((s) => s.course.code)).map((code) => ({ code, name: sections.find((x) => x.course.code === code)!.course.name })),
       sections: sections.map((s) => ({ id: s.id, code: s.code, course: s.course.name })),
-      types: uniq(sections.map((s) => s.course.courseType)),
       suggestions: [...count.values()].sort((x, y) => y.n - x.n).slice(0, 6).map((x) => x.label),
     };
   }

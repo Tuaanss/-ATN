@@ -157,7 +157,6 @@ export class DashboardService {
           id: e.section.id,
           code: e.section.code,
           course: e.section.course.name,
-          type: e.section.course.courseType,
           lecturer: e.section.lecturer.fullName,
           total: list.length,
           done: list.filter((r) => done.includes(r.status)).length,

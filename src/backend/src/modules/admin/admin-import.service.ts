@@ -1,19 +1,17 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
-import { CourseType } from '@prisma/client';
 import { randomUUID } from 'node:crypto';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { AppException } from '../../common/errors/app-exception';
 import { AuditService } from '../../common/audit/audit.service';
 import { SheetColumn, buildSheet, normCode, readSheet } from '../../common/utils/excel';
 import { AdminUsersService, LecturerInput } from './admin-users.service';
-import { AdminAcademicService, CourseInput, SectionInput, Session } from './admin-academic.service';
+import { AdminAcademicService, CourseInput, SectionInput, sectionCodeOk, sectionPrefix } from './admin-academic.service';
 
 export type ImportKind = 'lecturers' | 'courses' | 'sections' | 'faculties' | 'majors' | 'cohorts' | 'classes' | 'enrollments';
 export const IMPORT_KINDS: ImportKind[] = ['lecturers', 'courses', 'sections', 'faculties', 'majors', 'cohorts', 'classes', 'enrollments'];
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const PHONE = /^(03|05|07|08|09)\d{8}$/;
-const COURSE_TYPES: Record<string, CourseType> = { thietke: 'DESIGN', design: 'DESIGN', laptrinh: 'PROGRAMMING', programming: 'PROGRAMMING', khac: 'OTHER', other: 'OTHER' };
 const plain = (s: string) =>
   s
     .normalize('NFD')
@@ -34,21 +32,12 @@ const COLS: Record<ImportKind, SheetColumn[]> = {
     { key: 'code', header: 'Mã môn', width: 12, required: true },
     { key: 'name', header: 'Tên môn', width: 34, required: true },
     { key: 'credits', header: 'Tín chỉ', width: 10, aliases: ['Số tín chỉ', 'TC'], required: true },
-    { key: 'type', header: 'Loại môn', width: 14, required: true },
     { key: 'faculty', header: 'Mã khoa', width: 12, aliases: ['Khoa'] },
-    { key: 'wa', header: 'CC (%)', width: 9, aliases: ['Chuyên cần', 'CC'] },
-    { key: 'wb', header: 'BT (%)', width: 9, aliases: ['Bài tập', 'BT'] },
-    { key: 'wm', header: 'GK (%)', width: 9, aliases: ['Giữa kỳ', 'GK'] },
-    { key: 'wf', header: 'CK (%)', width: 9, aliases: ['Cuối kỳ', 'CK'] },
   ],
   sections: [
-    { key: 'code', header: 'Mã lớp HP', width: 14, aliases: ['Mã lớp', 'Mã lớp học phần'], required: true },
+    { key: 'code', header: 'Mã lớp HP', width: 24, aliases: ['Mã lớp', 'Mã lớp học phần'] },
     { key: 'course', header: 'Mã môn', width: 12, required: true },
     { key: 'lecturer', header: 'Mã GV', width: 12, aliases: ['Mã giảng viên'], required: true },
-    { key: 'max', header: 'Sĩ số tối đa', width: 12, aliases: ['Sĩ số'], required: true },
-    { key: 'ws', header: 'Tuần bắt đầu', width: 12, aliases: ['Từ tuần'] },
-    { key: 'we', header: 'Tuần kết thúc', width: 12, aliases: ['Đến tuần'] },
-    { key: 'schedule', header: 'Lịch học', width: 40, required: true },
   ],
   faculties: [
     { key: 'code', header: 'Mã khoa', width: 12, required: true },
@@ -71,7 +60,7 @@ const COLS: Record<ImportKind, SheetColumn[]> = {
   ],
   enrollments: [
     { key: 'section', header: 'Mã lớp HP', width: 14, aliases: ['Mã lớp học phần', 'Lớp HP'], required: true },
-    { key: 'code', header: 'MSSV', width: 14, aliases: ['MSV', 'Mã sinh viên'], required: true },
+    { key: 'code', header: 'MSV', width: 14, aliases: ['MSSV', 'Mã SV', 'Mã sinh viên'], required: true },
     { key: 'name', header: 'Họ tên', width: 28, aliases: ['Họ và tên'] },
   ],
 };
@@ -81,26 +70,6 @@ const yearOf = (cohort: string) => {
   const m = cohort.match(/(\d{2})$/);
   return m ? 2000 + Number(m[1]) : null;
 };
-
-/** "T2 1-3 A2-301; T5 6-8 B1-101" → các buổi học. Thứ 2–7, CN; tiết 1–12. */
-export function parseSchedule(text: string): Session[] | null {
-  const parts = text
-    .split(/[;\n]+/)
-    .map((x) => x.trim())
-    .filter(Boolean);
-  if (!parts.length) return null;
-  const out: Session[] = [];
-  for (const p of parts) {
-    const m = p.match(/^(?:(?:t|thứ|thu)\s*([2-7])|(cn|chủ nhật|chu nhat))\s*,?\s*(?:tiết|tiet)?\s*(\d{1,2})\s*[-–]\s*(\d{1,2})\s*[,·]?\s*(?:phòng|phong)?\s*(.*)$/i);
-    if (!m) return null;
-    const day = m[2] ? 8 : Number(m[1]);
-    const from = Number(m[3]);
-    const to = Number(m[4]);
-    if (from < 1 || to > 12 || to < from) return null;
-    out.push({ day, from, to, room: (m[5] ?? '').trim() });
-  }
-  return out;
-}
 
 interface Row {
   row: number;
@@ -125,23 +94,25 @@ export class AdminImportService {
 
   async template(kind: ImportKind, sectionId?: string) {
     if (kind === 'enrollments' && sectionId) return this.sectionTemplate(sectionId);
-    const [fac, course, lec, major, section, student] = await Promise.all([
+    const [fac, course, lec, major, section, student, sem] = await Promise.all([
       this.prisma.faculty.findFirst(),
       this.prisma.course.findFirst(),
       this.prisma.lecturer.findFirst(),
       this.prisma.major.findFirst(),
       this.prisma.courseSection.findFirst({ where: { semester: { isCurrent: true } } }),
       this.prisma.student.findFirst(),
+      this.prisma.semester.findFirst({ where: { isCurrent: true } }),
     ]);
     const f = fac?.code ?? 'TKTT';
+    const pre = sectionPrefix(course?.code ?? 'TK101', sem ?? { term: 'TERM_1', academicYear: '2026-2027' });
     const rows: Record<ImportKind, (string | number)[][]> = {
       lecturers: [
         ['GV0100', 'TS. Nguyễn Văn A', 'nguyenvana@truong.edu.vn', '0912345670', f],
         ['GV0101', 'ThS. Trần Thị B', 'tranthib@truong.edu.vn', '', f],
       ],
       courses: [
-        ['TK101', 'Thiết kế giao diện', 3, 'Thiết kế', f, 10, 30, 20, 40],
-        ['LT201', 'Lập trình Web', 3, 'Lập trình', f, 10, 20, 20, 50],
+        ['TK101', 'Thiết kế giao diện', 3, f],
+        ['LT201', 'Lập trình Web', 3, f],
       ],
       faculties: [
         ['DPT', 'Khoa Đa phương tiện'],
@@ -160,12 +131,12 @@ export class AdminImportService {
         ['D26CQPT02-B', major?.code ?? 'CNDPT', 'D26', ''],
       ],
       enrollments: [
-        [section?.code ?? 'TK101_01', student?.studentCode ?? 'B26DCPT001', student?.fullName ?? 'Nguyễn Văn A'],
-        [section?.code ?? 'TK101_01', 'B26DCPT002', 'Trần Thị B'],
+        [section?.code ?? `${pre}_01`, student?.studentCode ?? 'B26DCPT001', student?.fullName ?? 'Nguyễn Văn A'],
+        [section?.code ?? `${pre}_01`, 'B26DCPT002', 'Trần Thị B'],
       ],
       sections: [
-        [`${course?.code ?? 'TK101'}_05`, course?.code ?? 'TK101', lec?.code ?? 'GV0100', 50, 1, 15, 'T3 1-3 A2-302'],
-        [`${course?.code ?? 'TK101'}_06`, course?.code ?? 'TK101', lec?.code ?? 'GV0100', 50, 1, 15, 'T4 6-8 B1-101; T6 1-2 Lab 3'],
+        [`${pre}_05`, course?.code ?? 'TK101', lec?.code ?? 'GV0100'],
+        ['', course?.code ?? 'TK101', lec?.code ?? 'GV0100'],
       ],
     };
     const guide: Record<ImportKind, string[]> = {
@@ -175,15 +146,13 @@ export class AdminImportService {
         'Mỗi giảng viên nhận email chứa mật khẩu tạm và phải đổi mật khẩu ở lần đăng nhập đầu.',
       ],
       courses: [
-        'Mỗi dòng là một môn học. Bắt buộc: Mã môn, Tên môn, Tín chỉ (1–10), Loại môn.',
-        'Loại môn: Thiết kế / Lập trình / Khác. Mã khoa lấy theo Danh mục › Khoa.',
-        'Trọng số CC, BT, GK, CK (%) tổng phải bằng 100; để trống cả 4 cột thì dùng mặc định 10 · 30 · 20 · 40.',
+        'Mỗi dòng là một môn học. Bắt buộc: Mã môn, Tên môn, Tín chỉ (1–10).',
+        'Mã khoa lấy theo Danh mục › Khoa (để trống nếu chưa xếp khoa).',
       ],
       sections: [
         'Mỗi dòng là một lớp học phần, mở trong học kỳ chọn trên màn hình import.',
-        'Bắt buộc: Mã lớp HP (VD: TK101_05), Mã môn, Mã GV, Sĩ số tối đa, Lịch học. Tuần để trống = 1 đến 15.',
-        'Lịch học: mỗi buổi dạng "T2 1-3 A2-301" (thứ, tiết bắt đầu-kết thúc, phòng); nhiều buổi cách nhau bằng dấu chấm phẩy. Chủ nhật ghi CN.',
-        'Hệ thống kiểm tra trùng lịch giảng viên / phòng với các lớp đã có và giữa các dòng trong tệp.',
+        'Bắt buộc: Mã môn, Mã GV (đều phải có sẵn trong hệ thống).',
+        `Mã lớp HP dạng MÃMÔN_HKx_NĂMHỌC_STT, VD: ${pre}_01 (HK1 / HK2 / HE; năm học 2025-2026 ghi 2526). Để trống thì hệ thống tự đánh số tiếp theo.`,
       ],
       faculties: [
         'Mỗi dòng là một khoa. Bắt buộc: Mã khoa (tối đa 20 ký tự), Tên khoa. Mã và tên khoa không được trùng.',
@@ -202,8 +171,8 @@ export class AdminImportService {
       ],
       enrollments: [
         'Mỗi dòng xếp một sinh viên vào một lớp học phần. Một tệp có thể xếp cho nhiều lớp.',
-        'Bắt buộc: Mã lớp HP, MSSV (phải có sẵn trong hệ thống). Cột Họ tên chỉ để đối chiếu.',
-        'Hệ thống bỏ qua sinh viên đã ở trong lớp, đã học môn này ở lớp khác cùng học kỳ, trùng lịch học, hoặc khi lớp đã đủ sĩ số.',
+        'Bắt buộc: Mã lớp HP, MSV (phải có sẵn trong hệ thống). Cột Họ tên chỉ để đối chiếu.',
+        'Sinh viên đã ở trong lớp sẽ được bỏ qua.',
       ],
     };
     const NAME: Record<ImportKind, string> = {
@@ -220,7 +189,7 @@ export class AdminImportService {
   }
 
   async preview(kind: ImportKind, file: Express.Multer.File, semesterId?: string, sectionId?: string) {
-    // xếp vào một lớp cụ thể: chỉ cần cột MSSV
+    // xếp vào một lớp cụ thể: chỉ cần cột MSV
     const one = kind === 'enrollments' && sectionId ? await this.prisma.courseSection.findUnique({ where: { id: sectionId } }) : null;
     if (kind === 'enrollments' && sectionId && !one) throw new AppException('NOT_FOUND', 'Lớp học phần không tồn tại', HttpStatus.NOT_FOUND);
     const raw = await readSheet(file, one ? COLS.enrollments.map((c) => (c.key === 'section' ? { ...c, required: false } : c)) : COLS[kind]);
@@ -324,78 +293,49 @@ export class AdminImportService {
       const c = r.cells;
       const code = normCode(c.code ?? '');
       const credits = Number(c.credits);
-      const type = COURSE_TYPES[plain(c.type ?? '')];
       const fac = c.faculty ? faculties.find((f) => f.code.toUpperCase() === normCode(c.faculty)) : null;
-      const ws = [c.wa, c.wb, c.wm, c.wf];
-      const empty = ws.every((w) => !w);
-      const [wa, wb, wm, wf] = empty ? [10, 30, 20, 40] : ws.map((w) => Number(w || 0));
       if (!code) r.problems.push('Thiếu mã môn');
       else if (taken.has(code)) r.problems.push('Mã môn đã tồn tại');
       else if (seen.has(code)) r.problems.push('Mã môn lặp trong tệp');
       if (!c.name?.trim()) r.problems.push('Thiếu tên môn');
       if (!Number.isInteger(credits) || credits < 1 || credits > 10) r.problems.push('Tín chỉ 1–10');
-      if (!type) r.problems.push('Loại môn: Thiết kế / Lập trình / Khác');
       if (c.faculty && !fac) r.problems.push(`Không có khoa “${c.faculty}”`);
-      if ([wa, wb, wm, wf].some((w) => !Number.isInteger(w) || w < 0 || w > 100)) r.problems.push('Trọng số là số nguyên 0–100');
-      else if (wa + wb + wm + wf !== 100) r.problems.push(`Tổng trọng số ${wa + wb + wm + wf}% (phải bằng 100%)`);
       if (code) seen.add(code);
-      r.data = { code, name: (c.name ?? '').trim(), credits, courseType: type ?? 'OTHER', facultyId: fac?.id ?? null, wAttendance: wa, wAssignment: wb, wMidterm: wm, wFinal: wf } satisfies CourseInput;
+      r.data = { code, name: (c.name ?? '').trim(), credits, facultyId: fac?.id ?? null } satisfies CourseInput;
     }
   }
 
   private async checkSections(rows: Row[], semesterId: string) {
-    const [existing, courses, lecturers] = await Promise.all([
+    const [existing, courses, lecturers, sem] = await Promise.all([
       this.prisma.courseSection.findMany({ select: { code: true } }),
       this.prisma.course.findMany(),
       this.prisma.lecturer.findMany({ include: { user: { select: { status: true } } } }),
+      this.prisma.semester.findUniqueOrThrow({ where: { id: semesterId } }),
     ]);
     const taken = new Set(existing.map((s) => s.code.toUpperCase()));
     const seen = new Set<string>();
-    const accepted: SectionInput[] = [];
-    const overlap = (a: SectionInput, b: SectionInput) => {
-      const out: string[] = [];
-      if (a.weekStart > b.weekEnd || b.weekStart > a.weekEnd) return out;
-      for (const x of a.sessions)
-        for (const y of b.sessions) {
-          if (x.day !== y.day || x.from > y.to || y.from > x.to) continue;
-          if (a.lecturerId === b.lecturerId) out.push(`trùng giờ dạy với lớp ${b.code} trong tệp`);
-          if (x.room && y.room && x.room.toUpperCase() === y.room.toUpperCase()) out.push(`trùng phòng ${x.room} với lớp ${b.code} trong tệp`);
-        }
-      return out;
-    };
     for (const r of rows) {
       const c = r.cells;
-      const code = normCode(c.code ?? '');
       const course = courses.find((x) => x.code.toUpperCase() === normCode(c.course ?? ''));
       const lec = lecturers.find((x) => x.code.toUpperCase() === normCode(c.lecturer ?? ''));
-      const max = Number(c.max);
-      const weekStart = c.ws ? Number(c.ws) : 1;
-      const weekEnd = c.we ? Number(c.we) : 15;
-      const sessions = parseSchedule(c.schedule ?? '');
-      if (!/^[A-Z0-9]+_\d{2,3}$/.test(code)) r.problems.push('Mã lớp dạng MÃMÔN_số, VD: TK101_05');
+      const prefix = course ? sectionPrefix(course.code, sem) : null;
+      let code = normCode(c.code ?? '');
+      // để trống mã lớp → tự đánh số tiếp theo của môn trong học kỳ
+      if (!code && prefix) {
+        let n = 1;
+        while (taken.has(`${prefix}_${String(n).padStart(2, '0')}`) || seen.has(`${prefix}_${String(n).padStart(2, '0')}`)) n++;
+        code = `${prefix}_${String(n).padStart(2, '0')}`;
+        c.code = code;
+      }
+      if (!code) r.problems.push('Thiếu mã lớp HP');
+      else if (prefix && !sectionCodeOk(code, prefix)) r.problems.push(`Mã lớp phải dạng ${prefix}_01`);
       else if (taken.has(code)) r.problems.push('Mã lớp đã tồn tại');
       else if (seen.has(code)) r.problems.push('Mã lớp lặp trong tệp');
       if (!course) r.problems.push(`Không có môn “${c.course ?? ''}”`);
       if (!lec) r.problems.push(`Không có giảng viên “${c.lecturer ?? ''}”`);
       else if (lec.user.status !== 'ACTIVE') r.problems.push('Giảng viên đang bị khóa');
-      if (!Number.isInteger(max) || max < 1 || max > 300) r.problems.push('Sĩ số 1–300');
-      if (!Number.isInteger(weekStart) || !Number.isInteger(weekEnd) || weekStart < 1 || weekEnd < weekStart || weekEnd > 25) r.problems.push('Tuần học không hợp lệ');
-      if (!sessions) r.problems.push('Lịch học sai định dạng (VD: T2 1-3 A2-301)');
-      else if (sessions.some((s) => !s.room)) r.problems.push('Mỗi buổi cần ghi phòng học');
       if (code) seen.add(code);
-      const d: SectionInput = { semesterId, courseId: course?.id ?? '', code, lecturerId: lec?.id ?? '', maxStudents: max, weekStart, weekEnd, sessions: sessions ?? [] };
-      if (!r.problems.length) {
-        for (const a of d.sessions)
-          for (const b of d.sessions) if (a !== b && a.day === b.day && a.from <= b.to && b.from <= a.to) r.problems.push('Hai buổi của lớp bị chồng tiết');
-        if (!r.problems.length) {
-          const db = await this.academic.conflicts(d);
-          r.problems.push(...db.map((x) => x.message));
-          for (const prev of accepted) r.problems.push(...overlap(d, prev));
-          r.problems = [...new Set(r.problems)];
-        }
-      }
-      if (!r.problems.length) accepted.push(d);
-      r.data = d;
+      r.data = { semesterId, courseId: course?.id ?? '', code, lecturerId: lec?.id ?? '' } satisfies SectionInput;
     }
   }
 
@@ -523,14 +463,14 @@ export class AdminImportService {
 
   // ---------------------------------------------------------------- xếp sinh viên vào lớp học phần
 
-  /** File mẫu xếp SV cho một lớp: chỉ cần điền MSSV, cột Mã lớp HP để trống. */
+  /** File mẫu xếp SV cho một lớp: chỉ cần điền MSV, cột Mã lớp HP để trống. */
   private async sectionTemplate(sectionId: string) {
     const s = await this.prisma.courseSection.findUnique({ where: { id: sectionId }, include: { course: true } });
     if (!s) throw new AppException('NOT_FOUND', 'Lớp học phần không tồn tại', HttpStatus.NOT_FOUND);
     const buffer = await buildSheet('Du_lieu', COLS.enrollments, [], [
       `Xếp sinh viên vào lớp ${s.code} – ${s.course.name}.`,
-      'Mỗi dòng một sinh viên: điền MSSV (bắt buộc), Họ tên chỉ để đối chiếu. Có thể để trống cột Mã lớp HP.',
-      'Sinh viên đã ở trong lớp, đã học môn này ở lớp khác cùng học kỳ, trùng lịch học, hoặc khi lớp đủ sĩ số sẽ bị bỏ qua.',
+      'Mỗi dòng một sinh viên: điền MSV (bắt buộc), Họ tên chỉ để đối chiếu. Có thể để trống cột Mã lớp HP.',
+      'Sinh viên đã ở trong lớp sẽ được bỏ qua.',
     ]);
     return { buffer, fileName: `Xep_sinh_vien_${s.code}.xlsx` };
   }
@@ -544,24 +484,15 @@ export class AdminImportService {
     const secCodes = [...new Set(rows.map((r) => normCode(r.cells.section ?? '')).filter(Boolean))];
     const stCodes = [...new Set(rows.map((r) => normCode(r.cells.code ?? '')).filter(Boolean))];
     const [sections, students] = await Promise.all([
-      this.prisma.courseSection.findMany({ where: { code: { in: secCodes } }, include: { _count: { select: { students: true } } } }),
+      this.prisma.courseSection.findMany({ where: { code: { in: secCodes } } }),
       this.prisma.student.findMany({
         where: { studentCode: { in: stCodes } },
-        include: { user: { select: { status: true } }, enrollments: { include: { section: { select: { id: true, code: true, courseId: true, semesterId: true, weekStart: true, weekEnd: true, sessions: true } } } } },
+        include: { user: { select: { status: true } }, enrollments: { select: { sectionId: true } } },
       }),
     ]);
-    type Sec = { id: string; code: string; courseId: string; semesterId: string; weekStart: number; weekEnd: number; sessions: unknown };
     const secBy = new Map(sections.map((x) => [x.code.toUpperCase(), x]));
     const stBy = new Map(students.map((x) => [x.studentCode.toUpperCase(), x]));
-    // trạng thái giả lập: lớp đã xếp của từng SV (CSDL + các dòng hợp lệ phía trên) và chỗ còn trống của từng lớp
-    const plan = new Map<string, Sec[]>(students.map((x) => [x.id, x.enrollments.map((e) => e.section)]));
-    const room = new Map(sections.map((x) => [x.id, x.maxStudents - x._count.students]));
     const seen = new Map<string, number>();
-    const clash = (a: Sec, b: Sec) =>
-      a.semesterId === b.semesterId &&
-      a.weekStart <= b.weekEnd &&
-      b.weekStart <= a.weekEnd &&
-      (a.sessions as Session[]).some((x) => (b.sessions as Session[]).some((y) => x.day === y.day && x.from <= y.to && y.from <= x.to));
     for (const r of rows) {
       const secCode = normCode(r.cells.section ?? '');
       const code = normCode(r.cells.code ?? '');
@@ -569,24 +500,14 @@ export class AdminImportService {
       const st = stBy.get(code);
       if (!secCode) r.problems.push('Thiếu mã lớp HP');
       else if (!sec) r.problems.push(`Không có lớp học phần “${r.cells.section}”`);
-      if (!code) r.problems.push('Thiếu MSSV');
+      if (!code) r.problems.push('Thiếu MSV');
       else if (!st) r.problems.push(`Không có sinh viên ${code}`);
       else if (st.user.status !== 'ACTIVE') r.problems.push('Tài khoản sinh viên đang bị khóa');
       if (sec && st && !r.problems.length) {
         const key = `${sec.id}:${st.id}`;
-        const mine = plan.get(st.id)!;
-        const same = mine.find((e) => e.semesterId === sec.semesterId && e.courseId === sec.courseId);
-        const clashWith = mine.find((e) => e.id !== sec.id && clash(e, sec));
         if (seen.has(key)) r.problems.push(`Dòng lặp (đã có ở dòng ${seen.get(key)})`);
-        else if (mine.some((e) => e.id === sec.id)) r.problems.push('Sinh viên đã ở trong lớp');
-        else if (same) r.problems.push(`Đã học môn này ở lớp ${same.code}`);
-        else if (clashWith) r.problems.push(`Trùng lịch với lớp ${clashWith.code}`);
-        else if ((room.get(sec.id) ?? 0) <= 0) r.problems.push(`Lớp ${sec.code} đã đủ sĩ số (${sec.maxStudents})`);
-        else {
-          mine.push(sec);
-          room.set(sec.id, room.get(sec.id)! - 1);
-          seen.set(key, r.row);
-        }
+        else if (st.enrollments.some((e) => e.sectionId === sec.id)) r.problems.push('Sinh viên đã ở trong lớp');
+        else seen.set(key, r.row);
       }
       r.data = { sectionId: sec?.id ?? '', code };
     }

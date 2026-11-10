@@ -1,4 +1,5 @@
 import { Body, Controller, Get, HttpStatus, Injectable, Module, Param, ParseUUIDPipe, Post, Query } from '@nestjs/common';
+import { vnDate } from '../../common/utils/date';
 import { Prisma } from '@prisma/client';
 import { z } from 'zod';
 import { PrismaService } from '../../common/prisma/prisma.service';
@@ -28,8 +29,8 @@ export interface SearchCriteria {
   cohorts?: string[];
   major?: string;
   classId?: string;
-  gpaMin?: number;
-  gpaMax?: number;
+  scoreMin?: number;
+  scoreMax?: number;
   topics?: string[];
   skills?: string[];
   page?: number;
@@ -58,21 +59,15 @@ export class EnterpriseService {
 
   // ---------------------------------------------------------------- dữ liệu dùng chung
 
-  /** CPA (thang 4) – môn học lại lấy điểm cao nhất, chỉ tính bảng điểm đã công bố. */
-  private async cpaOf(studentIds: string[]) {
-    const grades = await this.prisma.sectionGrade.findMany({ where: { studentId: { in: studentIds }, status: 'PUBLISHED', gpa4: { not: null } }, include: { section: { include: { course: true } } } });
+  /** Điểm trung bình các bài tập đã công bố điểm (thang 10). */
+  private async avgScoreOf(studentIds: string[]) {
+    const rows = await this.prisma.assignmentGrade.groupBy({
+      by: ['studentId'],
+      where: { studentId: { in: studentIds }, score: { not: null }, assignment: { deletedAt: null, gradesPublishedAt: { not: null } } },
+      _avg: { score: true },
+    });
     const out = new Map<string, number | null>();
-    for (const id of studentIds) {
-      const best = new Map<string, { g: number; cr: number }>();
-      for (const g of grades.filter((x) => x.studentId === id)) {
-        const v = Number(g.gpa4);
-        const k = g.section.course.code;
-        if (!best.has(k) || v > best.get(k)!.g) best.set(k, { g: v, cr: g.section.course.credits });
-      }
-      const all = [...best.values()];
-      const cr = all.reduce((a, x) => a + x.cr, 0);
-      out.set(id, cr ? Math.round((all.reduce((a, x) => a + x.g * x.cr, 0) / cr) * 100) / 100 : null);
-    }
+    for (const r of rows) out.set(r.studentId, r._avg.score == null ? null : Math.round(Number(r._avg.score) * 10) / 10);
     return out;
   }
 
@@ -191,7 +186,7 @@ export class EnterpriseService {
     if (c.classId) where.adminClassId = c.classId;
     const students = await this.prisma.student.findMany({ where, include: { adminClass: true } });
     const ids = students.map((s) => s.id);
-    const [cpa, works, access, interests] = await Promise.all([this.cpaOf(ids), this.worksOf(ids), this.accessOf(e.id, ids), this.prisma.enterpriseInterest.findMany({ where: { enterpriseId: e.id, studentId: { in: ids } } })]);
+    const [avg, works, access, interests] = await Promise.all([this.avgScoreOf(ids), this.worksOf(ids), this.accessOf(e.id, ids), this.prisma.enterpriseInterest.findMany({ where: { enterpriseId: e.id, studentId: { in: ids } } })]);
     const q = c.q ? norm(c.q) : '';
     const topics = (c.topics ?? []).map(norm);
     const skills = (c.skills ?? []).map(norm);
@@ -205,20 +200,20 @@ export class EnterpriseService {
           cohort: s.cohort,
           major: s.major,
           adminClass: s.adminClass?.code ?? null,
-          gpa: cpa.get(s.id) ?? null,
+          avgScore: avg.get(s.id) ?? null,
           skills: strs(s.skills),
           works: w.map((x) => ({ title: x.title, keywords: x.keywords })),
           access: access.get(s.id)!,
           interested: interests.some((i) => i.studentId === s.id),
         };
       })
-      .filter((r) => (c.gpaMin == null || (r.gpa != null && r.gpa >= c.gpaMin)) && (c.gpaMax == null || (r.gpa != null && r.gpa <= c.gpaMax)))
+      .filter((r) => (c.scoreMin == null || (r.avgScore != null && r.avgScore >= c.scoreMin)) && (c.scoreMax == null || (r.avgScore != null && r.avgScore <= c.scoreMax)))
       .filter((r) => !topics.length || r.works.some((w) => w.keywords.some((k) => topics.includes(norm(k)))))
       .filter((r) => !skills.length || skills.every((sk) => r.skills.some((x) => norm(x) === sk)))
       .filter((r) => !q || norm(`${r.fullName} ${r.studentCode} ${r.works.map((w) => `${w.title} ${w.keywords.join(' ')}`).join(' ')} ${r.skills.join(' ')}`).includes(q));
-    rows = rows.sort((a, b) => (b.gpa ?? -1) - (a.gpa ?? -1) || a.studentCode.localeCompare(b.studentCode));
+    rows = rows.sort((a, b) => (b.avgScore ?? -1) - (a.avgScore ?? -1) || a.studentCode.localeCompare(b.studentCode));
     if (log) {
-      const parts = [c.code && `MSSV ${c.code}`, c.q && `“${c.q}”`, c.cohorts?.length && `Khóa ${c.cohorts.join(', ')}`, c.major, c.gpaMin != null && `GPA ≥ ${c.gpaMin}`, ...(c.topics ?? []), ...(c.skills ?? [])].filter(Boolean);
+      const parts = [c.code && `MSV ${c.code}`, c.q && `“${c.q}”`, c.cohorts?.length && `Khóa ${c.cohorts.join(', ')}`, c.major, c.scoreMin != null && `Điểm TB ≥ ${c.scoreMin}`, ...(c.topics ?? []), ...(c.skills ?? [])].filter(Boolean);
       await this.prisma.enterpriseSearch.create({ data: { enterpriseId: e.id, criteria: c as unknown as Prisma.InputJsonValue, summary: (parts.join(' · ') || 'Tất cả sinh viên').slice(0, 300), results: rows.length } });
     }
     const page = Math.max(1, c.page ?? 1);
@@ -234,8 +229,8 @@ export class EnterpriseService {
     if (!s) throw notFound('Sinh viên');
     const access = (await this.accessOf(e.id, [s.id])).get(s.id)!;
     if (!s.discoverable && access.state !== 'ACTIVE') throw forbidden('Sinh viên đã tắt chế độ cho doanh nghiệp tìm thấy');
-    const [cpa, works, interest, pending] = await Promise.all([
-      this.cpaOf([s.id]),
+    const [avg, works, interest, pending] = await Promise.all([
+      this.avgScoreOf([s.id]),
       this.worksOf([s.id]),
       this.prisma.enterpriseInterest.findUnique({ where: { enterpriseId_studentId: { enterpriseId: e.id, studentId: s.id } } }),
       this.prisma.viewRequest.findFirst({ where: { enterpriseId: e.id, studentId: s.id, status: 'PENDING' } }),
@@ -254,7 +249,7 @@ export class EnterpriseService {
       bio: s.bio,
       skills: strs(s.skills),
       links: { github: s.githubUrl, behance: s.behanceUrl, linkedin: s.linkedinUrl },
-      gpa: cpa.get(s.id) ?? null,
+      avgScore: avg.get(s.id) ?? null,
       works: (works.get(s.id) ?? []).map((w) => ({ ...w, submissionId: granted ? w.submissionId : null })),
       access,
       pending: pending && { createdAt: pending.createdAt, purpose: pending.purpose, requestedDays: pending.requestedDays },
@@ -303,7 +298,7 @@ export class EnterpriseService {
     for (const s of students) {
       const a = access.get(s.id)!;
       if (!s.discoverable) skipped.push({ studentCode: s.studentCode, reason: 'Sinh viên không cho doanh nghiệp tìm thấy' });
-      else if (a.state === 'PENDING') skipped.push({ studentCode: s.studentCode, reason: `Đã có yêu cầu đang chờ duyệt từ ${a.since.toLocaleDateString('vi-VN')}` });
+      else if (a.state === 'PENDING') skipped.push({ studentCode: s.studentCode, reason: `Đã có yêu cầu đang chờ duyệt từ ${vnDate(a.since)}` });
       else if (a.state === 'ACTIVE') skipped.push({ studentCode: s.studentCode, reason: `Đang có quyền xem, còn ${a.daysLeft} ngày` });
       else {
         await this.prisma.viewRequest.create({ data: { enterpriseId: e.id, studentId: s.id, purpose, requestedDays: days } });
@@ -329,7 +324,7 @@ export class EnterpriseService {
     const latest = new Map<string, (typeof reqs)[number]>();
     for (const r of reqs) if (!latest.has(r.studentId)) latest.set(r.studentId, r);
     const ids = [...latest.keys()];
-    const [cpa, works] = await Promise.all([this.cpaOf(ids), this.worksOf(ids)]);
+    const [avg, works] = await Promise.all([this.avgScoreOf(ids), this.worksOf(ids)]);
     return [...latest.values()]
       .map((r) => {
         const active = r.status === 'APPROVED' && !!r.expiresAt && r.expiresAt > new Date();
@@ -337,7 +332,7 @@ export class EnterpriseService {
           studentId: r.studentId,
           studentCode: r.student.studentCode,
           fullName: r.student.fullName,
-          gpa: cpa.get(r.studentId) ?? null,
+          avgScore: avg.get(r.studentId) ?? null,
           works: (works.get(r.studentId) ?? []).length,
           active,
           revoked: r.status === 'REVOKED',
@@ -373,7 +368,7 @@ export class EnterpriseService {
     const recent = [...new Map(seen.map((v) => [v.studentId, v])).values()].slice(0, 12);
     const isActive = (r: (typeof reqs)[number]) => r.status === 'APPROVED' && !!r.expiresAt && r.expiresAt > now;
     const state = (r: (typeof reqs)[number]) => (r.status === 'APPROVED' ? (isActive(r) ? 'ACTIVE' : 'EXPIRED') : r.status);
-    const cpa = await this.cpaOf([...new Set([...interests.map((i) => i.studentId), ...recent.map((v) => v.studentId)])]);
+    const avg = await this.avgScoreOf([...new Set([...interests.map((i) => i.studentId), ...recent.map((v) => v.studentId)])]);
     return {
       enterprise: { name: e.name, field: e.field },
       counts: {
@@ -388,8 +383,8 @@ export class EnterpriseService {
       active: reqs.filter(isActive).map((r) => ({ studentId: r.studentId, studentCode: r.student.studentCode, fullName: r.student.fullName, approvedAt: r.approvedAt, daysLeft: daysLeft(r.expiresAt!) })),
       history: reqs.slice(0, 12).map((r) => ({ id: r.id, studentId: r.studentId, studentCode: r.student.studentCode, fullName: r.student.fullName, state: state(r), adminNote: r.adminNote, createdAt: r.createdAt, purpose: r.purpose })),
       searches: searches.map((s) => ({ id: String(s.id), summary: s.summary, results: s.results, at: s.createdAt, criteria: s.criteria })),
-      recent: recent.map((v) => ({ studentId: v.studentId, studentCode: v.student.studentCode, fullName: v.student.fullName, cohort: v.student.cohort, major: v.student.major, gpa: cpa.get(v.studentId) ?? null, at: v.createdAt })),
-      interests: interests.map((i) => ({ studentId: i.studentId, studentCode: i.student.studentCode, fullName: i.student.fullName, cohort: i.student.cohort, major: i.student.major, gpa: cpa.get(i.studentId) ?? null })),
+      recent: recent.map((v) => ({ studentId: v.studentId, studentCode: v.student.studentCode, fullName: v.student.fullName, cohort: v.student.cohort, major: v.student.major, avgScore: avg.get(v.studentId) ?? null, at: v.createdAt })),
+      interests: interests.map((i) => ({ studentId: i.studentId, studentCode: i.student.studentCode, fullName: i.student.fullName, cohort: i.student.cohort, major: i.student.major, avgScore: avg.get(i.studentId) ?? null })),
     };
   }
 
@@ -505,7 +500,7 @@ export class ViewRequestAdminService {
     const u = await this.prisma.viewRequest.update({ where: { id }, data });
     const label = { approve: 'Duyệt', reject: 'Từ chối', revoke: 'Thu hồi' }[action];
     await this.audit.log({ actorId: adminId, action: `VIEW_REQUEST_${action.toUpperCase()}`, entityType: 'view_request', entityId: id, summary: `${label} yêu cầu xem bài của ${r.enterprise.name} với ${r.student.studentCode}${note ? ` – ${note}` : ''}` });
-    const until = u.expiresAt?.toLocaleDateString('vi-VN');
+    const until = u.expiresAt ? vnDate(u.expiresAt) : undefined;
     await this.notifications.notify([r.enterprise.userId], {
       type: 'VIEW_REQUEST_RESULT',
       title: action === 'approve' ? `Được xem bài của ${r.student.fullName} đến ${until}` : action === 'reject' ? `Yêu cầu xem bài ${r.student.fullName} bị từ chối` : `Quyền xem bài ${r.student.fullName} đã bị thu hồi`,
@@ -524,8 +519,8 @@ const searchSchema = z.object({
   cohorts: z.array(z.string().max(10)).max(10).optional(),
   major: z.string().max(200).optional(),
   classId: z.string().uuid().optional(),
-  gpaMin: z.number().min(0).max(4).optional(),
-  gpaMax: z.number().min(0).max(4).optional(),
+  scoreMin: z.number().min(0).max(10).optional(),
+  scoreMax: z.number().min(0).max(10).optional(),
   topics: z.array(z.string().max(50)).max(10).optional(),
   skills: z.array(z.string().max(40)).max(10).optional(),
   page: z.number().int().min(1).optional(),

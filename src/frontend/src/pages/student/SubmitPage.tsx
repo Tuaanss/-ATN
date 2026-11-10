@@ -7,7 +7,7 @@ import { useCrumbs } from '../../layouts/AppLayout';
 import { Icon, type IconName } from '../../components/Icon';
 import { Avatar, Badge, Card, Field, Loading, Modal, Note, PageHead, RowKV, Seg, useToast, type Tone } from '../../components/ui';
 import { DropZone, filesSummary, lateText } from '../../components/work';
-import { COURSE_TYPE, ddmmHHmm, fmtSize, fullDT, remain, SYNC_BADGE } from '../../utils/format';
+import { ddmmHHmm, fmtSize, fullDT, remain, SYNC_BADGE } from '../../utils/format';
 
 type Kind = 'IMAGE' | 'VIDEO' | 'SOURCE' | 'DOCUMENT';
 const RULES: Record<Kind, { ext: string[]; maxMB: number; max: number; accept: string; label: string; icon: IconName }> = {
@@ -107,7 +107,7 @@ function SubmitForm({ w, kind, current, disabled, onDone }: { w: MyWork; kind: '
   const toast = useToast();
   const p = a.productTypes;
   const personalOfGroup = kind === 'PERSONAL' && !!w.group;
-  const programming = a.section.course.type === 'PROGRAMMING' || (p.includes('VIDEO') && !p.includes('IMAGE'));
+  const programming = p.includes('VIDEO') && !p.includes('IMAGE');
   const [queue, setQueue] = useState<Queued[]>([]);
   const [figma, setFigma] = useState(current?.figmaUrl ?? '');
   const [git, setGit] = useState(current?.gitUrl ?? '');
@@ -479,7 +479,6 @@ function SubmitForm({ w, kind, current, disabled, onDone }: { w: MyWork; kind: '
 
   const sync = current ? (SYNC_BADGE[current.syncStatus] ?? { label: current.syncStatus, tone: 'gray' as Tone }) : null;
   const events = w.events;
-  const t = COURSE_TYPE[a.section.course.type] ?? COURSE_TYPE.OTHER;
 
   return (
     <>
@@ -510,7 +509,7 @@ function SubmitForm({ w, kind, current, disabled, onDone }: { w: MyWork; kind: '
             <RowKV label="Trạng thái">
               <Badge tone={current ? 'blue' : 'gray'}>{current ? (current.isLate ? 'Nộp muộn' : 'Đã nộp') : 'Chưa nộp'}</Badge>
             </RowKV>
-            {personalOfGroup ? <RowKV label="Ai thấy">Bạn + giảng viên</RowKV> : programming ? <RowKV label="Loại môn"><Badge tone={t.tone}>{t.label}</Badge></RowKV> : <RowKV label="Điểm"><span className="muted">Chưa chấm</span></RowKV>}
+            {personalOfGroup ? <RowKV label="Ai thấy">Bạn + giảng viên</RowKV> : <RowKV label="Điểm"><span className="muted">Chưa chấm</span></RowKV>}
             <RowKV label="Hạn nộp">{fullDT(a.dueAt)}</RowKV>
             <RowKV label="Nộp muộn">{lateText(a) ? lateText(a)!.replace('Nộp muộn ', '') : 'Không cho phép'}</RowKV>
             {!personalOfGroup && !programming && (

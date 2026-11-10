@@ -4,33 +4,96 @@ import { useQuery } from '@tanstack/react-query';
 import { api } from '../../api/client';
 import type { MyGrades } from '../../api/types';
 import { useCrumbs } from '../../layouts/AppLayout';
-import { Badge, Card, Empty, Loading, PageHead, Stat, Tabs, type Tone } from '../../components/ui';
+import { Card, Empty, Loading, PageHead, Stat, Tabs } from '../../components/ui';
 import { Icon } from '../../components/Icon';
 import { ddmm, score10, semesterLabel } from '../../utils/format';
 
-const LETTER_TONE = (l: string | null): Tone => (!l ? 'gray' : l === 'A' ? 'green' : l.startsWith('B') ? 'blue' : l === 'F' ? 'red' : 'amber');
-const gpa = (v: number | null | undefined) => (v == null ? '—' : v.toFixed(2).replace('.', ','));
-const shortTerm = (t: { term: string; academicYear: string }) => `${t.term === 'TERM_1' ? 'HK1' : t.term === 'TERM_2' ? 'HK2' : 'Hè'} ${t.academicYear.replace(/20(\d\d)-20(\d\d)/, '$1–$2')}`;
+/** Bảng điểm bài tập đã công bố, mỗi học kỳ một bảng. Dùng chung cho SV và phụ huynh. */
+export function TermGradeTables({ terms, link = true }: { terms: MyGrades['terms']; link?: boolean }) {
+  return (
+    <div className="col">
+      {terms.map((t) => (
+        <Card
+          key={t.code}
+          title={
+            <>
+              {semesterLabel(t)}{' '}
+              <span className="muted" style={{ fontWeight: 500, fontSize: 13 }}>
+                · {t.assignments.length} bài · điểm TB {score10(t.avg)}
+              </span>
+            </>
+          }
+          body={false}
+        >
+          <div className="tbl-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Bài tập</th>
+                  <th>Môn học</th>
+                  <th>Hạn nộp</th>
+                  <th>Điểm</th>
+                  <th>Nhận xét</th>
+                  <th>Công bố</th>
+                </tr>
+              </thead>
+              <tbody>
+                {t.assignments.map((a) => (
+                  <tr key={a.assignmentId}>
+                    <td>
+                      {link ? (
+                        <Link to={`/student/assignments/${a.assignmentId}`} style={{ fontWeight: 600, color: '#1A1C21' }}>
+                          {a.title}
+                        </Link>
+                      ) : (
+                        <b>{a.title}</b>
+                      )}
+                    </td>
+                    <td style={{ fontSize: 13 }}>
+                      {a.course.name}
+                      <div className="mono muted" style={{ fontSize: 12 }}>
+                        {a.sectionCode}
+                      </div>
+                    </td>
+                    <td className="muted" style={{ fontSize: 13 }}>
+                      {ddmm(a.dueAt)}
+                    </td>
+                    <td>
+                      <b className="mono" style={{ color: a.score != null && a.score < 4 ? '#B42318' : undefined }}>
+                        {score10(a.score)}
+                      </b>
+                    </td>
+                    <td style={{ fontSize: 13, maxWidth: 360 }}>{a.note ?? <span className="muted">—</span>}</td>
+                    <td className="muted" style={{ fontSize: 13 }}>
+                      {ddmm(a.publishedAt)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Card>
+      ))}
+    </div>
+  );
+}
 
-/** Kết quả học tập của sinh viên – mẫu sinh-vien/SV_Grades. Chỉ hiện điểm đã công bố. */
+/** Điểm bài tập của sinh viên – chỉ hiện điểm đã công bố, không có điểm tổng kết học phần. */
 export function StudentGrades() {
-  useCrumbs([{ label: 'Kết quả học tập' }]);
-  const [tab, setTab] = useState<'terms' | 'assignments' | 'stats'>('terms');
+  useCrumbs([{ label: 'Điểm bài tập' }]);
+  const [tab, setTab] = useState<'terms' | 'stats'>('terms');
   const [term, setTerm] = useState('');
   const { data, isLoading } = useQuery({ queryKey: ['student', 'grades'], queryFn: () => api.get<MyGrades>('/me/grades').then((r) => r.data) });
   if (isLoading || !data) return <Loading />;
 
-  const latest = data.terms[0];
-  const prev = data.terms[1];
   const shown = term ? data.terms.filter((t) => t.code === term) : data.terms;
-  const chart = [...data.terms].reverse();
-  const maxG = 4;
+  const latest = data.terms[0];
 
   return (
     <div className="page">
       <PageHead
-        title="Kết quả học tập"
-        sub="Điểm học phần thang 10, quy đổi điểm chữ và thang 4 theo quy chế tín chỉ"
+        title="Điểm bài tập"
+        sub="Điểm từng bài tập đã được giảng viên công bố (thang 10)"
         actions={
           <span className="no-print" style={{ display: 'flex', gap: 10 }}>
             {tab === 'terms' && data.terms.length > 0 && (
@@ -51,165 +114,28 @@ export function StudentGrades() {
         }
       />
 
-      <div className="grid4">
-        <Stat tone="red" icon="chart" label="GPA tích lũy (thang 4)" value={gpa(data.cpa)} sub={data.rank ? `Xếp loại: ${data.rank}` : 'Chưa có học phần công bố'} />
-        <Stat tone="amber" icon="listAlt" label="Tín chỉ tích lũy" value={data.credits} sub="học phần đạt (không tính F)" />
-        <Stat
-          tone="blue"
-          icon="trend"
-          label={latest ? `GPA ${shortTerm(latest)}` : 'GPA học kỳ'}
-          value={gpa(latest?.gpa)}
-          sub={latest && prev && latest.gpa != null && prev.gpa != null ? `${latest.gpa >= prev.gpa ? '+' : ''}${(latest.gpa - prev.gpa).toFixed(2).replace('.', ',')} so với kỳ trước` : `${latest?.credits ?? 0} tín chỉ`}
-        />
-        <Stat tone="green" icon="check" label="Bài tập có điểm" value={data.assignments.length} sub="điểm bài tập đã công bố" />
+      <div className="grid3">
+        <Stat tone="green" icon="check" label="Bài tập có điểm" value={data.graded} sub="điểm đã công bố" />
+        <Stat tone="red" icon="chart" label="Điểm TB các bài" value={score10(data.avg)} sub="tất cả học kỳ" />
+        <Stat tone="blue" icon="trend" label={latest ? `Điểm TB ${semesterLabel(latest)}` : 'Điểm TB học kỳ gần nhất'} value={score10(latest?.avg)} sub={latest ? `${latest.assignments.length} bài` : 'Chưa có điểm'} />
       </div>
 
-      <Tabs<'terms' | 'assignments' | 'stats'>
+      <Tabs<'terms' | 'stats'>
         value={tab}
         onChange={setTab}
         items={[
           { key: 'terms', label: 'Theo học kỳ' },
-          { key: 'assignments', label: `Bài tập (${data.assignments.length})` },
           { key: 'stats', label: 'Thống kê cá nhân' },
         ]}
       />
 
-      {tab === 'terms' ? (
-        data.terms.length ? (
-          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(0,2fr)', gap: 24, alignItems: 'start' }} className="gr-top">
-            <Card title="GPA theo học kỳ (thang 4)">
-              <div style={{ display: 'flex', gap: 10, borderBottom: '1px solid #D6D3C8' }}>
-                {chart.map((t, i) => {
-                  const last = i === chart.length - 1;
-                  return (
-                    <div key={t.code} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, minWidth: 0 }}>
-                      <div style={{ height: 220, width: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', alignItems: 'center', gap: 6 }}>
-                        {last && <span style={{ fontSize: 13, fontWeight: 700 }}>{gpa(t.gpa)}</span>}
-                        <div title={`${shortTerm(t)}: ${gpa(t.gpa)}`} style={{ width: '60%', maxWidth: 44, height: Math.max(2, ((t.gpa ?? 0) / maxG) * 190), background: last ? '#DB0000' : '#F2AAAA', borderRadius: '4px 4px 0 0' }} />
-                      </div>
-                      <span style={{ fontSize: 12, color: '#62666F', whiteSpace: 'nowrap' }}>{shortTerm(t)}</span>
-                    </div>
-                  );
-                })}
-              </div>
-              <span className="muted" style={{ fontSize: 12 }}>
-                Thang 0–4 · chỉ tính học phần đã công bố
-              </span>
-            </Card>
-            <div className="col">
-              {shown.map((t) => (
-                <Card
-                  key={t.code}
-                  title={
-                    <>
-                      {semesterLabel(t)}{' '}
-                      <span className="muted" style={{ fontWeight: 500, fontSize: 13 }}>
-                        · {t.courses.length} học phần · {t.credits} tín chỉ · GPA {gpa(t.gpa)}
-                      </span>
-                    </>
-                  }
-                  body={false}
-                >
-                  <div className="tbl-wrap">
-                    <table>
-                      <thead>
-                        <tr>
-                          <th>Học phần</th>
-                          <th>TC</th>
-                          <th>CC</th>
-                          <th>BT</th>
-                          <th>GK</th>
-                          <th>CK</th>
-                          <th>Tổng kết</th>
-                          <th>Chữ</th>
-                          <th>Hệ 4</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {t.courses.map((c) => (
-                          <tr key={c.sectionId}>
-                            <td>
-                              <div style={{ fontWeight: 600 }}>{c.course.name}</div>
-                              <div className="mono muted" style={{ fontSize: 12 }}>
-                                {c.sectionCode}
-                              </div>
-                            </td>
-                            <td className="mono" style={{ fontSize: 13 }}>
-                              {c.course.credits}
-                            </td>
-                            {(['attendance', 'assignment', 'midterm', 'final'] as const).map((k) => (
-                              <td key={k} className="mono" style={{ fontSize: 13 }}>
-                                {score10(c[k])}
-                              </td>
-                            ))}
-                            <td className="mono" style={{ fontWeight: 600, color: c.total != null && c.total < 4 ? '#B42318' : undefined }}>
-                              {score10(c.total)}
-                            </td>
-                            <td>{c.letter ? <Badge tone={LETTER_TONE(c.letter)}>{c.letter}</Badge> : <span className="muted">—</span>}</td>
-                            <td className="mono">{c.gpa4 == null ? '—' : c.gpa4.toFixed(1).replace('.', ',')}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </Card>
-              ))}
-            </div>
-          </div>
-        ) : (
-          <Card>
-            <Empty icon="chart">Chưa có học phần nào được công bố điểm.</Empty>
-          </Card>
-        )
-      ) : tab === 'stats' ? (
+      {tab === 'stats' ? (
         <MyStatsView />
+      ) : shown.length ? (
+        <TermGradeTables terms={shown} />
       ) : (
-        <Card title="Điểm bài tập đã công bố" body={false}>
-          {data.assignments.length ? (
-            <div className="tbl-wrap">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Bài tập</th>
-                    <th>Học phần</th>
-                    <th>Trọng số</th>
-                    <th>Điểm</th>
-                    <th>Nhận xét</th>
-                    <th>Công bố</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {data.assignments.map((a) => (
-                    <tr key={a.assignmentId}>
-                      <td>
-                        <Link to={`/student/assignments/${a.assignmentId}`} style={{ fontWeight: 600, color: '#1A1C21' }}>
-                          {a.title}
-                        </Link>
-                      </td>
-                      <td style={{ fontSize: 13 }}>
-                        {a.course}
-                        <div className="mono muted" style={{ fontSize: 12 }}>
-                          {a.sectionCode}
-                        </div>
-                      </td>
-                      <td className="mono">{a.weight}%</td>
-                      <td>
-                        <b className="mono" style={{ color: a.score != null && a.score < 4 ? '#B42318' : undefined }}>
-                          {score10(a.score)}
-                        </b>
-                      </td>
-                      <td style={{ fontSize: 13, maxWidth: 360 }}>{a.note ?? <span className="muted">—</span>}</td>
-                      <td className="muted" style={{ fontSize: 13 }}>
-                        {ddmm(a.publishedAt)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          ) : (
-            <Empty icon="list">Chưa có bài tập nào được công bố điểm.</Empty>
-          )}
+        <Card>
+          <Empty icon="chart">Chưa có bài tập nào được công bố điểm.</Empty>
         </Card>
       )}
     </div>

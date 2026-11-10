@@ -34,7 +34,7 @@ export interface StudentInput {
 }
 
 const STUDENT_COLS: SheetColumn[] = [
-  { key: 'code', header: 'MSSV', width: 14, aliases: ['MSV', 'Mã sinh viên'], required: true },
+  { key: 'code', header: 'MSV', width: 14, aliases: ['MSSV', 'Mã sinh viên'], required: true },
   { key: 'name', header: 'Họ tên', width: 28, aliases: ['Họ và tên'], required: true },
   { key: 'dob', header: 'Ngày sinh', width: 14, required: true },
   { key: 'class', header: 'Lớp', width: 14, aliases: ['Lớp hành chính', 'Lớp sinh hoạt', 'Mã lớp'], required: true },
@@ -181,13 +181,13 @@ export class AdminUsersService {
 
   async createStudent(adminId: string, d: StudentInput) {
     const code = normCode(d.studentCode);
-    if (!code) throw new AppException('VALIDATION_ERROR', 'Nhập MSSV');
+    if (!code) throw new AppException('VALIDATION_ERROR', 'Nhập MSV');
     if (!d.fullName.trim()) throw new AppException('VALIDATION_ERROR', 'Nhập họ tên');
     const dob = this.parseDob(d.dateOfBirth);
     if (!dob) throw new AppException('VALIDATION_ERROR', 'Ngày sinh không hợp lệ (dd/mm/yyyy)');
     if (d.email && !EMAIL.test(d.email)) throw new AppException('VALIDATION_ERROR', 'Email không hợp lệ');
     if (d.phone && !PHONE.test(d.phone)) throw new AppException('VALIDATION_ERROR', 'SĐT gồm 10 số, bắt đầu 03/05/07/08/09');
-    if (await this.prisma.user.findFirst({ where: { username: { equals: code } } })) throw new AppException('CONFLICT', `MSSV ${code} đã tồn tại`, HttpStatus.CONFLICT);
+    if (await this.prisma.user.findFirst({ where: { username: { equals: code } } })) throw new AppException('CONFLICT', `MSV ${code} đã tồn tại`, HttpStatus.CONFLICT);
     const cls = await this.classInfo(d.adminClassId);
     const user = await this.prisma.user.create({
       data: {
@@ -221,7 +221,7 @@ export class AdminUsersService {
 
   async studentTemplate() {
     const buffer = await buildSheet('Sinh_vien', STUDENT_COLS, [['SV1001', 'Nguyễn Văn A', '15/03/2005', (await this.prisma.adminClass.findFirst())?.code ?? 'D22TKDH1', 'a.nguyen@email.com', '0912345678']], [
-      'Mỗi dòng là một sinh viên. Cột bắt buộc: MSSV, Họ tên, Ngày sinh (dd/mm/yyyy), Lớp (mã lớp hành chính đã có trong Danh mục).',
+      'Mỗi dòng là một sinh viên. Cột bắt buộc: MSV, Họ tên, Ngày sinh (dd/mm/yyyy), Lớp (mã lớp hành chính đã có trong Danh mục).',
       'Email, SĐT không bắt buộc – sinh viên tự khai báo khi đăng nhập lần đầu.',
       'Mật khẩu ban đầu = ngày sinh dạng ddmmyyyy; sinh viên phải đổi ở lần đăng nhập đầu tiên.',
       'Tối đa 2.000 dòng, 5 MB.',
@@ -240,9 +240,9 @@ export class AdminUsersService {
       const code = normCode(values.code ?? '');
       const cls = classes.get(normCode(values.class ?? ''));
       const problems: string[] = [];
-      if (!code) problems.push('Thiếu MSSV');
-      else if (existing.has(code)) problems.push('MSSV đã có tài khoản');
-      else if (seen.has(code)) problems.push('MSSV lặp trong tệp');
+      if (!code) problems.push('Thiếu MSV');
+      else if (existing.has(code)) problems.push('MSV đã có tài khoản');
+      else if (seen.has(code)) problems.push('MSV lặp trong tệp');
       if (!values.name?.trim()) problems.push('Thiếu họ tên');
       const dobText = /^\d{4}-\d{2}-\d{2}T/.test(values.dob ?? '') ? (values.dob ?? '').slice(0, 10) : (values.dob ?? '');
       if (!this.parseDob(dobText)) problems.push('Ngày sinh không hợp lệ');

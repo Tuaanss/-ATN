@@ -3,9 +3,10 @@ import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { api } from '../../api/client';
 import { useCrumbs } from '../../layouts/AppLayout';
 import { Icon, type IconName } from '../../components/Icon';
-import { Badge, Card, Empty, KV, Loading, Note, PageHead, Switch, Tabs, useToast, type Tone } from '../../components/ui';
-import { fullDT, score10 } from '../../utils/format';
-import { Count, FormModal, SearchBox, Select, Table, Toolbar, useAct, useAdmin, useConfirm } from './kit';
+import { DateInput } from '../../components/DateInput';
+import { Badge, Card, KV, Loading, PageHead, Switch, useToast, type Tone } from '../../components/ui';
+import { fullDT } from '../../utils/format';
+import { FormModal, SearchBox, Select, Table, Toolbar, useAct, useAdmin, useConfirm } from './kit';
 
 // ================================================================ nhật ký hệ thống (UC02.12)
 
@@ -139,10 +140,10 @@ export function LogsPage() {
             ))}
           </Select>
           <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13 }} className="muted">
-            Từ <input className="inp" type="date" value={f.from} onChange={(e) => set('from')(e.target.value)} style={{ width: 150, height: 40 }} />
+            Từ <DateInput value={f.from} onChange={set('from')} style={{ width: 160, height: 40 }} />
           </label>
           <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13 }} className="muted">
-            đến <input className="inp" type="date" value={f.to} onChange={(e) => set('to')(e.target.value)} style={{ width: 150, height: 40 }} />
+            đến <DateInput value={f.to} onChange={set('to')} style={{ width: 160, height: 40 }} />
           </label>
           <button
             className="btn btn-g btn-sm"
@@ -252,12 +253,10 @@ export function LogsPage() {
 
 // ================================================================ cấu hình (UC02.13)
 
-type Scale = [number, string, number][];
 interface Config {
   files: { imageMaxMB: number; imageMax: number; videoMaxMB: number; videoMax: number; sourceMaxMB: number; sourceMax: number; documentMaxMB: number; documentMax: number; linkDomains: string[] };
-  grading: { scale: Scale; retake: 'HIGHEST' | 'LATEST' };
   security: { maxFailed: number; lockMinutes: number; forceChangeFirstLogin: boolean };
-  warning: { scoreThreshold: number; gpaDrop: number };
+  warning: { scoreThreshold: number };
   enterprise: { viewDaysMin: number; viewDaysMax: number };
   reminder: { hours: number };
   email: { sender: string };
@@ -288,7 +287,6 @@ function Num({ value, onChange, unit, min, max, step = 1 }: { value: number; onC
 }
 const SEC: [string, string][] = [
   ['c-tep', 'Tệp nộp bài'],
-  ['c-diem', 'Thang điểm & GPA'],
   ['c-bm', 'Bảo mật đăng nhập'],
   ['c-cb', 'Cảnh báo học tập'],
   ['c-dn', 'Quyền xem của DN'],
@@ -321,12 +319,8 @@ export function ConfigPage() {
     setC({ ...c, [k]: { ...c[k], ...v } });
     setDirty(true);
   };
-  const scale = c.grading.scale;
-  const setScale = (i: number, j: 0 | 1 | 2, v: string) => up('grading', { scale: scale.map((r, k) => (k === i ? (r.map((x, m) => (m === j ? (j === 1 ? v : +v) : x)) as Scale[number]) : r)) });
-  const scaleOk = scale.every((r, i) => r[1].trim() && (i === 0 || (r[0] < scale[i - 1][0] && r[2] <= scale[i - 1][2]))) && scale[scale.length - 1][0] === 0;
   const save = async () => {
     const errs: string[] = [];
-    if (!scaleOk) errs.push('Thang điểm chưa hợp lệ: ngưỡng phải giảm dần, mức cuối là 0, điểm chữ không để trống.');
     if (c.enterprise.viewDaysMax < c.enterprise.viewDaysMin) errs.push('Thời hạn DN: tối đa phải ≥ tối thiểu.');
     if (!/^.+@.+\..+|<.+@.+>/.test(c.email.sender)) errs.push('Địa chỉ gửi email không hợp lệ.');
     if (errs.length) return toast.err(errs[0]);
@@ -394,47 +388,6 @@ export function ConfigPage() {
               />
             </Set>
           </Card>
-          <span id="c-diem" />
-          <Card title="Thang điểm & quy đổi GPA">
-            <div className="tbl-wrap" style={{ border: '1px solid #E3E1D9', borderRadius: 10 }}>
-              <table>
-                <thead>
-                  <tr>
-                    <th>Điểm chữ</th>
-                    <th>Từ điểm (thang 10)</th>
-                    <th>Đến</th>
-                    <th>Thang 4</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {scale.map(([min, chu, h4], i) => (
-                    <tr key={i}>
-                      <td>
-                        <input className="inp mono" style={{ width: 80, height: 36 }} value={chu} onChange={(e) => setScale(i, 1, e.target.value)} aria-label="Điểm chữ" />
-                      </td>
-                      <td>
-                        <input className="inp" style={{ width: 110, height: 36 }} type="number" step={0.1} min={0} max={10} value={min} readOnly={i === scale.length - 1} onChange={(e) => setScale(i, 0, e.target.value)} aria-label="Từ điểm" />
-                      </td>
-                      <td className="muted mono">{i ? score10(Math.round((scale[i - 1][0] - 0.1) * 10) / 10) : '10,0'}</td>
-                      <td>
-                        <input className="inp" style={{ width: 90, height: 36 }} type="number" step={0.5} min={0} max={4} value={h4} onChange={(e) => setScale(i, 2, e.target.value)} aria-label="Thang 4" />
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            {!scaleOk && <div className="err">Ngưỡng điểm phải giảm dần từ trên xuống, điểm chữ không để trống.</div>}
-            <Set title="Môn học lại" desc="Cách lấy điểm khi tính GPA tích lũy (CPA).">
-              <select className="inp" style={{ width: 260 }} value={c.grading.retake} onChange={(e) => up('grading', { retake: e.target.value as Config['grading']['retake'] })}>
-                <option value="HIGHEST">Lấy điểm cao nhất</option>
-                <option value="LATEST">Lấy điểm lần học gần nhất</option>
-              </select>
-            </Set>
-            <Note tone="blue" icon="info" style={{ marginTop: 10 }}>
-              GPA / CPA = Σ(điểm hệ 4 × số tín chỉ) / Σ số tín chỉ. Thay đổi thang điểm áp dụng cho các lần tính điểm tiếp theo.
-            </Note>
-          </Card>
           <span id="c-bm" />
           <Card title="Bảo mật đăng nhập">
             <Set title="Số lần nhập sai mật khẩu tối đa" desc="Vượt quá thì tạm khóa tài khoản.">
@@ -449,11 +402,8 @@ export function ConfigPage() {
           </Card>
           <span id="c-cb" />
           <Card title="Cảnh báo học tập gửi phụ huynh">
-            <Set title="Ngưỡng điểm cảnh báo" desc="Gửi cảnh báo khi điểm thành phần / học phần thấp hơn ngưỡng.">
+            <Set title="Ngưỡng điểm cảnh báo" desc="Gửi cảnh báo khi điểm một bài tập thấp hơn ngưỡng.">
               <Num value={c.warning.scoreThreshold} onChange={(v) => up('warning', { scoreThreshold: v })} unit="điểm" min={0} max={10} step={0.1} />
-            </Set>
-            <Set title="GPA giảm so với kỳ trước" desc="Cảnh báo khi GPA học kỳ giảm từ mức này trở lên.">
-              <Num value={c.warning.gpaDrop} onChange={(v) => up('warning', { gpaDrop: v })} unit="điểm" min={0} max={4} step={0.1} />
             </Set>
             <Set title="Quá hạn nộp bài" desc="Luôn gửi khi con quá hạn mà chưa nộp.">
               <Badge tone="green">Luôn bật</Badge>
@@ -502,130 +452,3 @@ export function ConfigPage() {
   );
 }
 
-// ================================================================ yêu cầu sửa điểm (GV gửi, Admin duyệt)
-
-type Comp = 'attendance' | 'assignment' | 'midterm' | 'final';
-const COMP: Record<Comp, string> = { attendance: 'CC', assignment: 'BT', midterm: 'GK', final: 'CK' };
-interface GReq {
-  id: string;
-  status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELLED';
-  reason: string;
-  adminNote: string | null;
-  oldValues: Partial<Record<Comp, number | null>>;
-  newValues: Partial<Record<Comp, number | null>>;
-  createdAt: string;
-  resolvedAt: string | null;
-  student: { studentCode: string; fullName: string };
-  lecturer: { code: string; fullName: string };
-  section: { code: string; course: string };
-}
-const REQ: Record<GReq['status'], [string, Tone]> = { PENDING: ['Chờ duyệt', 'amber'], APPROVED: ['Đã duyệt', 'green'], REJECTED: ['Từ chối', 'red'], CANCELLED: ['GV đã hủy', 'gray'] };
-
-export function GradeRequestsPage() {
-  useCrumbs([{ label: 'Yêu cầu sửa điểm' }]);
-  const [tab, setTab] = useState<GReq['status']>('PENDING');
-  const q = useAdmin<GReq[]>('/grade-requests');
-  const act = useAct();
-  const confirm = useConfirm();
-  if (!q.data) return <Loading />;
-  const rows = q.data.filter((r) => r.status === tab);
-  const decide = async (r: GReq, approve: boolean) => {
-    const note = await confirm({
-      title: approve ? 'Duyệt yêu cầu sửa điểm' : 'Từ chối yêu cầu',
-      msg: (
-        <>
-          {approve ? 'Áp dụng' : 'Từ chối'} thay đổi điểm của <b>{r.student.fullName}</b> ({r.student.studentCode}) lớp {r.section.code}?{approve && ' Điểm tổng kết được tính lại và sinh viên nhận thông báo.'}
-        </>
-      ),
-      ok: approve ? 'Duyệt' : 'Từ chối',
-      danger: !approve,
-      reason: approve ? 'Ghi chú (không bắt buộc)' : 'Lý do từ chối',
-      reasonRequired: !approve,
-    });
-    if (!note) return;
-    await act.mutateAsync({ method: 'post', path: `grade-requests/${r.id}/${approve ? 'approve' : 'reject'}`, body: { note: note === 'ok' ? undefined : note }, ok: approve ? 'Đã duyệt và cập nhật điểm.' : 'Đã từ chối yêu cầu.' }).catch(() => undefined);
-  };
-  return (
-    <div className="page">
-      <PageHead title="Yêu cầu sửa điểm" />
-      <Card body={false}>
-        <div style={{ padding: '0 12px' }}>
-          <Tabs
-            value={tab}
-            onChange={setTab}
-            items={(Object.keys(REQ) as GReq['status'][]).map((k) => ({
-              key: k,
-              label: (
-                <>
-                  {REQ[k][0]}
-                  <Count n={q.data!.filter((r) => r.status === k).length} />
-                </>
-              ),
-            }))}
-          />
-        </div>
-        {rows.length ? (
-          <Table
-            rows={rows}
-            rowKey={(r) => r.id}
-            cols={[
-              { h: 'Gửi lúc', r: (r) => <span style={{ fontSize: 13 }}>{fullDT(r.createdAt)}</span> },
-              {
-                h: 'Lớp · Sinh viên',
-                r: (r) => (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                    <b>{r.student.fullName}</b>
-                    <span className="muted" style={{ fontSize: 12 }}>
-                      <span className="mono">{r.student.studentCode}</span> · {r.section.code} – {r.section.course}
-                    </span>
-                  </div>
-                ),
-              },
-              { h: 'Giảng viên', r: (r) => r.lecturer.fullName },
-              {
-                h: 'Thay đổi',
-                r: (r) => (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 2, fontSize: 13 }}>
-                    {(Object.keys(r.newValues) as Comp[]).map((k) => (
-                      <span key={k}>
-                        <b>{COMP[k]}</b> {score10(r.oldValues[k] ?? null)} → <b style={{ color: '#DB0000' }}>{score10(r.newValues[k] ?? null)}</b>
-                      </span>
-                    ))}
-                  </div>
-                ),
-              },
-              {
-                h: 'Lý do',
-                r: (r) => (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxWidth: 320, fontSize: 13 }}>
-                    <span>{r.reason}</span>
-                    {r.adminNote && <span className="muted">Admin: {r.adminNote}</span>}
-                  </div>
-                ),
-              },
-              {
-                h: '',
-                align: 'right',
-                r: (r) =>
-                  r.status === 'PENDING' ? (
-                    <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
-                      <button className="btn btn-sm btn-d" onClick={() => decide(r, false)}>
-                        Từ chối
-                      </button>
-                      <button className="btn btn-sm btn-p" onClick={() => decide(r, true)}>
-                        Duyệt
-                      </button>
-                    </div>
-                  ) : (
-                    <Badge tone={REQ[r.status][1]}>{REQ[r.status][0]}</Badge>
-                  ),
-              },
-            ]}
-          />
-        ) : (
-          <Empty icon="edit">Không có yêu cầu nào trong mục này.</Empty>
-        )}
-      </Card>
-    </div>
-  );
-}

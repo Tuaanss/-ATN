@@ -6,7 +6,7 @@ import type { MyStatus, StudentAssignmentRow, StudentSectionInfo } from '../../a
 import { useCrumbs } from '../../layouts/AppLayout';
 import { Icon } from '../../components/Icon';
 import { Avatar, Badge, Card, Empty, KV, Loading, MiniSteps, PageHead, Stat, Tabs } from '../../components/ui';
-import { COURSE_TYPE, ddmm, ddmmHHmm, fullDate, remain, semesterLabel, studentProgress } from '../../utils/format';
+import { ddmm, ddmmHHmm, fullDate, remain, score10, semesterLabel, studentProgress } from '../../utils/format';
 import { modeCell } from './StudentDashboard';
 
 interface Data {
@@ -42,7 +42,6 @@ export function StudentCourse() {
 
   const s = d.section;
   const rows = d.assignments;
-  const t = COURSE_TYPE[s.course.type] ?? COURSE_TYPE.OTHER;
   const fresh = rows.filter((r) => r.status === 'NO_GROUP' || r.status === 'NO_TOPIC').length;
   const graded = rows.filter((r) => r.status === 'GRADED');
   const doing = rows.length - fresh - graded.length - rows.filter((r) => r.status === 'MISSED' || r.status === 'NOT_OPEN').length;
@@ -51,8 +50,6 @@ export function StudentCourse() {
   const avg = graded.length ? graded.reduce((n, r) => n + (r.score ?? 0), 0) / graded.length : null;
   const next = rows.filter((r) => new Date(r.finalDeadline) > new Date() && !DONE.includes(r.status)).sort((x, y) => new Date(x.dueAt).getTime() - new Date(y.dueAt).getTime())[0];
   const briefs = rows.filter((r) => r.hasBrief);
-  const w = s.course.weights;
-  const maxW = Math.max(w.attendance, w.assignment, w.midterm, w.final, 1);
 
   const workTable = (
     <Card
@@ -127,29 +124,25 @@ export function StudentCourse() {
   );
 
   const gradesCard = (
-    <Card title="Cơ cấu điểm">
-      {(
-        [
-          ['Chuyên cần', w.attendance, null],
-          ['Bài tập', w.assignment, avg],
-          ['Giữa kỳ', w.midterm, null],
-          ['Cuối kỳ', w.final, null],
-        ] as [string, number, number | null][]
-      ).map(([label, pct, score]) => (
-        <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 12, fontSize: 13 }}>
-          <span style={{ width: 96 }}>{label}</span>
-          <div style={{ flex: 1, height: 6, borderRadius: 3, background: '#EFEDE6' }}>
-            <div style={{ width: `${(pct / maxW) * 100}%`, height: '100%', borderRadius: 3, background: '#DB0000' }} />
+    <Card title="Điểm các bài tập">
+      {graded.length ? (
+        graded.map((r) => (
+          <div key={r.id} style={{ display: 'flex', alignItems: 'center', gap: 12, fontSize: 13 }}>
+            <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{short(r.title)}</span>
+            <div style={{ width: 90, height: 6, borderRadius: 3, background: '#EFEDE6' }}>
+              <div style={{ width: `${((r.score ?? 0) / 10) * 100}%`, height: '100%', borderRadius: 3, background: '#DB0000' }} />
+            </div>
+            <span style={{ width: 40, textAlign: 'right', fontWeight: 600 }}>{score10(r.score)}</span>
           </div>
-          <span className="mono" style={{ width: 40, textAlign: 'right' }}>
-            {pct}%
-          </span>
-          <span style={{ width: 52, textAlign: 'right', fontWeight: 600 }}>{score == null ? '—' : score.toFixed(1)}</span>
-        </div>
-      ))}
-      <p className="help">Điểm thành phần hiển thị khi giảng viên công bố.</p>
+        ))
+      ) : (
+        <span className="muted" style={{ fontSize: 13 }}>
+          Chưa có bài nào được công bố điểm.
+        </span>
+      )}
+      <p className="help">Điểm từng bài hiển thị khi giảng viên công bố.</p>
       <Link to="/student/grades" style={{ fontSize: 13, fontWeight: 600 }}>
-        Xem kết quả học tập
+        Xem điểm tất cả bài tập
       </Link>
     </Card>
   );
@@ -222,10 +215,9 @@ export function StudentCourse() {
             </span>
           </>
         }
-        sub={[semesterLabel(s.semester), `${s.course.credits} tín chỉ`, s.lecturer.fullName, s.schedule].filter(Boolean).join(' · ')}
+        sub={[semesterLabel(s.semester), `${s.course.credits} tín chỉ`, s.lecturer.fullName].join(' · ')}
         actions={
           <>
-            <Badge tone={t.tone}>{t.label}</Badge>
             <Link className="btn" to="/student/notifications">
               <Icon name="bell" size={16} />
               Thông báo của môn
@@ -238,7 +230,7 @@ export function StudentCourse() {
         onChange={setTab}
         items={[
           { key: 'work', label: `Bài tập (${rows.length})` },
-          { key: 'grades', label: 'Điểm thành phần' },
+          { key: 'grades', label: 'Điểm bài tập' },
           { key: 'docs', label: 'Tài liệu' },
           { key: 'members', label: `Thành viên lớp (${s.studentCount})` },
         ]}
@@ -322,12 +314,10 @@ export function StudentCourse() {
                     ['Mã lớp học phần', <span key="c" className="mono">{s.code}</span>],
                     ['Tên môn', s.course.name],
                     ['Số tín chỉ', String(s.course.credits)],
-                    ['Loại môn', <Badge key="t" tone={t.tone}>{t.label}</Badge>],
                     ['Giảng viên', s.lecturer.fullName],
                     ['Email GV', s.lecturer.email],
-                    ['Lịch học', s.schedule ?? '—'],
                     ['Thời gian', `${fullDate(s.semester.startDate)} – ${fullDate(s.semester.endDate)}`],
-                    ['Sĩ số', `${s.studentCount} sinh viên`],
+                    ['Số sinh viên', `${s.studentCount} sinh viên`],
                   ]}
                 />
               </Card>

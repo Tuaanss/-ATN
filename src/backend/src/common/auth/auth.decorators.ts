@@ -8,7 +8,7 @@ export interface AuthUser {
   name: string;
   lecturerId?: string;
   studentId?: string;
-  /** Mã GV hoặc MSSV */
+  /** Mã GV hoặc MSV */
   code?: string;
   /** Tài khoản do hệ thống cấp, chưa đổi mật khẩu lần đầu (FR-01.03) */
   mcp?: boolean;

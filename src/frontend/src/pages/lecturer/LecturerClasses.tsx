@@ -6,7 +6,7 @@ import type { AssignmentSummary, LecturerSection, SectionGroupRow, SectionStuden
 import { useCrumbs } from '../../layouts/AppLayout';
 import { Icon } from '../../components/Icon';
 import { Badge, Bar, Card, Empty, Loading, PageHead, Tabs } from '../../components/ui';
-import { COURSE_TYPE, ddmmHHmm, phaseBadge, semesterLabel, workModeText } from '../../utils/format';
+import { ddmmHHmm, phaseBadge, semesterLabel, workModeText } from '../../utils/format';
 
 interface SectionAssignments {
   section: { id: string; code: string; course: { name: string } };
@@ -64,7 +64,6 @@ export function LecturerClasses() {
 
       <div className="grid3">
         {current.map((s) => {
-          const type = COURSE_TYPE[s.course.type] ?? COURSE_TYPE.OTHER;
           const on = s.id === selected.id;
           return (
             <Link
@@ -79,12 +78,10 @@ export function LecturerClasses() {
                 <span className="mono muted" style={{ fontSize: 12 }}>
                   {s.code}
                 </span>
-                <Badge tone={type.tone}>{type.label}</Badge>
               </div>
               <span style={{ fontSize: 16, fontWeight: 700 }}>{s.course.name}</span>
               <span className="muted" style={{ fontSize: 13 }}>
                 {s.studentCount} SV · {s.assignmentCount} bài tập{s.openAssignmentCount ? ` (${s.openAssignmentCount} đang mở)` : ''}
-                {s.schedule ? ` · ${s.schedule}` : ''}
               </span>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 12 }} className="muted">
                 <Bar value={s.onTimeRate ?? 0} />
@@ -265,7 +262,7 @@ function StudentsCard({ title, data, loading }: { title: string; data?: SectionS
       <div style={{ padding: '12px 20px', display: 'flex', gap: 10, borderBottom: '1px solid #EFEDE6', flexWrap: 'wrap' }}>
         <label style={{ display: 'flex', alignItems: 'center', gap: 8, width: 280, maxWidth: '100%', height: 38, border: '1px solid #E3E1D9', borderRadius: 8, padding: '0 12px', color: '#62666F' }}>
           <Icon name="search" size={16} />
-          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Tìm MSSV, họ tên…" aria-label="Tìm sinh viên" style={{ border: 0, outline: 0, flex: 1, minWidth: 0, font: "400 14px 'Be Vietnam Pro',sans-serif", background: 'transparent' }} />
+          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Tìm MSV, họ tên…" aria-label="Tìm sinh viên" style={{ border: 0, outline: 0, flex: 1, minWidth: 0, font: "400 14px 'Be Vietnam Pro',sans-serif", background: 'transparent' }} />
         </label>
         <select className="chip" style={{ cursor: 'pointer', paddingRight: 8 }} value={group} onChange={(e) => setGroup(e.target.value)} aria-label="Lọc theo nhóm" disabled={!ga}>
           <option value="all">Nhóm: tất cả</option>
@@ -288,7 +285,7 @@ function StudentsCard({ title, data, loading }: { title: string; data?: SectionS
             <table>
               <thead>
                 <tr>
-                  <th>MSSV</th>
+                  <th>MSV</th>
                   <th>Họ tên</th>
                   <th>{ga ? `Nhóm · ${shortTitle(ga.title)}` : 'Nhóm'}</th>
                   <th>Đề tài</th>
@@ -392,7 +389,7 @@ function ExportButton({ section }: { section: LecturerSection }) {
     try {
       const { data } = await api.get<SectionStudents>(`/lecturer/sections/${section.id}/students`);
       const esc = (v: unknown) => `"${String(v ?? '').replace(/"/g, '""')}"`;
-      const head = ['MSSV', 'Họ tên', 'Khóa', data.groupAssignment ? `Nhóm (${data.groupAssignment.title})` : 'Nhóm', 'Đề tài', `Đã nộp / ${data.totalAssignments}`, 'Điểm TB bài tập', 'Hồ sơ'];
+      const head = ['MSV', 'Họ tên', 'Khóa', data.groupAssignment ? `Nhóm (${data.groupAssignment.title})` : 'Nhóm', 'Đề tài', `Đã nộp / ${data.totalAssignments}`, 'Điểm TB bài tập', 'Hồ sơ'];
       const lines = data.students.map((s) =>
         [s.studentCode, s.fullName, s.cohort, s.group ? groupLabel(s.group.code, s.group.name) : '', s.topic, s.submitted, s.avgScore, s.profileCompleted ? 'Hoàn thiện' : 'Chưa khai báo'].map(esc).join(','),
       );

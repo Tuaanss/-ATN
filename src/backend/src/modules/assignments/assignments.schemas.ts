@@ -12,7 +12,6 @@ export const assignmentCommonSchema = z
     productTypes: z.array(productType).min(1, 'Chọn ít nhất một loại sản phẩm'),
     allowLate: z.boolean().default(false),
     lateDays: z.number().int().min(1).max(14).optional(),
-    weight: z.number().int().min(1, 'Trọng số 1–100%').max(100, 'Trọng số 1–100%').default(10),
     hasIndividualPart: z.boolean().default(false),
     folderUrl: z.string().trim().optional(),
     publishNow: z.boolean().default(true),
@@ -55,7 +54,6 @@ export const checkFolderSchema = z.object({ folderUrl: z.string().trim().min(1, 
 export const driveLinkSchema = z.object({ folderUrl: z.string().trim().min(1, 'Dán link thư mục Google Drive') });
 export const commitSchema = z.object({ onlyValid: z.boolean().optional() });
 export const resolveReportSchema = z.object({ note: z.string().trim().max(500).optional() });
-export const publishSectionSchema = z.object({ allowIncomplete: z.boolean().optional() });
 
 export type AssignmentCommon = z.infer<typeof assignmentCommonSchema>;
 export type SectionSchedule = z.infer<typeof sectionScheduleSchema>;

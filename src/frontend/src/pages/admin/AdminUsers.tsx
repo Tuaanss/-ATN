@@ -11,7 +11,6 @@ export interface Catalog {
   majors: { id: string; code: string; name: string; faculty: { id: string; code: string; name: string }; classes: number; students: number }[];
   cohorts: { id: string; name: string; startYear: number; classes: number; students: number }[];
   classes: { id: string; code: string; major: { id: string; name: string }; cohort: { id: string; name: string }; students: number }[];
-  courseTypes: { code: string; courses: number }[];
 }
 interface Lecturer {
   id: string;
@@ -321,7 +320,7 @@ export function StudentsPage() {
       />
       <Card body={false}>
         <Toolbar>
-          <SearchBox value={q} onChange={setQ} placeholder="Tìm theo MSSV, họ tên, email…" />
+          <SearchBox value={q} onChange={setQ} placeholder="Tìm theo MSV, họ tên, email…" />
           <Select label="Lọc theo khóa" value={f.cohort} onChange={setFilter('cohort')} style={{ minWidth: 120 }}>
             <option value="">Tất cả khóa</option>
             {c.cohorts.map((x) => (
@@ -458,7 +457,7 @@ function StudentForm({ s, cat, onClose }: { s: Student | null; cat: Catalog; onC
   const set = (k: keyof typeof v) => (e: { target: { value: string } }) => setV({ ...v, [k]: e.target.value });
   const save = async () => {
     const e: Record<string, string> = {};
-    if (!v.studentCode.trim()) e.studentCode = 'Bắt buộc nhập MSSV.';
+    if (!v.studentCode.trim()) e.studentCode = 'Bắt buộc nhập MSV.';
     if (!v.fullName.trim()) e.fullName = 'Bắt buộc nhập họ tên.';
     if (!/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(v.dateOfBirth.trim())) e.dateOfBirth = 'Định dạng dd/mm/yyyy.';
     if (!v.adminClassId) e.adminClassId = 'Chọn lớp hành chính.';
@@ -489,7 +488,7 @@ function StudentForm({ s, cat, onClose }: { s: Student | null; cat: Catalog; onC
       }
     >
       <Grid2>
-        <Field label="MSSV *" help="Dùng làm tên đăng nhập." error={err.studentCode}>
+        <Field label="MSV *" help="Dùng làm tên đăng nhập." error={err.studentCode}>
           <input className="inp mono" value={v.studentCode} onChange={set('studentCode')} readOnly={!!s} />
         </Field>
         <Field label="Ngày sinh *" error={err.dateOfBirth}>
@@ -572,7 +571,7 @@ export function ParentsPage() {
       />
       <Card body={false}>
         <Toolbar>
-          <SearchBox value={q} onChange={setQ} placeholder="Tìm theo SĐT, tên/MSSV của con…" />
+          <SearchBox value={q} onChange={setQ} placeholder="Tìm theo SĐT, tên/MSV của con…" />
           <Select label="Lọc theo trạng thái" value={st} onChange={setSt}>
             <option value="">Mọi trạng thái</option>
             <option value="ACTIVE">Hoạt động</option>
@@ -705,8 +704,8 @@ function PhoneChange({ parents, onClose }: { parents: Parent[]; onClose: () => v
       </Note>
       <Grid2>
         <Full>
-          <Field label="Sinh viên *" help={sv && !s ? 'Không tìm thấy MSSV này.' : s ? s.fullName : undefined}>
-            <input className="inp" list="dl-sv" value={sv} onChange={(e) => setSv(e.target.value)} placeholder="Nhập MSSV…" />
+          <Field label="Sinh viên *" help={sv && !s ? 'Không tìm thấy MSV này.' : s ? s.fullName : undefined}>
+            <input className="inp" list="dl-sv" value={sv} onChange={(e) => setSv(e.target.value)} placeholder="Nhập MSV…" />
             <datalist id="dl-sv">
               {students.data?.map((x) => (
                 <option key={x.id} value={x.studentCode}>

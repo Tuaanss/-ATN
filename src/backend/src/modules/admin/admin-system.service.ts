@@ -45,7 +45,7 @@ export class AdminSystemService {
   async dashboard() {
     const now = new Date();
     const semester = await this.prisma.semester.findFirst({ where: { isCurrent: true } });
-    const [students, discoverable, withWork, lecturers, entActive, entPending, viewPending, grants, gradeReq, driveLinks, failedFiles, storage, sync, views] = await Promise.all([
+    const [students, discoverable, withWork, lecturers, entActive, entPending, viewPending, grants, driveLinks, failedFiles, storage, sync, views] = await Promise.all([
       this.prisma.student.count(),
       this.prisma.student.count({ where: { discoverable: true } }),
       this.prisma.student.count({ where: { OR: [{ submissions: { some: {} } }, { groupMembers: { some: { group: { submissions: { some: { kind: 'GROUP_SHARED' } } } } } }] } }),
@@ -56,7 +56,6 @@ export class AdminSystemService {
       this.prisma.enterprise.count({ where: { user: { status: 'PENDING' } } }),
       this.prisma.viewRequest.count({ where: { status: 'PENDING' } }),
       this.prisma.viewRequest.count({ where: { status: 'APPROVED', expiresAt: { gt: now } } }),
-      this.prisma.gradeChangeRequest.count({ where: { status: 'PENDING' } }),
       this.prisma.lecturerDriveLink.findMany({ select: { lecturerId: true, status: true, refreshTokenEnc: true, lecturer: { select: { code: true, fullName: true } } } }),
       this.prisma.submissionFile.count({ where: { deletedAt: null, syncStatus: { in: ['FAILED', 'MISSING'] } } }),
       this.prisma.submissionFile.groupBy({ by: ['fileType'], where: { deletedAt: null }, _sum: { sizeBytes: true }, _count: { _all: true } }),
@@ -93,7 +92,7 @@ export class AdminSystemService {
 
     return {
       semester: semester?.code ?? null,
-      todo: { enterprisesPending: entPending, viewRequests: viewPending, gradeRequests: gradeReq, failedFiles },
+      todo: { enterprisesPending: entPending, viewRequests: viewPending, failedFiles },
       drive: {
         lecturers: lecturerIds.size,
         linked,
@@ -283,12 +282,9 @@ export class AdminSystemService {
   }
 
   async saveConfig(adminId: string, value: SystemConfigValue) {
-    const scale = [...value.grading.scale].sort((a, b) => b[0] - a[0]);
-    if (!scale.length || scale[scale.length - 1][0] !== 0) throw new AppException('VALIDATION_ERROR', 'Thang điểm phải có mức bắt đầu từ 0');
-    if (new Set(scale.map((r) => r[1])).size !== scale.length) throw new AppException('VALIDATION_ERROR', 'Điểm chữ bị trùng');
     if (value.enterprise.viewDaysMin > value.enterprise.viewDaysMax) throw new AppException('VALIDATION_ERROR', 'Số ngày xem tối thiểu không được lớn hơn tối đa');
     const before = await this.config.get();
-    const saved = await this.config.save({ ...value, grading: { ...value.grading, scale } }, adminId);
+    const saved = await this.config.save(value, adminId);
     const changed = (Object.keys(saved) as (keyof SystemConfigValue)[]).filter((k) => JSON.stringify(saved[k]) !== JSON.stringify(before[k]));
     await this.audit.log({ actorId: adminId, action: 'UPDATE_CONFIG', entityType: 'system_config', entityId: 'main', summary: `Cập nhật cấu hình: ${changed.join(', ') || 'không đổi'}`, oldData: before, newData: saved });
     return { value: saved };

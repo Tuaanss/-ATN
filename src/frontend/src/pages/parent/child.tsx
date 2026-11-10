@@ -12,9 +12,8 @@ export interface Child {
   adminClass: string | null;
   major: string | null;
   cohort: string | null;
-  cpa: number | null;
-  credits: number;
-  rank: string | null;
+  avgScore: number | null;
+  gradedAssignments: number;
   unread: number;
   warnings: number;
 }

@@ -5,7 +5,7 @@ import { api } from '../../api/client';
 import { useCrumbs } from '../../layouts/AppLayout';
 import { Icon } from '../../components/Icon';
 import { Card, ChipInput, Empty, Field, Loading, PageHead } from '../../components/ui';
-import { AccessBadge, RequestModal, gpa, type Access } from './common';
+import { AccessBadge, RequestModal, avg, type Access } from './common';
 
 interface Filters {
   cohorts: string[];
@@ -22,7 +22,7 @@ interface Row {
   cohort: string | null;
   major: string | null;
   adminClass: string | null;
-  gpa: number | null;
+  avgScore: number | null;
   skills: string[];
   works: { title: string; keywords: string[] }[];
   access: Access;
@@ -40,8 +40,8 @@ export interface Criteria {
   cohorts?: string[];
   major?: string;
   classId?: string;
-  gpaMin?: number;
-  gpaMax?: number;
+  scoreMin?: number;
+  scoreMax?: number;
   topics?: string[];
   skills?: string[];
 }
@@ -60,7 +60,7 @@ export function EnterpriseSearch() {
     }
   })();
   if (params.get('q')) init.q = params.get('q')!;
-  const [form, setForm] = useState({ code: init.code ?? '', q: init.q ?? '', cohort: init.cohorts?.[0] ?? '', major: init.major ?? '', classId: init.classId ?? '', gpaMin: init.gpaMin?.toString() ?? '', gpaMax: init.gpaMax?.toString() ?? '', topics: init.topics ?? [], skills: init.skills ?? [] });
+  const [form, setForm] = useState({ code: init.code ?? '', q: init.q ?? '', cohort: init.cohorts?.[0] ?? '', major: init.major ?? '', classId: init.classId ?? '', scoreMin: init.scoreMin?.toString() ?? '', scoreMax: init.scoreMax?.toString() ?? '', topics: init.topics ?? [], skills: init.skills ?? [] });
   const [res, setRes] = useState<Result | null>(null);
   const [page, setPage] = useState(1);
   const [sel, setSel] = useState<string[]>([]);
@@ -71,8 +71,8 @@ export function EnterpriseSearch() {
     cohorts: form.cohort ? [form.cohort] : undefined,
     major: form.major || undefined,
     classId: form.classId || undefined,
-    gpaMin: form.gpaMin ? Number(form.gpaMin.replace(',', '.')) : undefined,
-    gpaMax: form.gpaMax ? Number(form.gpaMax.replace(',', '.')) : undefined,
+    scoreMin: form.scoreMin ? Number(form.scoreMin.replace(',', '.')) : undefined,
+    scoreMax: form.scoreMax ? Number(form.scoreMax.replace(',', '.')) : undefined,
     topics: form.topics.length ? form.topics : undefined,
     skills: form.skills.length ? form.skills : undefined,
   });
@@ -97,7 +97,7 @@ export function EnterpriseSearch() {
   const picked = res?.rows.filter((r) => sel.includes(r.id)) ?? [];
   return (
     <div className="page">
-      <PageHead title="Tìm kiếm sinh viên" sub="Sắp xếp theo GPA từ cao đến thấp" />
+      <PageHead title="Tìm kiếm sinh viên" sub="Sắp xếp theo điểm TB bài tập từ cao đến thấp" />
       <Card>
         <form
           onSubmit={(e) => {
@@ -109,7 +109,7 @@ export function EnterpriseSearch() {
           style={{ display: 'flex', flexDirection: 'column', gap: 14 }}
         >
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))', gap: 12, alignItems: 'end' }}>
-            <Field label="MSSV">
+            <Field label="MSV">
               <input className="inp mono" value={form.code} onChange={set('code')} placeholder="Khớp chính xác" />
             </Field>
             <Field label="Khóa">
@@ -138,11 +138,11 @@ export function EnterpriseSearch() {
                 ))}
               </select>
             </Field>
-            <Field label="GPA từ">
+            <Field label="Điểm TB từ">
               <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <input className="inp mono" value={form.gpaMin} onChange={set('gpaMin')} placeholder="0.0" aria-label="GPA tối thiểu" />
+                <input className="inp mono" value={form.scoreMin} onChange={set('scoreMin')} placeholder="0.0" aria-label="Điểm TB tối thiểu" />
                 <span className="muted">–</span>
-                <input className="inp mono" value={form.gpaMax} onChange={set('gpaMax')} placeholder="4.0" aria-label="GPA tối đa" />
+                <input className="inp mono" value={form.scoreMax} onChange={set('scoreMax')} placeholder="10" aria-label="Điểm TB tối đa" />
               </div>
             </Field>
             <button className="btn btn-p" style={{ height: 42 }} disabled={search.isPending}>
@@ -192,7 +192,7 @@ export function EnterpriseSearch() {
                     <th style={{ width: 40 }} />
                     <th>Sinh viên</th>
                     <th>Khóa · Ngành</th>
-                    <th>GPA ↓</th>
+                    <th>Điểm TB ↓</th>
                     <th>Đề tài đã thực hiện</th>
                     <th>Quyền xem</th>
                     <th />
@@ -215,7 +215,7 @@ export function EnterpriseSearch() {
                       <td>
                         {r.cohort ?? '—'} · {r.major ?? '—'}
                       </td>
-                      <td className="mono">{gpa(r.gpa)}</td>
+                      <td className="mono">{avg(r.avgScore)}</td>
                       <td>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                           {r.works.slice(0, 2).map((w, i) => (

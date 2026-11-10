@@ -65,7 +65,6 @@ export interface AssignmentSummary {
   dueAt: string;
   finalDeadline: string;
   batchId: string | null;
-  weight: number;
   groupsImportedAt: string | null;
   gradesPublishedAt: string | null;
   avgScore: number | null;
@@ -76,8 +75,7 @@ export interface AssignmentSummary {
 export interface LecturerSection {
   id: string;
   code: string;
-  schedule: string | null;
-  course: { code: string; name: string; type: string; credits: number };
+  course: { code: string; name: string; credits: number };
   semester: Semester;
   studentCount: number;
   assignmentCount: number;
@@ -151,7 +149,6 @@ export interface LecturerAssignmentDetail extends Omit<AssignmentSummary, 'hasIn
     finalDeadline: string;
     allowLate: boolean;
     lateDueAt: string | null;
-    weight: number;
     suggestedTopics: string[];
     hasIndividualPart: boolean;
     groupsImportedAt: string | null;
@@ -161,7 +158,7 @@ export interface LecturerAssignmentDetail extends Omit<AssignmentSummary, 'hasIn
     createdAt: string;
     brief: { name: string; size: number } | null;
     driveFolderUrl: string | null;
-    section: { id: string; code: string; studentCount: number; course: { name: string; type: string } };
+    section: { id: string; code: string; studentCount: number; course: { name: string } };
   };
   views: number;
   units: WorkUnit[];
@@ -241,54 +238,55 @@ export interface AssignmentGradePreview {
   errors: RowError[];
 }
 
-export type GradeComp = 'attendance' | 'assignment' | 'midterm' | 'final';
-
 export interface GradebookItem {
   id: string;
   code: string;
   course: { code: string; name: string; credits: number };
   semester: Semester & { term: string };
   students: number;
-  graded: number;
-  status: 'EMPTY' | 'DRAFT' | 'PUBLISHED';
-  publishedAt: string | null;
+  /** số bài tập đã giao */
+  assignments: number;
+  /** số bài đã có điểm */
+  gradedAssignments: number;
+  /** số bài đã công bố điểm */
+  publishedAssignments: number;
 }
 
+/** Ma trận điểm SV × bài tập của một lớp – để so sánh chất lượng các bài (không có điểm tổng kết). */
 export interface SectionGrades {
-  section: { id: string; code: string; course: { code: string; name: string; credits: number; type: string }; semester: { code: string; academicYear: string; term: string }; publishedAt: string | null };
-  weights: Record<GradeComp, number>;
-  assignments: { id: string; title: string; weight: number; publishedAt: string | null }[];
-  rows: ({ studentId: string; studentCode: string; fullName: string; assignments: (number | null)[]; suggestedAssignment: number | null; total: number | null; letter: string | null; gpa4: number | null } & Record<GradeComp, number | null>)[];
-  stats: { students: number; complete: number; avg: number | null; failing: number; histogram: { label: string; count: number }[] };
-  imports: ImportHistory[];
-}
-
-export interface SectionGradePreview {
-  jobId: string;
-  fileName: string;
-  totalRows: number;
-  errorRows: number;
-  complete: number;
-  incomplete: number;
-  changed: number;
-  rows: { studentId: string; studentCode: string; fullName: string; old: Record<GradeComp, number | null>; values: Record<GradeComp, number | null>; total: number | null; letter: string | null; changed: boolean }[];
-  missing: { studentCode: string; fullName: string }[];
-  errors: RowError[];
-}
-
-export interface MyGrades {
-  cpa: number | null;
-  credits: number;
-  rank: string | null;
-  terms: {
-    code: string;
-    academicYear: string;
-    term: string;
-    gpa: number | null;
-    credits: number;
-    courses: ({ sectionId: string; sectionCode: string; course: { code: string; name: string; credits: number }; total: number | null; letter: string | null; gpa4: number | null } & Record<GradeComp, number | null>)[];
+  section: { id: string; code: string; course: { code: string; name: string; credits: number }; semester: { code: string; academicYear: string; term: string } };
+  assignments: {
+    id: string;
+    title: string;
+    workMode: WorkMode;
+    dueAt: string;
+    publishedAt: string | null;
+    graded: number;
+    avg: number | null;
+    max: number | null;
+    min: number | null;
+    histogram: { label: string; count: number }[];
   }[];
-  assignments: { assignmentId: string; title: string; course: string; sectionCode: string; semester: string; weight: number; score: number | null; note: string | null; publishedAt: string }[];
+  rows: { studentId: string; studentCode: string; fullName: string; assignments: (number | null)[] }[];
+  stats: { students: number; assignments: number };
+}
+
+export interface MyGradeItem {
+  assignmentId: string;
+  title: string;
+  course: { code: string; name: string };
+  sectionCode: string;
+  score: number | null;
+  note: string | null;
+  dueAt: string;
+  publishedAt: string;
+}
+
+/** Điểm các bài tập đã công bố, nhóm theo học kỳ. */
+export interface MyGrades {
+  graded: number;
+  avg: number | null;
+  terms: { code: string; academicYear: string; term: string; avg: number | null; assignments: MyGradeItem[] }[];
 }
 
 // ================================================================ Sinh viên
@@ -330,8 +328,7 @@ export interface StudentSubmission {
 export interface StudentSectionInfo {
   id: string;
   code: string;
-  schedule: string | null;
-  course: { code: string; name: string; type: string; credits: number; weights: { attendance: number; assignment: number; midterm: number; final: number } };
+  course: { code: string; name: string; credits: number };
   semester: Semester;
   lecturer: { fullName: string; email: string };
 }
@@ -350,7 +347,6 @@ export interface MyWork {
     lateDueAt: string | null;
     suggestedTopics: string[];
     hasIndividualPart: boolean;
-    weight: number;
     groupsImportedAt: string | null;
     gradesPublishedAt: string | null;
     brief: { name: string; size: number } | null;

@@ -292,13 +292,23 @@ export class AssignmentsService {
     return { batchId, results };
   }
 
+  /** Cuối ngày kết thúc học kỳ (23:59:59.999). */
+  private endOfSemester(semesterEnd: Date): Date {
+    const end = new Date(semesterEnd);
+    end.setHours(23, 59, 59, 999);
+    return end;
+  }
+
+  /** Học kỳ đã kết thúc theo thời gian thực → nhập bài tập cũ: hạn nộp tùy ý (quá khứ để lưu hồ sơ, hoặc tương lai để SV đăng bài cũ lên). */
+  private semesterEnded(semesterEnd: Date): boolean {
+    return this.endOfSemester(semesterEnd) < new Date();
+  }
+
   private validateDates(_common: AssignmentCommon, s: SectionSchedule, semesterEnd: Date) {
     const fail = (message: string) => new AppException('ASSIGNMENT_INVALID_DATES', message, HttpStatus.BAD_REQUEST);
     if (s.dueAt <= s.openAt) throw fail('Hạn nộp phải sau ngày mở (BR-04)');
-    if (s.dueAt <= new Date()) throw fail('Hạn nộp phải ở tương lai');
-    const endOfSemester = new Date(semesterEnd);
-    endOfSemester.setHours(23, 59, 59, 999);
-    if (s.dueAt > endOfSemester) throw fail('Hạn nộp phải nằm trong học kỳ (BR-04)');
+    if (!this.semesterEnded(semesterEnd) && s.dueAt <= new Date()) throw fail('Hạn nộp phải ở tương lai');
+    if (!this.semesterEnded(semesterEnd) && s.dueAt > this.endOfSemester(semesterEnd)) throw fail('Hạn nộp phải nằm trong học kỳ (BR-04)');
   }
 
   private async createOne(
@@ -328,7 +338,6 @@ export class AssignmentsService {
       dueAt: s.dueAt,
       allowLate: c.allowLate,
       lateDueAt: c.allowLate && c.lateDays ? new Date(s.dueAt.getTime() + c.lateDays * 86400000) : null,
-      weight: c.weight,
       hasIndividualPart: c.workMode === 'GROUP' && c.hasIndividualPart,
       suggestedTopics: c.suggestedTopics,
       autoOpen: !c.saveDraft,
@@ -345,7 +354,8 @@ export class AssignmentsService {
       await this.drive.trash(folderId, lecturerId).catch(() => undefined); // bù trừ (UC04.2 ngoại lệ)
       throw e;
     }
-    if (status === 'OPEN') await this.notifyOpened(assignment.id);
+    // chỉ báo SV khi bài còn nhận nộp (bài cũ đã quá hạn thì không báo)
+    if (status === 'OPEN' && (assignment.lateDueAt ?? assignment.dueAt) > now) await this.notifyOpened(assignment.id);
     await this.audit.log({ actorId: null, action: c.saveDraft ? 'DRAFT' : 'PUBLISH', entityType: 'assignment', entityId: assignment.id, summary: c.saveDraft ? 'Lưu nháp bài tập' : 'Giao bài tập', newData: { by: lecturerId } });
     return assignment.id;
   }
@@ -360,7 +370,8 @@ export class AssignmentsService {
     const now = new Date();
     const open = a.autoOpen || a.openAt <= now;
     await this.prisma.assignment.update({ where: { id }, data: { autoOpen: true, status: open ? 'OPEN' : 'DRAFT', ...(open && a.openAt > now ? { openAt: now } : {}) } });
-    if (open) await this.notifyOpened(id);
+    // bài đã quá hạn (nhập cho học kỳ cũ) → không thông báo cho SV
+    if (open && (a.lateDueAt ?? a.dueAt) > now) await this.notifyOpened(id);
     await this.audit.log({ actorId: userId, action: 'PUBLISH', entityType: 'assignment', entityId: id, summary: 'Giao bài tập' });
     return { ok: true, opened: open };
   }
@@ -455,8 +466,7 @@ export class AssignmentsService {
       return {
         id: s.id,
         code: s.code,
-        schedule: s.schedule,
-        course: { code: s.course.code, name: s.course.name, type: s.course.courseType, credits: s.course.credits },
+        course: { code: s.course.code, name: s.course.name, credits: s.course.credits },
         semester: { code: s.semester.code, academicYear: s.semester.academicYear, term: s.semester.term, isCurrent: s.semester.isCurrent, endDate: s.semester.endDate },
         studentCount: s._count.students,
         assignmentCount: s._count.assignments,
@@ -488,9 +498,8 @@ export class AssignmentsService {
       section: {
         id: section.id,
         code: section.code,
-        schedule: section.schedule,
         studentCount: section._count.students,
-        course: { code: section.course.code, name: section.course.name, type: section.course.courseType },
+        course: { code: section.course.code, name: section.course.name },
         semester: { code: section.semester.code, endDate: section.semester.endDate },
       },
       assignments: items,
@@ -526,7 +535,6 @@ export class AssignmentsService {
       dueAt: a.dueAt,
       finalDeadline: finalDeadline(a),
       batchId: a.batchId,
-      weight: a.weight,
       groupsImportedAt: a.groupsImportedAt,
       gradesPublishedAt: a.gradesPublishedAt,
       avgScore: avg._avg.score == null ? null : Math.round(Number(avg._avg.score) * 10) / 10,
@@ -633,7 +641,7 @@ export class AssignmentsService {
     return {
       ...rest,
       briefFileSize: rest.briefFileSize == null ? null : Number(rest.briefFileSize),
-      section: { id: section.id, code: section.code, course: { name: section.course.name, type: section.course.courseType } },
+      section: { id: section.id, code: section.code, course: { name: section.course.name } },
       counts: { groups, submissions: subs, graded, individuals: works },
       groups: groupRows.map((g) => ({ id: g.id, seq: g.seq, code: g.code, name: g.name, members: g._count.members })),
       history: history.map((h) => ({ action: h.action, summary: h.summary, actor: h.actor?.lecturer?.fullName ?? h.actor?.student?.fullName ?? 'Hệ thống', createdAt: h.createdAt })),
@@ -669,10 +677,9 @@ export class AssignmentsService {
 
     const openAt = a.status === 'DRAFT' ? s.openAt : a.openAt; // bài đã mở thì giữ ngày mở
     if (s.dueAt <= openAt) throw fail('Hạn nộp phải sau ngày mở (BR-04)');
-    if (s.dueAt.getTime() !== a.dueAt.getTime() && s.dueAt <= new Date()) throw fail('Hạn nộp mới phải ở tương lai');
-    const end = new Date(a.section.semester.endDate);
-    end.setHours(23, 59, 59, 999);
-    if (s.dueAt > end) throw fail('Hạn nộp phải nằm trong học kỳ (BR-04)');
+    const pastSemester = this.semesterEnded(a.section.semester.endDate);
+    if (!pastSemester && s.dueAt.getTime() !== a.dueAt.getTime() && s.dueAt <= new Date()) throw fail('Hạn nộp mới phải ở tương lai');
+    if (!pastSemester && s.dueAt > this.endOfSemester(a.section.semester.endDate)) throw fail('Hạn nộp phải nằm trong học kỳ (BR-04)');
     const lateDueAt = c.allowLate && c.lateDays ? new Date(s.dueAt.getTime() + c.lateDays * 86400000) : null;
 
     // ---- đổi thư mục nhận bài (UC04.6)
@@ -710,7 +717,6 @@ export class AssignmentsService {
         dueAt: s.dueAt,
         allowLate: c.allowLate,
         lateDueAt,
-        weight: c.weight,
         hasIndividualPart: c.workMode === 'GROUP' && c.hasIndividualPart,
         suggestedTopics: c.suggestedTopics,
         ...(folderPatch ?? {}),
@@ -727,7 +733,6 @@ export class AssignmentsService {
     if (a.workMode !== c.workMode) changes.push(`Đổi hình thức → ${c.workMode === 'GROUP' ? 'nhóm' : 'cá nhân'}`);
     if (a.hasIndividualPart !== updated.hasIndividualPart) changes.push(`${updated.hasIndividualPart ? 'Bật' : 'Tắt'} phần cá nhân`);
     if (a.allowLate !== c.allowLate) changes.push(`${c.allowLate ? 'Cho phép' : 'Không cho'} nộp muộn`);
-    if (a.weight !== c.weight) changes.push(`Trọng số ${a.weight}% → ${c.weight}%`);
     if (folderPatch) changes.push('Đổi thư mục Drive nhận bài');
     if (a.description !== c.description) changes.push('Sửa mô tả đề bài');
     if (changes.length)

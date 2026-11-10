@@ -627,9 +627,6 @@ function ResultStep({ w }: { w: MyWork }) {
                     / 10{a.gradesPublishedAt ? ` · công bố ${ddmm(a.gradesPublishedAt)}` : ''}
                   </span>
                 </div>
-                <div style={{ flex: 1, minWidth: 220, fontSize: 13 }} className="muted">
-                  Trọng số {a.weight}% trong cột Bài tập của học phần {a.section.course.name}.
-                </div>
               </div>
               {w.grade?.note && (
                 <div style={{ padding: 14, borderRadius: 10, background: '#F7F6F2', fontSize: 14, lineHeight: 1.6 }}>

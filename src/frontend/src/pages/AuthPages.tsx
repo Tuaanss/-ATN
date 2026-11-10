@@ -184,7 +184,7 @@ export function ForgotPasswordPage() {
           </div>
           <div>
             <label className="lbl" htmlFor="fu">
-              MSSV / mã giảng viên
+              MSV / mã giảng viên
             </label>
             <input id="fu" className="inp" value={username} onChange={(e) => setUsername(e.target.value)} placeholder="VD: SV0001" style={{ height: 46 }} autoFocus />
           </div>

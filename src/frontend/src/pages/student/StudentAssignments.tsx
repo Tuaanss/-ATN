@@ -5,7 +5,7 @@ import { api } from '../../api/client';
 import type { MyStatus, StudentAssignmentRow, StudentSection } from '../../api/types';
 import { useCrumbs } from '../../layouts/AppLayout';
 import { Badge, Card, Empty, Loading, MiniSteps, PageHead, Seg, Stat } from '../../components/ui';
-import { COURSE_TYPE, ddmmHHmm, remain, semesterLabel, studentProgress } from '../../utils/format';
+import { ddmmHHmm, remain, semesterLabel, studentProgress } from '../../utils/format';
 import { modeCell, SectionTile } from './StudentDashboard';
 
 type Filter = 'ALL' | 'OPEN' | 'SOON' | 'DONE' | 'OVERDUE' | 'NEW' | 'DOING' | 'GRADED';
@@ -39,18 +39,15 @@ export function StudentAssignments() {
   const q = (params.get('q') ?? '').trim().toLowerCase();
   const [filter, setFilter] = useState<Filter>('ALL');
   const [section, setSection] = useState('');
-  const [type, setType] = useState('');
   const rowsQ = useQuery({ queryKey: ['student', 'assignments'], queryFn: () => api.get<StudentAssignmentRow[]>('/student/assignments').then((r) => r.data) });
   const sectionsQ = useQuery({ queryKey: ['student', 'sections'], queryFn: () => api.get<StudentSection[]>('/student/sections').then((r) => r.data) });
   if (rowsQ.isLoading || sectionsQ.isLoading) return <Loading />;
 
   const all = rowsQ.data ?? [];
   const sections = (sectionsQ.data ?? []).filter((s) => s.semester.isCurrent);
-  const typeOf = (r: StudentAssignmentRow) => sections.find((s) => s.id === r.section?.id)?.course.type;
   const rows = all
     .filter((r) => match(r, filter))
     .filter((r) => !section || r.section?.id === section)
-    .filter((r) => !type || typeOf(r) === type)
     .filter((r) => !q || `${r.title} ${r.section?.code} ${r.section?.course}`.toLowerCase().includes(q));
   const count = (f: Filter) => all.filter((r) => match(r, f)).length;
   const segValue = (['ALL', 'OPEN', 'SOON', 'DONE', 'OVERDUE'] as Filter[]).includes(filter) ? filter : ('' as Filter);
@@ -98,7 +95,7 @@ export function StudentAssignments() {
               <SectionTile
                 key={s.id}
                 extra
-                s={{ id: s.id, code: s.code, course: s.course.name, type: s.course.type, lecturer: s.lecturer.fullName, total: s.assignmentCount, done: s.submittedCount, schedule: s.schedule, dueSoon: s.dueSoonCount }}
+                s={{ id: s.id, code: s.code, course: s.course.name, lecturer: s.lecturer.fullName, total: s.assignmentCount, done: s.submittedCount, dueSoon: s.dueSoonCount }}
               />
             ))}
           </div>
@@ -124,14 +121,6 @@ export function StudentAssignments() {
                   {sections.map((s) => (
                     <option key={s.id} value={s.id}>
                       Lớp: {s.code}
-                    </option>
-                  ))}
-                </select>
-                <select className="chip" value={type} onChange={(e) => setType(e.target.value)} aria-label="Loại môn" style={{ cursor: 'pointer' }}>
-                  <option value="">Loại môn: tất cả</option>
-                  {Object.entries(COURSE_TYPE).map(([k, v]) => (
-                    <option key={k} value={k}>
-                      Loại môn: {v.label}
                     </option>
                   ))}
                 </select>

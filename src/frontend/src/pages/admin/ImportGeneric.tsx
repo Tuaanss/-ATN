@@ -61,18 +61,14 @@ const CFG: Record<Kind, { title: string; noun: string; back: [string, string]; f
       ['code', 'Mã môn'],
       ['name', 'Tên môn'],
       ['credits', 'TC'],
-      ['type', 'Loại môn'],
       ['faculty', 'Khoa'],
-      ['w', 'CC · BT · GK · CK'],
     ],
     rules: [
       ['Mã môn', 'Bắt buộc, không trùng.'],
       ['Tín chỉ', 'Số nguyên 1–10.'],
-      ['Loại môn', 'Thiết kế / Lập trình / Khác.'],
       ['Mã khoa', 'Theo Danh mục › Khoa (không bắt buộc).'],
-      ['Trọng số', 'CC, BT, GK, CK (%) tổng bằng 100; để trống cả 4 cột = 10 · 30 · 20 · 40.'],
     ],
-    note: 'Loại môn quyết định loại sản phẩm gợi ý khi giảng viên giao bài.',
+    note: 'Môn học dùng để gom các lớp học phần và bài tập của sinh viên các khóa.',
   },
   sections: {
     title: 'Import lớp học phần từ Excel',
@@ -83,16 +79,10 @@ const CFG: Record<Kind, { title: string; noun: string; back: [string, string]; f
       ['code', 'Mã lớp HP'],
       ['course', 'Mã môn'],
       ['lecturer', 'Mã GV'],
-      ['max', 'Sĩ số'],
-      ['weeks', 'Tuần'],
-      ['schedule', 'Lịch học'],
     ],
     rules: [
-      ['Mã lớp HP', 'Dạng MÃMÔN_số, VD: TK101_05, không trùng.'],
+      ['Mã lớp HP', 'Dạng MÃMÔN_HKx_NĂMHỌC_STT, VD: TK101_HK1_2526_01 (HK1 / HK2 / HE; năm học 2025–2026 ghi 2526). Để trống thì tự đánh số.'],
       ['Mã môn, Mã GV', 'Phải có sẵn trong hệ thống.'],
-      ['Sĩ số', 'Sĩ số tối đa 1–300. Tuần để trống = 1 đến 15.'],
-      ['Lịch học', 'Mỗi buổi "T2 1-3 A2-301" (thứ, tiết, phòng); nhiều buổi cách nhau dấu ;. Chủ nhật ghi CN.'],
-      ['Trùng lịch', 'Kiểm tra trùng giờ giảng viên, trùng phòng với lớp đã có và giữa các dòng trong tệp.'],
     ],
     note: 'Lớp được mở trong học kỳ chọn ở trên. Xếp sinh viên vào lớp bằng import xếp lớp hoặc trong mục chi tiết lớp.',
   },
@@ -168,22 +158,15 @@ const CFG: Record<Kind, { title: string; noun: string; back: [string, string]; f
     file: 'Mau_xep_sinh_vien_vao_lop_hoc_phan.xlsx',
     cols: [
       ['section', 'Mã lớp HP'],
-      ['code', 'MSSV'],
+      ['code', 'MSV'],
       ['name', 'Họ tên'],
     ],
-    rules: [
-      ['Mã lớp HP, MSSV', 'Bắt buộc, phải có sẵn trong hệ thống. Một tệp xếp được nhiều lớp.'],
-      ['Môn học', 'Sinh viên không được học cùng một môn ở hai lớp trong một học kỳ.'],
-      ['Lịch học', 'Không trùng lịch với các lớp sinh viên đang học trong học kỳ.'],
-      ['Sĩ số', 'Không vượt sĩ số tối đa của lớp (tính cả các dòng phía trên trong tệp).'],
-    ],
+    rules: [['Mã lớp HP, MSV', 'Bắt buộc, phải có sẵn trong hệ thống. Một tệp xếp được nhiều lớp.']],
     note: 'Sinh viên được xếp vào lớp sẽ thấy lớp học phần và bài tập của lớp ngay sau khi import.',
   },
 };
 
 const cellOf = (k: Kind, key: string, c: Record<string, string>) => {
-  if (k === 'courses' && key === 'w') return [c.wa, c.wb, c.wm, c.wf].every((x) => !x) ? '10 · 30 · 20 · 40' : [c.wa, c.wb, c.wm, c.wf].map((x) => x || 0).join(' · ');
-  if (k === 'sections' && key === 'weeks') return `${c.ws || 1}–${c.we || 15}`;
   if (k === 'cohorts' && key === 'year') return c.year || (c.yearAuto ? `${c.yearAuto} (theo tên khóa)` : '—');
   if (k === 'classes' && key === 'cohort') return c.cohortNew ? `${c.cohort} (khóa mới · ${c.cohortNew})` : c.cohort || '—';
   return c[key] || '—';
@@ -206,7 +189,7 @@ export function ImportGeneric() {
   const toast = useToast();
   const qc = useQueryClient();
   const sems = useAdmin<{ id: string; academicYear: string; term: string; isCurrent: boolean }[]>('/semesters', k === 'sections');
-  // ?section=<id>: xếp SV vào một lớp cụ thể (mở từ chi tiết lớp học phần) – tệp chỉ cần cột MSSV
+  // ?section=<id>: xếp SV vào một lớp cụ thể (mở từ chi tiết lớp học phần) – tệp chỉ cần cột MSV
   const [sp] = useSearchParams();
   const secId = k === 'enrollments' ? (sp.get('section') ?? '') : '';
   const one = useAdmin<{ code: string; course: string }>(`/sections/${secId}/students`, !!secId);
@@ -299,7 +282,7 @@ export function ImportGeneric() {
           </div>
           <Card title="Quy tắc dữ liệu">
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12, fontSize: 13, lineHeight: 1.5 }}>
-              {(secId ? [['MSSV', 'Bắt buộc, phải có sẵn trong hệ thống. Cột Mã lớp HP để trống hoặc ghi đúng mã lớp này.'] as [string, string], ...cfg.rules.slice(1)] : cfg.rules).map(([a, b]) => (
+              {(secId ? [['MSV', 'Bắt buộc, phải có sẵn trong hệ thống. Cột Mã lớp HP để trống hoặc ghi đúng mã lớp này.'] as [string, string], ...cfg.rules.slice(1)] : cfg.rules).map(([a, b]) => (
                 <div key={a} style={{ display: 'flex', gap: 10 }}>
                   <span style={{ color: '#15803D', marginTop: 2 }}>
                     <Icon name="check" size={16} strokeWidth={2.2} />
@@ -310,7 +293,7 @@ export function ImportGeneric() {
                 </div>
               ))}
               <Note tone="blue" icon="info">
-                {secId && one.data ? `Tệp chỉ cần cột MSSV; tất cả sinh viên sẽ được xếp vào lớp ${one.data.code} – ${one.data.course}.` : cfg.note}
+                {secId && one.data ? `Tệp chỉ cần cột MSV; tất cả sinh viên sẽ được xếp vào lớp ${one.data.code} – ${one.data.course}.` : cfg.note}
               </Note>
             </div>
           </Card>

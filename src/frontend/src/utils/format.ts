@@ -59,11 +59,6 @@ export const fmtSize = (b: number) => (b < 1024 ? `${b} B` : b < 1048576 ? `${Ma
 const TERM: Record<string, string> = { TERM_1: 'Học kỳ 1', TERM_2: 'Học kỳ 2', SUMMER: 'Học kỳ hè' };
 export const semesterLabel = (s?: { term: string; academicYear: string } | null) => (s ? `${TERM[s.term] ?? s.term} · ${s.academicYear.replace('-', '–')}` : '');
 
-export const COURSE_TYPE: Record<string, { label: string; tone: Tone }> = {
-  DESIGN: { label: 'Thiết kế', tone: 'blue' },
-  PROGRAMMING: { label: 'Lập trình', tone: 'green' },
-  OTHER: { label: 'Khác', tone: 'gray' },
-};
 
 export function workModeText(m: WorkMode) {
   return m === 'INDIVIDUAL' ? 'Cá nhân' : 'Nhóm';

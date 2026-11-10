@@ -171,8 +171,8 @@ export class DriveSyncService implements OnApplicationBootstrap, OnModuleDestroy
   // ---------------------------------------------------------------- cây thư mục (UC04.3)
   //  <MaLHP>_<TenBaiTap>/
   //  ├── Nhom01_<TenNhom>/Bai_chung/          bài chung
-  //  ├── Nhom01_<TenNhom>/<MSSV>_<HoTen>/     phần cá nhân trong nhóm
-  //  └── CaNhan_<MSSV>_<HoTen>/               làm cá nhân
+  //  ├── Nhom01_<TenNhom>/<MSV>_<HoTen>/     phần cá nhân trong nhóm
+  //  └── CaNhan_<MSV>_<HoTen>/               làm cá nhân
 
   private async targetFolder(s: { assignmentId: string; kind: string; groupId: string | null; studentId: string | null; assignment: { driveFolderId: string; createdById: string } }) {
     const root = s.assignment.driveFolderId;

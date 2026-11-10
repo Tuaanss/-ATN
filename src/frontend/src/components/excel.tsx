@@ -100,7 +100,7 @@ export function RowErrors({ errors }: { errors: RowError[] }) {
         <thead>
           <tr>
             <th style={{ width: 80 }}>Dòng</th>
-            <th style={{ width: 130 }}>MSSV</th>
+            <th style={{ width: 130 }}>MSV</th>
             <th>Lỗi</th>
           </tr>
         </thead>

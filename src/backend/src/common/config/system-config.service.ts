@@ -2,9 +2,6 @@ import { Global, Injectable, Module } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 
-/** [điểm từ, điểm chữ, hệ 4] – sắp giảm dần (BR-15) */
-export type ScaleRow = [number, string, number];
-
 export const DEFAULT_CONFIG = {
   files: {
     imageMaxMB: 10,
@@ -17,21 +14,9 @@ export const DEFAULT_CONFIG = {
     documentMax: 3,
     linkDomains: ['figma.com', 'github.com', 'gitlab.com'],
   },
-  grading: {
-    scale: [
-      [8.5, 'A', 4],
-      [8.0, 'B+', 3.5],
-      [7.0, 'B', 3],
-      [6.5, 'C+', 2.5],
-      [5.5, 'C', 2],
-      [5.0, 'D+', 1.5],
-      [4.0, 'D', 1],
-      [0, 'F', 0],
-    ] as ScaleRow[],
-    retake: 'HIGHEST' as 'HIGHEST' | 'LATEST',
-  },
   security: { maxFailed: 5, lockMinutes: 15, forceChangeFirstLogin: true },
-  warning: { scoreThreshold: 4, gpaDrop: 0.5 },
+  /** Cảnh báo phụ huynh khi điểm bài tập dưới ngưỡng */
+  warning: { scoreThreshold: 4 },
   enterprise: { viewDaysMin: 14, viewDaysMax: 28 },
   reminder: { hours: 24 },
   email: { sender: 'FrameUp <no-reply@frameup.local>' },
@@ -63,13 +48,6 @@ export class SystemConfigService {
     });
     this.cache = undefined;
     return this.get();
-  }
-
-  /** Quy đổi điểm chữ / hệ 4 theo thang đang cấu hình. */
-  async letter(total: number) {
-    const scale = [...(await this.get()).grading.scale].sort((a, b) => b[0] - a[0]);
-    const row = scale.find((r) => total >= r[0]) ?? scale[scale.length - 1];
-    return { letter: row[1], gpa4: row[2] };
   }
 }
 

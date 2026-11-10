@@ -5,34 +5,31 @@ import type { MyGrades, Notification, StudentAssignmentRow } from '../../api/typ
 import { useAuth } from '../../auth/auth';
 import { useCrumbs } from '../../layouts/AppLayout';
 import { Badge, Bar, Card, Empty, Loading, PageHead, Stat } from '../../components/ui';
-import { ago, COURSE_TYPE, ddmmHHmm, remain, semesterLabel, studentProgress } from '../../utils/format';
+import { ago, ddmmHHmm, remain, score10, semesterLabel, studentProgress } from '../../utils/format';
 
 interface Data {
   semester: { term: string; academicYear: string; week: number } | null;
   dueSoon: number;
   stats: { openAssignments: number; due3Days: number; noGroup: number; published: number; enterpriseViews: number };
   upcoming: StudentAssignmentRow[];
-  sections: { id: string; code: string; course: string; type: string; lecturer: string; total: number; done: number }[];
+  sections: { id: string; code: string; course: string; lecturer: string; total: number; done: number }[];
   notifications: Notification[];
 }
 
 export const modeCell = (r: Pick<StudentAssignmentRow, 'workMode' | 'groupCode' | 'groupName'>) =>
   r.workMode === 'GROUP' ? `Nhóm · ${r.groupCode ? (r.groupName && r.groupName !== r.groupCode ? `${r.groupCode} ${r.groupName}` : r.groupCode) : 'chờ xếp nhóm'}` : 'Cá nhân';
 
-export function SectionTile({ s, extra }: { s: { id: string; code: string; course: string; type: string; lecturer: string; total: number; done: number; schedule?: string | null; dueSoon?: number }; extra?: boolean }) {
-  const t = COURSE_TYPE[s.type] ?? COURSE_TYPE.OTHER;
+export function SectionTile({ s, extra }: { s: { id: string; code: string; course: string; lecturer: string; total: number; done: number; dueSoon?: number }; extra?: boolean }) {
   return (
     <Link to={`/student/courses/${s.id}`} style={{ display: 'flex', flexDirection: 'column', gap: extra ? 8 : 10, padding: 16, border: '1px solid #E3E1D9', borderRadius: 10, color: '#1A1C21', background: '#fff' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between' }}>
         <span className="mono muted" style={{ fontSize: 12 }}>
           {s.code}
         </span>
-        <Badge tone={t.tone}>{t.label}</Badge>
       </div>
       <span style={{ fontSize: 15, fontWeight: 600 }}>{s.course}</span>
       <span className="muted" style={{ fontSize: 13 }}>
         {s.lecturer}
-        {extra && s.schedule ? ` · ${s.schedule}` : ''}
       </span>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 12 }} className="muted">
         <Bar value={s.total ? (s.done / s.total) * 100 : 0} />
@@ -64,7 +61,7 @@ export function StudentDashboard() {
       <PageHead title={`Chào bạn ${user?.name}${data.dueSoon ? `, còn ${data.dueSoon} bài sắp đến hạn` : ''}`} sub={data.semester ? `${semesterLabel(data.semester)} · Tuần ${data.semester.week}` : 'Chưa có học kỳ hiện tại'} />
 
       <div className="grid4">
-        <Stat tone="red" icon="chart" label="GPA tích lũy" value={gradesQ.data?.cpa != null ? gradesQ.data.cpa.toFixed(2).replace('.', ',') : '—'} sub={gradesQ.data?.cpa != null ? `${gradesQ.data.credits} tín chỉ tích lũy` : 'Chưa có điểm học phần'} />
+        <Stat tone="red" icon="chart" label="Điểm TB bài tập" value={score10(gradesQ.data?.avg)} sub={gradesQ.data?.graded ? `${gradesQ.data.graded} bài đã có điểm` : 'Chưa có bài nào được công bố điểm'} />
         <Stat tone="green" icon="list" label="Bài tập đang mở" value={s.openAssignments} sub={`${s.due3Days} bài hạn trong 3 ngày tới`} />
         <Stat tone="amber" icon="listAlt" label="Bài tập đã có điểm" value={s.published} sub={s.noGroup ? `${s.noGroup} bài đang chờ GV xếp nhóm` : 'điểm đã được công bố'} />
         <Stat tone="blue" icon="building" label="Doanh nghiệp đã xem bài" value={s.enterpriseViews} sub="Chưa có doanh nghiệp được cấp quyền" />

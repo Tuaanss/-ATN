@@ -8,7 +8,7 @@ import { useAdmin } from './kit';
 
 interface Dash {
   semester: string | null;
-  todo: { enterprisesPending: number; viewRequests: number; gradeRequests: number; failedFiles: number };
+  todo: { enterprisesPending: number; viewRequests: number; failedFiles: number };
   drive: { lecturers: number; linked: number; notLinked: string[]; errors: { code: string; status: string }[]; nearFull: { code: string; usedPct: number }[] };
   users: { role: 'STUDENT' | 'LECTURER' | 'PARENT' | 'ENTERPRISE'; total: number; active30: number; locked: number }[];
   storage: { fileType: string; bytes: number; files: number }[];
@@ -103,7 +103,6 @@ export function AdminDashboard() {
     { icon: 'link', label: 'GV chưa liên kết Drive', count: d.drive.notLinked.length, detail: codes(d.drive.notLinked), to: '/admin/lecturers?drive=NONE', tone: 'amber' },
     { icon: 'building', label: 'Doanh nghiệp chờ duyệt tài khoản', count: d.todo.enterprisesPending, to: '/admin/enterprises', tone: 'amber' },
     { icon: 'eye', label: 'Yêu cầu xem bài chờ duyệt', count: d.todo.viewRequests, to: '/admin/view-requests', tone: 'amber' },
-    { icon: 'edit', label: 'Yêu cầu sửa điểm chờ duyệt', count: d.todo.gradeRequests, to: '/admin/grade-requests', tone: 'amber' },
   ];
   const pending = todo.reduce((a, t) => a + t.count, 0);
   const storageState = d.sync.failed > 0 ? { value: 'Có lỗi', tone: 'red' as const, sub: `${n(d.sync.failed)} tệp đồng bộ thất bại` } : d.sync.pending > 0 ? { value: 'Đang đồng bộ', tone: 'amber' as const, sub: `${n(d.sync.pending)} tệp đang chờ` } : { value: 'Ổn định', tone: 'green' as const, sub: `${n(d.sync.synced)} tệp đã đồng bộ` };

@@ -209,7 +209,6 @@ function InfoTab({ d, run }: { d: Detail; run: { mutate: (k: 'publish' | 'delete
               ['Nộp muộn', lateText(a) ?? 'Không nhận'],
               ['Hình thức', group ? `Nhóm theo danh sách tải lên${a.hasIndividualPart ? ' · có phần cá nhân' : ''}` : 'Cá nhân'],
               ['Sản phẩm', productsLabel(d)],
-              ['Trọng số', `${a.weight}% điểm bài tập của học phần`],
               ['Drive', a.driveFolderUrl ? <a key="d" href={a.driveFolderUrl} target="_blank" rel="noreferrer"><Badge tone="green">Đã tạo thư mục nhận bài</Badge></a> : <Badge key="d" tone="green">Đã tạo thư mục nhận bài</Badge>],
             ]}
           />
@@ -352,7 +351,7 @@ function GroupsTab({ d }: { d: Detail }) {
                 type="button"
                 onClick={() =>
                   downloadCsv(`nhom-${a.section.code}.csv`, [
-                    ['Mã nhóm', 'Tên nhóm', 'MSSV', 'Họ tên', 'Vai trò', 'Đề tài'],
+                    ['Mã nhóm', 'Tên nhóm', 'MSV', 'Họ tên', 'Vai trò', 'Đề tài'],
                     ...g.groups.flatMap((x) => x.members.map((m) => [x.code, x.name, m.studentCode, m.fullName, m.role === 'LEADER' ? 'Trưởng nhóm' : '', x.topic?.title ?? ''])),
                   ])
                 }
@@ -630,7 +629,7 @@ function SubmissionsTab({ d }: { d: Detail }) {
 
   const exportList = () =>
     downloadCsv(`bai-nop-${a.section.code}.csv`, [
-      [group ? 'Nhóm' : 'Sinh viên', 'Đề tài', 'Từ khóa', 'Người nộp', 'MSSV người nộp', 'Nộp lúc', 'Đúng hạn', 'Sản phẩm', 'Drive'],
+      [group ? 'Nhóm' : 'Sinh viên', 'Đề tài', 'Từ khóa', 'Người nộp', 'MSV người nộp', 'Nộp lúc', 'Đúng hạn', 'Sản phẩm', 'Drive'],
       ...rows.map((u) => [
         u.label,
         u.topic?.title ?? '',

@@ -18,7 +18,6 @@ export interface BriefData {
   allowLate: boolean;
   lateDueAt: string | null;
   dueAt: string;
-  weight: number;
   suggestedTopics: string[];
   brief: { name: string; size: number } | null;
 }
@@ -55,7 +54,6 @@ export function BriefBody({ b }: { b: BriefData }) {
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
         <Badge tone="gray">{modeBadgeText(b)}</Badge>
         {lateText(b) ? <Badge tone="amber">{lateText(b)}</Badge> : <Badge tone="red">Không nhận nộp muộn</Badge>}
-        <Badge tone="blue">Trọng số {b.weight}%</Badge>
       </div>
       {b.brief && (
         <div style={{ display: 'flex', gap: 10, alignItems: 'center', padding: 12, border: '1px solid #E3E1D9', borderRadius: 8 }}>

@@ -41,14 +41,6 @@ enum TermType {
   @@map("term_type")
 }
 
-enum CourseType {
-  DESIGN
-  PROGRAMMING
-  OTHER
-
-  @@map("course_type")
-}
-
 enum DriveAuthMode {
   SERVICE_ACCOUNT
   OAUTH
@@ -118,7 +110,6 @@ enum ReportStatus {
 enum ImportType {
   ASSIGNMENT_GROUPS
   ASSIGNMENT_GRADES
-  SECTION_GRADES
 
   @@map("import_type")
 }
@@ -129,13 +120,6 @@ enum ImportStatus {
   CANCELLED
 
   @@map("import_status")
-}
-
-enum GradeStatus {
-  DRAFT
-  PUBLISHED
-
-  @@map("grade_status")
 }
 
 enum SubmissionKind {
@@ -238,8 +222,6 @@ model Lecturer {
   notes           LecturerNote[]
   semesterFolders LecturerSemesterFolder[]
 
-  gradeRequests GradeChangeRequest[]
-
   facultyId String?  @map("faculty_id") @db.Char(36)
   faculty   Faculty? @relation(fields: [facultyId], references: [id])
 
@@ -284,10 +266,7 @@ model Student {
   views            AssignmentView[]
   groupReports     GroupReport[]
   assignmentGrades AssignmentGrade[]
-  sectionGrades    SectionGrade[]
   parents          ParentStudent[]
-
-  gradeRequests GradeChangeRequest[]
 
   adminClassId String?     @map("admin_class_id") @db.Char(36)
   adminClass   AdminClass? @relation(fields: [adminClassId], references: [id])
@@ -386,40 +365,6 @@ model PasswordResetToken {
 
   @@index([userId])
   @@map("password_reset_tokens")
-}
-
-enum GradeRequestStatus {
-  PENDING
-  APPROVED
-  REJECTED
-  CANCELLED
-
-  @@map("grade_request_status")
-}
-
-/// Yêu cầu sửa điểm học phần sau khi bảng điểm đã khóa (UC07.7 – GV gửi, UC07.8 – Admin duyệt)
-model GradeChangeRequest {
-  id           String             @id @default(uuid()) @db.Char(36)
-  sectionId    String             @map("section_id") @db.Char(36)
-  studentId    String             @map("student_id") @db.Char(36)
-  lecturerId   String             @map("lecturer_id") @db.Char(36)
-  /// { attendance?, assignment?, midterm?, final? } trước và sau
-  oldValues    Json               @map("old_values")
-  newValues    Json               @map("new_values")
-  reason       String             @db.VarChar(1000)
-  status       GradeRequestStatus @default(PENDING)
-  adminNote    String?            @map("admin_note") @db.VarChar(500)
-  resolvedById String?            @map("resolved_by") @db.Char(36)
-  createdAt    DateTime           @default(now()) @map("created_at") @db.DateTime(3)
-  resolvedAt   DateTime?          @map("resolved_at") @db.DateTime(3)
-
-  section  CourseSection @relation(fields: [sectionId], references: [id])
-  student  Student       @relation(fields: [studentId], references: [id])
-  lecturer Lecturer      @relation(fields: [lecturerId], references: [id])
-
-  @@index([sectionId, status])
-  @@index([status, createdAt])
-  @@map("grade_change_requests")
 }
 
 /// Danh mục dùng chung (UC02.6): khoa → ngành → lớp sinh hoạt (theo khóa)
@@ -527,16 +472,11 @@ model Semester {
 }
 
 model Course {
-  id          String     @id @default(uuid()) @db.Char(36)
-  code        String     @unique @db.VarChar(20)
-  name        String     @db.VarChar(200)
-  credits     Int        @db.SmallInt
-  courseType  CourseType @map("course_type")
-  wAttendance Int        @default(10) @map("w_attendance") @db.SmallInt
-  wAssignment Int        @default(30) @map("w_assignment") @db.SmallInt
-  wMidterm    Int        @default(20) @map("w_midterm") @db.SmallInt
-  wFinal      Int        @default(40) @map("w_final") @db.SmallInt
-  isActive    Boolean    @default(true) @map("is_active")
+  id       String  @id @default(uuid()) @db.Char(36)
+  code     String  @unique @db.VarChar(20)
+  name     String  @db.VarChar(200)
+  credits  Int     @db.SmallInt
+  isActive Boolean @default(true) @map("is_active")
 
   sections CourseSection[]
 
@@ -547,33 +487,21 @@ model Course {
 }
 
 model CourseSection {
-  id                String    @id @default(uuid()) @db.Char(36)
-  code              String    @unique @db.VarChar(30)
-  courseId          String    @map("course_id") @db.Char(36)
-  semesterId        String    @map("semester_id") @db.Char(36)
-  lecturerId        String    @map("lecturer_id") @db.Char(36)
-  maxStudents       Int       @map("max_students") @db.SmallInt
-  schedule          String?   @db.VarChar(200)
-  gradesPublishedAt DateTime? @map("grades_published_at") @db.DateTime(3)
+  id            String   @id @default(uuid()) @db.Char(36)
+  code          String   @unique @db.VarChar(50)
+  courseId      String   @map("course_id") @db.Char(36)
+  semesterId    String   @map("semester_id") @db.Char(36)
+  lecturerId    String   @map("lecturer_id") @db.Char(36)
   /// Thư mục lớp trên Drive: <học kỳ>/<MaLHP>_<TenMon>/ (của GV phụ trách)
-  driveFolderId     String?   @map("drive_folder_id") @db.VarChar(100)
-  createdAt         DateTime  @default(now()) @map("created_at") @db.DateTime(3)
-  updatedAt         DateTime  @updatedAt @map("updated_at") @db.DateTime(3)
+  driveFolderId String?  @map("drive_folder_id") @db.VarChar(100)
+  createdAt     DateTime @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt     DateTime @updatedAt @map("updated_at") @db.DateTime(3)
 
   course      Course           @relation(fields: [courseId], references: [id])
   semester    Semester         @relation(fields: [semesterId], references: [id])
   lecturer    Lecturer         @relation(fields: [lecturerId], references: [id])
   students    SectionStudent[]
   assignments Assignment[]
-  grades      SectionGrade[]
-
-  gradeRequests GradeChangeRequest[]
-
-  /// Tuần học (UC02.9)
-  weekStart Int  @default(1) @map("week_start") @db.SmallInt
-  weekEnd   Int  @default(15) @map("week_end") @db.SmallInt
-  /// Lịch học hằng tuần: [{ day: 2..8, from: 1..12, to: 1..12, room }]
-  sessions  Json @default("[]")
 
   @@index([lecturerId])
   @@map("course_sections")
@@ -629,8 +557,6 @@ model Assignment {
   dueAt               DateTime         @map("due_at") @db.DateTime(3)
   allowLate           Boolean          @default(false) @map("allow_late")
   lateDueAt           DateTime?        @map("late_due_at") @db.DateTime(3)
-  /// Trọng số (%) khi tính cột "Bài tập" của điểm học phần
-  weight              Int              @default(10) @db.SmallInt
   suggestedTopics     Json             @default("[]") @map("suggested_topics")
   /// false = bản nháp, chỉ mở khi GV bấm "Giao bài"
   autoOpen            Boolean          @default(true) @map("auto_open")
@@ -818,20 +744,19 @@ model Submission {
   createdAt           DateTime         @default(now()) @map("created_at") @db.DateTime(3)
   updatedAt           DateTime         @updatedAt @map("updated_at") @db.DateTime(3)
 
-  assignment      Assignment        @relation(fields: [assignmentId], references: [id])
-  group           Group?            @relation(fields: [groupId], references: [id])
-  student         Student?          @relation("PersonalSubmissions", fields: [studentId], references: [id])
-  topic           Topic?            @relation(fields: [topicId], references: [id])
-  lastSubmittedBy Student           @relation("LastSubmittedBy", fields: [lastSubmittedById], references: [id])
+  assignment      Assignment           @relation(fields: [assignmentId], references: [id])
+  group           Group?               @relation(fields: [groupId], references: [id])
+  student         Student?             @relation("PersonalSubmissions", fields: [studentId], references: [id])
+  topic           Topic?               @relation(fields: [topicId], references: [id])
+  lastSubmittedBy Student              @relation("LastSubmittedBy", fields: [lastSubmittedById], references: [id])
   files           SubmissionFile[]
   events          SubmissionEvent[]
   lecturerNotes   LecturerNote[]
+  feedbacks       SubmissionFeedback[]
 
   @@index([assignmentId, status])
   @@index([groupId])
   @@index([studentId])
-  feedbacks       SubmissionFeedback[]
-
   @@map("submissions")
 }
 
@@ -900,29 +825,6 @@ model AssignmentGrade {
   @@id([assignmentId, studentId])
   @@index([studentId])
   @@map("assignment_grades")
-}
-
-model SectionGrade {
-  id          String      @id @default(uuid()) @db.Char(36)
-  sectionId   String      @map("section_id") @db.Char(36)
-  studentId   String      @map("student_id") @db.Char(36)
-  attendance  Decimal?    @db.Decimal(3, 1)
-  assignment  Decimal?    @db.Decimal(3, 1)
-  midterm     Decimal?    @db.Decimal(3, 1)
-  final       Decimal?    @db.Decimal(3, 1)
-  total       Decimal?    @db.Decimal(3, 1)
-  letter      String?     @db.VarChar(2)
-  gpa4        Decimal?    @db.Decimal(2, 1)
-  status      GradeStatus @default(DRAFT)
-  importJobId String?     @map("import_job_id") @db.Char(36)
-  updatedById String      @map("updated_by") @db.Char(36)
-  updatedAt   DateTime    @updatedAt @map("updated_at") @db.DateTime(3)
-
-  section CourseSection @relation(fields: [sectionId], references: [id])
-  student Student       @relation(fields: [studentId], references: [id])
-
-  @@unique([sectionId, studentId])
-  @@map("section_grades")
 }
 
 /// Mỗi lần GV tải file Excel (nhóm / điểm): bản xem trước rồi áp dụng

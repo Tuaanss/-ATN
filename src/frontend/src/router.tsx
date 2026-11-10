@@ -42,7 +42,7 @@ import { ImportGeneric } from './pages/admin/ImportGeneric';
 import { EnterpriseStatsPage, EnterprisesPage } from './pages/admin/AdminEnterprises';
 import { CatalogPage, SemestersPage } from './pages/admin/AdminAcademic';
 import { SectionsPage } from './pages/admin/AdminSections';
-import { ConfigPage, GradeRequestsPage, LogsPage } from './pages/admin/AdminSystem';
+import { ConfigPage, LogsPage } from './pages/admin/AdminSystem';
 
 function Home() {
   const { user, loading } = useAuth();
@@ -182,7 +182,6 @@ export const router = createBrowserRouter([
       { path: 'catalog', element: <CatalogPage /> },
       { path: 'semesters', element: <SemestersPage /> },
       { path: 'sections', element: <SectionsPage /> },
-      { path: 'grade-requests', element: <GradeRequestsPage /> },
       { path: 'view-requests', element: <AdminViewRequests /> },
       { path: 'logs', element: <LogsPage /> },
       { path: 'config', element: <ConfigPage /> },

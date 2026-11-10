@@ -17,7 +17,8 @@ export function AccessBadge({ a }: { a: Access }) {
   );
 }
 
-export const gpa = (v: number | null) => (v == null ? '—' : v.toFixed(2));
+/** Điểm TB các bài tập đã công bố (thang 10). */
+export const avg = (v: number | null) => (v == null ? '—' : v.toFixed(1).replace('.', ','));
 
 /** Gửi yêu cầu xem bài cho một hoặc nhiều SV – Admin duyệt thời hạn cuối cùng. */
 export function RequestModal({ students, viewDays, onClose, onDone }: { students: { id: string; fullName: string }[]; viewDays: { min: number; max: number }; onClose: () => void; onDone?: () => void }) {

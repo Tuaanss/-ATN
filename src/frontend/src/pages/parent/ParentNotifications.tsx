@@ -36,7 +36,7 @@ export function ParentNotifications() {
   const { child, loading } = useChild();
   useCrumbs([{ label: 'Thông báo & cảnh báo' }]);
   const qc = useQueryClient();
-  const q = useQuery({ queryKey: ['parent', 'noti', child?.id], queryFn: () => api.get<{ threshold: number; gpaDrop: number; items: Item[] }>(`/parent/children/${child!.id}/notifications`).then((r) => r.data), enabled: !!child });
+  const q = useQuery({ queryKey: ['parent', 'noti', child?.id], queryFn: () => api.get<{ threshold: number; items: Item[] }>(`/parent/children/${child!.id}/notifications`).then((r) => r.data), enabled: !!child });
   const [type, setType] = useState('');
   const [unread, setUnread] = useState(false);
   const refresh = () => qc.invalidateQueries({ queryKey: ['parent'] });
@@ -112,7 +112,7 @@ export function ParentNotifications() {
                     {t.type === 'PH_WARNING' && <Badge tone="red">Cần chú ý</Badge>}
                     {t.link && (
                       <Link to={t.link} style={{ fontSize: 13 }} onClick={(e) => e.stopPropagation()}>
-                        {t.link.startsWith('/parent/submissions') ? 'Xem bài nộp' : 'Xem bảng điểm'} →
+                        {t.link.startsWith('/parent/submissions') ? 'Xem bài nộp' : 'Xem điểm bài tập'} →
                       </Link>
                     )}
                   </div>
@@ -143,7 +143,7 @@ export function ParentNotifications() {
         <div style={{ display: 'flex', gap: 12, alignItems: 'center', fontSize: 13 }} className="muted">
           <Icon name="bell" size={20} />
           <span>
-            Ngưỡng cảnh báo do nhà trường cấu hình: điểm dưới <b>{score10(d.threshold)}</b>, GPA giảm từ <b>{score10(d.gpaDrop)}</b> điểm; bài quá hạn chưa nộp luôn được cảnh báo.
+            Ngưỡng cảnh báo do nhà trường cấu hình: điểm bài tập dưới <b>{score10(d.threshold)}</b>; bài quá hạn chưa nộp luôn được cảnh báo.
           </span>
         </div>
       </Card>

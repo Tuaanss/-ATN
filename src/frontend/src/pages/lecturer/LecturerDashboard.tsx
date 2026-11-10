@@ -75,7 +75,7 @@ export function LecturerDashboard() {
                 <thead>
                   <tr>
                     <th>Lớp học phần</th>
-                    <th>Sĩ số</th>
+                    <th>Số SV</th>
                     <th>Bài tập</th>
                     <th>Bài gần nhất · đã nộp</th>
                     <th></th>
