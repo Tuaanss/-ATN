@@ -469,8 +469,6 @@ export function SemestersPage() {
                       <Badge tone={t} dot>
                         {l}
                       </Badge>
-                      {/* "Đang diễn ra" đã đủ nghĩa; chỉ gắn "Hiện tại" khi học kỳ được đặt hiện tại nhưng ngoài thời gian diễn ra */}
-                      {s.isCurrent && l !== 'Đang diễn ra' && <Badge tone="red">Hiện tại</Badge>}
                     </div>
                   );
                 },

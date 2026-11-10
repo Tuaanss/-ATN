@@ -271,7 +271,6 @@ export function ImportGeneric() {
                     {sems.data?.map((s) => (
                       <option key={s.id} value={s.id}>
                         {semName(s)}
-                        {s.isCurrent ? ' (hiện tại)' : ''}
                       </option>
                     ))}
                   </select>

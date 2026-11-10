@@ -93,7 +93,6 @@ export function SectionsPage() {
             {sems.data.map((s) => (
               <option key={s.id} value={s.id}>
                 {semName(s)}
-                {s.isCurrent ? ' (hiện tại)' : ''}
               </option>
             ))}
           </Select>

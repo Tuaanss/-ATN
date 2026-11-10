@@ -240,8 +240,6 @@ export function AssignmentForm() {
     );
 
   const busy = save.isPending;
-  const pickedSem = semesters.find((s) => s.code === semCode);
-  const pastSemesterPick = !!pickedSem && new Date(pickedSem.endDate).setHours(23, 59, 59, 999) < Date.now();
   const filtered = current.filter((s) => !search || `${s.code} ${s.course.name}`.toLowerCase().includes(search.toLowerCase()));
   const sameCourse = current.find((s) => selected.includes(s.id))?.course.name ?? current[0]?.course.name;
   const dueText = mode === 'multi' && selected.length > 1 ? selected.map((id) => ddmmHHmm(fromInput(perDue[id] || dueAt))).filter((v, i, a) => a.indexOf(v) === i).join(' · ') + (Object.keys(perDue).length ? ' (theo lớp)' : '') : fullDT(fromInput(dueAt));
@@ -605,16 +603,10 @@ export function AssignmentForm() {
                   {semesters.map((s) => (
                     <option key={s.code} value={s.code}>
                       {semesterLabel(s)}
-                      {s.isCurrent ? ' (hiện tại)' : new Date(s.endDate).setHours(23, 59, 59, 999) < Date.now() ? ' (đã kết thúc)' : ''}
                     </option>
                   ))}
                 </select>
               </div>
-              {pastSemesterPick && (
-                <Note tone="amber" icon="info">
-                  Học kỳ đã kết thúc. Hạn nộp có thể chọn tùy ý: đặt <b>trong tương lai</b> để sinh viên đăng lại bài cũ lên hệ thống, hoặc <b>trong quá khứ</b> nếu chỉ lưu thông tin bài tập.
-                </Note>
-              )}
               <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
                 <label style={{ flex: 1, minWidth: 220, display: 'flex', alignItems: 'center', gap: 8, height: 40, border: '1px solid #D6D3C8', borderRadius: 8, padding: '0 12px', color: '#62666F' }}>
                   <Icon name="search" size={16} />

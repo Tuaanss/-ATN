@@ -13,7 +13,8 @@
     "db:seed": "tsx prisma/seed.ts",
     "db:setup": "prisma migrate deploy && tsx prisma/seed.ts",
     "db:reset": "prisma migrate reset --force",
-    "prisma:generate": "prisma generate"
+    "prisma:generate": "prisma generate",
+    "bulk:submit": "node dist/cli/bulk-submit.js"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
