@@ -27,12 +27,22 @@ export function LecturerClasses() {
   const nav = useNavigate();
   const sectionsQ = useQuery({ queryKey: ['lecturer', 'sections'], queryFn: () => api.get<LecturerSection[]>('/lecturer/sections').then((r) => r.data) });
 
+  // mọi học kỳ có lớp (mới nhất trước) – xem lại lớp và bài tập của các kỳ đã qua
+  const semesters = useMemo(() => {
+    const map = new Map<string, LecturerSection['semester']>();
+    for (const s of sectionsQ.data ?? []) map.set(s.semester.code, s.semester);
+    return [...map.values()].sort((a, b) => new Date(b.endDate).getTime() - new Date(a.endDate).getTime());
+  }, [sectionsQ.data]);
   const current = useMemo(() => {
     const list = sectionsQ.data ?? [];
-    const sem = list.find((s) => s.id === sectionId)?.semester.code ?? list.find((s) => s.semester.isCurrent)?.semester.code ?? list[0]?.semester.code;
+    const sem = list.find((s) => s.id === sectionId)?.semester.code ?? list.find((s) => s.semester.isCurrent)?.semester.code ?? semesters[0]?.code;
     return list.filter((s) => s.semester.code === sem);
-  }, [sectionsQ.data, sectionId]);
+  }, [sectionsQ.data, sectionId, semesters]);
   const selected = current.find((s) => s.id === sectionId) ?? current[0];
+  const pickSemester = (code: string) => {
+    const first = (sectionsQ.data ?? []).find((s) => s.semester.code === code);
+    if (first) nav(`/lecturer/sections/${first.id}`, { replace: true });
+  };
   useCrumbs([{ label: 'Lớp học phần' }]);
 
   if (sectionsQ.isLoading) return <Loading />;
@@ -53,6 +63,15 @@ export function LecturerClasses() {
         sub={`${semesterLabel(selected.semester)} · ${current.length} lớp · ${current.reduce((n, s) => n + s.studentCount, 0)} sinh viên`}
         actions={
           <>
+            {semesters.length > 1 && (
+              <select className="inp" aria-label="Học kỳ" style={{ width: 'auto', height: 40 }} value={selected.semester.code} onChange={(e) => pickSemester(e.target.value)}>
+                {semesters.map((s) => (
+                  <option key={s.code} value={s.code}>
+                    {semesterLabel(s)}
+                  </option>
+                ))}
+              </select>
+            )}
             <ExportButton section={selected} />
             <Link className="btn btn-p" to={`/lecturer/sections/${selected.id}/assignments/new`}>
               <Icon name="plus" size={16} />
