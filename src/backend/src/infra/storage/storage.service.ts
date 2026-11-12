@@ -73,4 +73,19 @@ export class StorageService implements OnModuleInit {
   async remove(file?: string | null) {
     if (file) await fs.unlink(file).catch(() => undefined);
   }
+
+  /**
+   * Xóa bản cục bộ của tệp đã lên Drive; dọn luôn thư mục pending/<submissionId> nếu đã rỗng.
+   * Trả false khi chưa xóa được (vd. Windows đang mở tệp để phát) – lần quét sau thử lại.
+   */
+  async removePending(file: string): Promise<boolean> {
+    try {
+      await fs.unlink(file);
+    } catch (e) {
+      if ((e as NodeJS.ErrnoException).code !== 'ENOENT') return false;
+    }
+    const dir = path.dirname(file);
+    if (path.dirname(dir) === this.pendingDir) await fs.rmdir(dir).catch(() => undefined); // chỉ xóa được khi rỗng
+    return true;
+  }
 }

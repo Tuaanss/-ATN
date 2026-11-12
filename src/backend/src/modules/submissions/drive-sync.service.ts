@@ -2,6 +2,7 @@ import { Injectable, Logger, OnApplicationBootstrap, OnModuleDestroy } from '@ne
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { sanitizeName, stripVietnamese } from '../../common/utils/files';
 import { DriveError, DriveService } from '../../infra/drive/drive.service';
+import { StorageService } from '../../infra/storage/storage.service';
 import { NotificationsService } from '../notifications/notifications.module';
 
 const MAX_ATTEMPTS = 8; // FR-06.14
@@ -27,6 +28,7 @@ export class DriveSyncService implements OnApplicationBootstrap, OnModuleDestroy
     private readonly prisma: PrismaService,
     private readonly drive: DriveService,
     private readonly notifications: NotificationsService,
+    private readonly storage: StorageService,
   ) {}
 
   onApplicationBootstrap() {
@@ -62,6 +64,13 @@ export class DriveSyncService implements OnApplicationBootstrap, OnModuleDestroy
         take: 200,
       });
       this.enqueue(files.map((f) => f.id));
+      // bản cục bộ còn sót của tệp đã lên Drive (chưa xóa được lần trước, hoặc đồng bộ trước khi có cơ chế dọn)
+      const leftovers = await this.prisma.submissionFile.findMany({
+        where: { syncStatus: 'SYNCED', driveFileId: { not: null }, localPath: { not: null } },
+        select: { id: true, localPath: true },
+        take: 500,
+      });
+      for (const f of leftovers) await this.dropLocal(f.id, f.localPath!);
     } catch (e) {
       this.logger.error(`Quét đồng bộ lỗi: ${e}`);
     }
@@ -104,10 +113,17 @@ export class DriveSyncService implements OnApplicationBootstrap, OnModuleDestroy
         where: { id: fileId },
         data: { syncStatus: 'SYNCED', driveFileId: res.id, lastError: null, nextRetryAt: null },
       });
+      await this.dropLocal(fileId, file.localPath);
     } catch (e) {
       await this.handleError(fileId, file.retryCount, file.submission, e);
     }
     await this.refreshSummary(file.submissionId);
+  }
+
+  /** Tệp đã nằm trên Drive → xóa bản trong data/pending để không tốn ổ đĩa; xem bài sẽ đọc từ Drive. */
+  private async dropLocal(fileId: string, localPath: string) {
+    if (await this.storage.removePending(localPath))
+      await this.prisma.submissionFile.update({ where: { id: fileId }, data: { localPath: null } });
   }
 
   private async handleError(
