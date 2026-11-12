@@ -59,7 +59,7 @@ export class GroupsService {
         topic: true,
         submissions: { where: { kind: 'GROUP_SHARED' }, select: { id: true, submittedAt: true, isLate: true, version: true } },
       },
-      orderBy: { seq: 'asc' },
+      orderBy: { code: 'asc' },
     });
   }
 
@@ -155,6 +155,8 @@ export class GroupsService {
       if (from && from.code !== g.code)
         plan.moved.push({ studentCode: v.student.studentCode, fullName: v.student.fullName, from: from.code, to: g.code, hadSubmission: from.submissions.length > 0 });
     }
+    // file Excel thường xếp theo SV → sắp nhóm theo mã (N01, N02, … N10) để STT nhóm mới khớp mã nhóm
+    plan.groups.sort((x, y) => x.code.localeCompare(y.code, 'vi', { numeric: true }));
     const inFile = new Set([...valid.map((v) => v.student.id), ...plan.skipped]);
     for (const { student: s } of a.section.students)
       if (!inFile.has(s.id) && !rows.some((r) => normCode(r.values.code ?? '') === s.studentCode.toUpperCase()))

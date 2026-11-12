@@ -28,7 +28,7 @@ export class AssignmentDetailService {
       include: {
         section: { include: { course: true, students: { include: { student: true } } } },
         groups: {
-          orderBy: { seq: 'asc' },
+          orderBy: { code: 'asc' },
           include: { members: { include: { student: true }, orderBy: [{ role: 'asc' }, { student: { studentCode: 'asc' } }] }, topic: true },
         },
         topics: true,

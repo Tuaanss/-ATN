@@ -606,7 +606,7 @@ export class AssignmentsService {
         topic: true,
         submissions: { where: { kind: 'GROUP_SHARED' } },
       },
-      orderBy: [{ assignment: { openAt: 'asc' } }, { seq: 'asc' }],
+      orderBy: [{ assignment: { openAt: 'asc' } }, { code: 'asc' }],
     });
     return groups.map((g) => ({
       id: g.id,
@@ -633,7 +633,7 @@ export class AssignmentsService {
       this.prisma.individualWork.count({ where: { assignmentId: id } }),
     ]);
     const [groupRows, graded, history] = await Promise.all([
-      this.prisma.group.findMany({ where: { assignmentId: id }, include: { _count: { select: { members: true } } }, orderBy: { seq: 'asc' } }),
+      this.prisma.group.findMany({ where: { assignmentId: id }, include: { _count: { select: { members: true } } }, orderBy: { code: 'asc' } }),
       this.prisma.assignmentGrade.count({ where: { assignmentId: id, score: { not: null } } }),
       this.audit.history('assignment', id, 10),
     ]);
